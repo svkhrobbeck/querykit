@@ -1,0 +1,76 @@
+{
+  "name": "@querykit/web",
+  "version": "0.1.0",
+  "description": "Frontend query-building for querykit — typed filters, pagination params & URL sync. Zero-dependency; you send the request.",
+  "type": "module",
+  "author": {
+    "name": "Suhrobbek Soatov",
+    "url": "https://soatov.uz",
+    "email": "svkhrobbeck@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svkhrobbeck/querykit.git",
+    "directory": "packages/web"
+  },
+  "homepage": "https://github.com/svkhrobbeck/querykit/tree/main/packages/web#readme",
+  "bugs": {
+    "url": "https://github.com/svkhrobbeck/querykit/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js",
+      "require": "./dist/react/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "bun run test/smoke.ts"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0"
+  },
+  "keywords": [
+    "querykit",
+    "query",
+    "filter",
+    "pagination",
+    "cursor",
+    "url-state",
+    "search-params",
+    "react",
+    "frontend",
+    "typescript"
+  ]
+}
