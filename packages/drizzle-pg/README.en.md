@@ -62,7 +62,7 @@ import { registry } from "../registry";
 import { users } from "../schema";
 
 export const usersRepository = registry.repository(users, base => ({
-  findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", op: "=", value: email }] }),
+  findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
 }));
 ```
 
@@ -79,7 +79,7 @@ await usersRepository.findAll({
 });
 ```
 
-**Operators:** `= != > >= < <=` (and `eq ne gt gte lt lte`), `like ilike notLike`, `contains startsWith endsWith` (case-insensitive), `in notIn`, `between notBetween` (`value: [min, max]`), `isNull isNotNull`. Raw Drizzle `SQL` can be dropped in anywhere. A per-condition `type` coerces the value before querying.
+**Operators:** `= != > >= < <=` (and `eq ne gt gte lt lte`), `like ilike notLike`, `contains startsWith endsWith` (case-insensitive), `in notIn`, `between notBetween` (`value: [min, max]`), `isNull isNotNull`. Raw Drizzle `SQL` can be dropped in anywhere. Values are passed through as-is (no automatic type coercion).
 
 ## Multi-field sort
 

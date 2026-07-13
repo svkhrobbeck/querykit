@@ -1,7 +1,5 @@
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 
-import type { FilterValue, FilterValueType } from "../types";
-
 /** Whether a value looks like a Drizzle column object. */
 function isColumn(value: unknown): value is AnyPgColumn {
   return typeof value === "object" && value !== null && "name" in value && "columnType" in value;
@@ -40,29 +38,4 @@ export function tableColumns(table: AnyPgTable): Array<[string, AnyPgColumn]> {
     if (isColumn(value)) out.push([key, value]);
   }
   return out;
-}
-
-/** Coerce a raw filter value into the requested runtime type. */
-export function coerceValue(type: FilterValueType | undefined, value: FilterValue | undefined): FilterValue | undefined {
-  if (type === undefined || value === undefined || value === null) return value;
-
-  switch (type) {
-    case "date":
-      return Array.isArray(value) ? value.map(v => new Date(v as string | number)) : new Date(value as string | number);
-    case "number":
-      return Array.isArray(value) ? value.map(Number) : Number(value);
-    case "boolean":
-      if (Array.isArray(value)) return value.map(toBoolean);
-      return toBoolean(value);
-    case "string":
-      return Array.isArray(value) ? value.map(String) : String(value);
-    default:
-      return value;
-  }
-}
-
-function toBoolean(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value.toLowerCase() === "true";
-  return Boolean(value);
 }

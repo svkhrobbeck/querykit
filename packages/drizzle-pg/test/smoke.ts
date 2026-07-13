@@ -118,6 +118,13 @@ async function main() {
     const back = await usersRepo.findCursor({ limit: 2, order: "asc", cursor: c2.meta.prev_cursor, direction: "backward" });
     check("cursor forward", c1.data.length === 2 && !c1.meta.has_prev && c1.meta.has_next);
     check("cursor backward returns first page", back.data.map(u => u.id).join() === c1.data.map(u => u.id).join());
+    // cursor column force-included even when columns omit it
+    const cCols = await usersRepo.findCursor({ limit: 2, order: "asc", columns: { name: true } });
+    const cCols2 = await usersRepo.findCursor({ limit: 2, order: "asc", cursor: cCols.meta.next_cursor, columns: { name: true } });
+    check(
+      "cursor works with columns omitting id",
+      cCols.meta.next_cursor !== null && cCols2.data.length > 0 && cCols2.data.map(u => u.name).join() !== cCols.data.map(u => u.name).join(),
+    );
 
     // 6. with + columns inference (runtime)
     const withRel = await postsRepo.findAll({ with: { author: true }, columns: { id: true, title: true } });

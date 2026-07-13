@@ -76,7 +76,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
   const scopeConditions: FieldCondition<TTable>[] = config.scope
     ? Object.entries(config.scope).map(([key, value]) => ({
         key: key as ColumnKey<TTable>,
-        op: "=",
+        operation: "=",
         value: value as never,
       }))
     : [];
@@ -94,7 +94,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
 
   /** Merge an id predicate into a filter as AND. */
   const withId = (filter: Filter<TTable> | undefined, idKey: string, id: Id): Filter<TTable> => {
-    const idCondition = { key: idKey, op: "=" as const, value: id };
+    const idCondition = { key: idKey, operation: "=" as const, value: id };
     if (!filter) return [idCondition] as Filter<TTable>;
     if (Array.isArray(filter)) return [...filter, idCondition] as Filter<TTable>;
     return { and: [filter, idCondition] } as Filter<TTable>;
@@ -253,11 +253,16 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       const seek = cursorValue !== undefined ? (ascInQuery ? gt(column, cursorValue) : lt(column, cursorValue)) : undefined;
       const where = seek && baseWhere ? and(baseWhere, seek) : (seek ?? baseWhere);
 
+      // Force-include the cursor column when a columns selection is given —
+      // otherwise its value is missing and next/prev cursors break.
+      const selected = pickColumns(params.columns);
+      const columns = selected ? { ...selected, [cursorKey]: true } : undefined;
+
       const rows = await handle().findMany({
         where,
         orderBy: [ascInQuery ? asc(column) : desc(column)],
         limit: limit + 1,
-        columns: pickColumns(params.columns),
+        columns,
         with: params.with,
       });
 
@@ -359,13 +364,16 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       ).returning();
 
       if (rows[0]) return rows[0] as Row<TTable>;
-      // Conflict with nothing to update → return the existing row.
+      // Conflict with nothing to update → return the existing row. Query it
+      // directly (no scope / no soft-delete guard) so a soft-deleted or
+      // out-of-scope conflicting row is still found — the type stays non-optional.
       const conflictFilter = targetKeys.map(key => ({
         key: key as ColumnKey<TTable>,
-        op: "=" as const,
+        operation: "=" as const,
         value: (inserted as Record<string, never>)[key],
       }));
-      return (await repository.findOne({ filter: conflictFilter })) as Row<TTable>;
+      const existing = await handle().findFirst({ where: buildWhere(table, conflictFilter) });
+      return existing as Row<TTable>;
     },
 
     async upsertMany(values: Insert<TTable>[], options: UpsertOptions<TTable>) {

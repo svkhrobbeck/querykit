@@ -8,7 +8,7 @@
 
 > Typed **query-building** for frontends: build filter/sort/pagination payloads, map response meta, sync URL state. It **does not send requests** — you pass the payload to your own `fetch`/`axios`.
 
-React dashboards hand-write the same boilerplate on every list page: build `IFilter[]` from `searchParams`, normalize filters + coerce types (dates to ISO), drop empty filters, `sortType` ↔ `{name,direction}`, "reset page on any change", snake→camel meta. `@querykit/web` removes all of it. The payload matches what the querykit backend (`@querykit/drizzle-pg`) accepts.
+React dashboards hand-write the same boilerplate on every list page: build `IFilter[]` from `searchParams`, drop empty filters, `sortType` ↔ `{name,direction}`, "reset page on any change", snake→camel meta. `@querykit/web` removes all of it. The payload matches what the querykit backend (`@querykit/drizzle-pg`) accepts.
 
 ```ts
 import { buildListParams, f, mapMeta } from "@querykit/web";
@@ -25,8 +25,8 @@ setMeta(mapMeta(meta));
 
 ## Features
 
-- **Two filter styles** — `f.eq()...` builder AND object/array (`{key, operation, value, type}`). Fully compatible with legacy `IFilter[]`.
-- **Normalization** — type coercion (date→ISO, number, boolean, arrays), empty-filter pruning, sort decoding.
+- **Two filter styles** — `f.eq()...` builder AND object/array (`{key, operation, value}`). Fully compatible with legacy `IFilter[]`.
+- **Normalization** — empty-filter pruning, sort decoding. Values pass through unchanged.
 - **Declarative schema** — `defineListSchema` maps URL params → filters; kills per-page hand-building.
 - **URL-state sync** — `searchParams` ↔ params, `sortType` encode/decode, page-reset. `searchParams` is injected (router-agnostic).
 - **React hook** — `useListParams` (peer `react`, `./react` subpath).
@@ -56,7 +56,7 @@ filter: [
 ];
 ```
 
-**Operators:** `= != > >= < <=`, `%_%` (contains), `%_` (startsWith), `_%` (endsWith), `in`, `notIn`, `between`, `isNull`, `isNotNull`. Date range: `f.range("createdAt", from, to, "date")` or two `>=`/`<=` conditions.
+**Operators:** `= != > >= < <=`, `%_%`/`contains`, `%_`/`startsWith`, `_%`/`endsWith`, `like`, `ilike`, `notLike`, `in`, `notIn`, `between`, `isNull`, `isNotNull` (same set as the querykit backend). Builder helpers: `f.eq/ne/gt/gte/lt/lte`, `f.contains/startsWith/endsWith`, `f.like/ilike/notLike`, `f.in/notIn`, `f.between`, `f.range` (date range → two conditions), `f.isNull/isNotNull`, `f.and/or/not`.
 
 ## Building the payload
 
@@ -70,10 +70,33 @@ const payload = buildListParams({
   perPage: 20,
   with: { supervisor: true }, // relations (default `with`)
 });
-// -> { filter:[...coerced+pruned], sort:{name,direction}, columns, with, page, per_page }
+// -> { filter:[...pruned], sort:{name,direction}, columns, with, page, per_page }
 ```
 
-Empty filters are dropped (`""`/`null`/`undefined`/`[]`), but `0`/`false` are kept. Values are coerced by `type` (dates to ISO).
+Empty filters are dropped (`""`/`null`/`undefined`/`[]`), but `0`/`false` are kept. Values are sent through unchanged.
+
+## Pagination modes (offset / infinite / cursor)
+
+Three builders matching the backend's three modes. Each mode's response meta is **different**, so there's a separate mapper for each:
+
+```ts
+import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykit/web";
+
+// 1) Offset — page / per_page
+const p = buildListParams({ filter, page: 2, perPage: 20 });
+mapMeta(res.meta); // { totalPages, totalCount, currentPage, perPage, hasNext, hasPrev }
+
+// 2) Infinite — limit / offset
+const p = buildInfiniteParams({ filter, limit: 20, offset: 40 });
+mapInfiniteMeta(res.meta); // { limit, offset, count, hasMore, nextOffset }
+
+// 3) Cursor — limit / cursor / order / direction (sort is ignored)
+const p = buildCursorParams({ filter, limit: 20, cursor, order: "asc" });
+mapCursorMeta(res.meta); // { limit, hasNext, hasPrev, nextCursor, prevCursor }
+
+// withDeleted — include soft-deleted rows
+buildListParams({ filter, withDeleted: true });
+```
 
 ## Declarative list schema
 
@@ -86,7 +109,7 @@ const buyersSchema = defineListSchema({
   id: { operation: "=" },
   buyerName: { operation: "%_%", trim: true },
   status: { operation: "=" },
-  createdAt: { type: "date", range: ["fromDate", "toDate"] }, // → >= and <=
+  createdAt: { range: ["fromDate", "toDate"] }, // → >= and <=
 });
 
 const params = searchParamsToPayload(buyersSchema, searchParams);
@@ -144,20 +167,24 @@ const params = q.list({ filter, page, perPage });
 
 ## API reference
 
-| Function                                       | Purpose                             |
-| ---------------------------------------------- | ----------------------------------- |
-| `createFilters<T>()` / `f`                     | typed / untyped filter builder      |
-| `buildParams(input)`                           | normalize params (no pagination)    |
-| `buildListParams(input)`                       | + `page`/`per_page`                 |
-| `createQuery(config)`                          | builder with custom field names     |
-| `defineListSchema(schema)`                     | URL param → filter descriptor       |
-| `schemaToFilter(schema, sp)`                   | searchParams → `FieldCondition[]`   |
-| `searchParamsToPayload(schema, sp)`            | searchParams → full payload         |
-| `readListParams(schema, sp)`                   | searchParams → `ListParams`         |
-| `setParam/setPage/setSize/setSort/resetParams` | URL writes (immutable, page-reset)  |
-| `encodeSort/decodeSort`                        | `{name,direction}` ↔ `"-createdAt"` |
-| `mapMeta(raw)`                                 | snake → camel meta                  |
-| `useListParams(opts)` (`/react`)               | URL-sync hook                       |
+| Function                                       | Purpose                                |
+| ---------------------------------------------- | -------------------------------------- |
+| `createFilters<T>()` / `f`                     | typed / untyped filter builder         |
+| `buildParams(input)`                           | normalize params (no pagination)       |
+| `buildListParams(input)`                       | + `page`/`per_page` (offset)           |
+| `buildInfiniteParams(input)`                   | + `limit`/`offset` (infinite)          |
+| `buildCursorParams(input)`                     | + `limit`/`cursor`/`order`/`direction` |
+| `createQuery(config)`                          | builder with custom field names        |
+| `defineListSchema(schema)`                     | URL param → filter descriptor          |
+| `schemaToFilter(schema, sp)`                   | searchParams → `FieldCondition[]`      |
+| `searchParamsToPayload(schema, sp)`            | searchParams → full payload            |
+| `readListParams(schema, sp)`                   | searchParams → `ListParams`            |
+| `setParam/setPage/setSize/setSort/resetParams` | URL writes (immutable, page-reset)     |
+| `encodeSort/decodeSort`                        | `{name,direction}` ↔ `"-createdAt"`    |
+| `mapMeta(raw)`                                 | offset meta → camel                    |
+| `mapInfiniteMeta(raw)`                         | infinite meta → camel                  |
+| `mapCursorMeta(raw)`                           | cursor meta → camel                    |
+| `useListParams(opts)` (`/react`)               | URL-sync hook                          |
 
 ## Development
 

@@ -73,9 +73,6 @@ export type ColumnKey<TTable extends AnyPgTable> = keyof Row<TTable> & string;
 
 /* -------------------------------- filters --------------------------------- */
 
-/** Optional runtime coercion applied to a filter value before querying. */
-export type FilterValueType = "string" | "number" | "boolean" | "date";
-
 export type FilterScalar = string | number | boolean | Date | null;
 export type FilterValue = FilterScalar | FilterScalar[];
 
@@ -116,14 +113,11 @@ export type FilterOperator =
   | "isNull"
   | "isNotNull";
 
-/** A single field comparison. `op` is canonical; `operation` is a legacy alias. */
+/** A single field comparison (`operation` defaults to `"="`). */
 export interface FieldCondition<TTable extends AnyPgTable = AnyPgTable> {
   key: ColumnKey<TTable>;
-  op?: FilterOperator;
-  /** @deprecated legacy alias for `op` (db-service compatibility) */
   operation?: FilterOperator;
   value?: FilterValue;
-  type?: FilterValueType;
 }
 
 export interface AndGroup<TTable extends AnyPgTable = AnyPgTable> {
@@ -340,7 +334,7 @@ export interface Repository<TTable extends AnyPgTable, TSchema extends Record<st
    * @example
    * ```ts
    * const active = await usersRepository.findAll({
-   *   filter: [{ key: "status", op: "=", value: "active" }],
+   *   filter: [{ key: "status", operation: "=", value: "active" }],
    *   sort: [{ key: "createdAt", direction: "desc" }],
    * });
    * ```
@@ -356,7 +350,7 @@ export interface Repository<TTable extends AnyPgTable, TSchema extends Record<st
    * @example
    * ```ts
    * const user = await usersRepository.findOne({
-   *   filter: [{ key: "email", op: "=", value: "a@b.com" }],
+   *   filter: [{ key: "email", operation: "=", value: "a@b.com" }],
    * });
    * ```
    */
@@ -534,7 +528,7 @@ export interface Registry<TSchema extends Record<string, unknown>> {
    * ```ts
    * export const usersRepository = registry.repository(users, base => ({
    *   findByEmail: (email: string) =>
-   *     base.findOne({ filter: [{ key: "email", op: "=", value: email }] }),
+   *     base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
    * }));
    * ```
    */

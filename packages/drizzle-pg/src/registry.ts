@@ -26,7 +26,7 @@ import { createContextStore } from "./internal/context";
  * // users.repository.ts — custom metodlar bilan kengaytirish
  * export const usersRepository = registry.repository(users, base => ({
  *   findByEmail: (email: string) =>
- *     base.findOne({ filter: [{ key: "email", op: "=", value: email }] }),
+ *     base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
  * }));
  * ```
  */

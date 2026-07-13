@@ -2,7 +2,7 @@ import { and, or, not, isSQLWrapper, type SQL } from "drizzle-orm";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 
 import type { FieldCondition, Filter, FilterNode } from "../types";
-import { coerceValue, resolveColumn } from "./columns";
+import { resolveColumn } from "./columns";
 import { operators } from "./operators";
 
 /**
@@ -46,15 +46,14 @@ function buildNode(table: AnyPgTable, node: FilterNode): SQL | undefined {
 }
 
 function buildCondition(table: AnyPgTable, condition: FieldCondition): SQL | undefined {
-  const operator = condition.op ?? condition.operation ?? "=";
+  const operator = condition.operation ?? "=";
   const build = operators[operator];
   if (!build) throw new Error(`Unsupported filter operator: "${operator}"`);
 
   const column = resolveColumn(table, condition.key);
   if (!column) return undefined; // unknown column → skip silently
 
-  const value = coerceValue(condition.type, condition.value);
-  return build(column, value);
+  return build(column, condition.value);
 }
 
 function combine(kind: "and" | "or", parts: Array<SQL | undefined>): SQL | undefined {

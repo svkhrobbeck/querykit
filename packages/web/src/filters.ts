@@ -1,7 +1,7 @@
-import type { AndGroup, FieldCondition, FieldKey, FilterNode, FilterOperator, FilterScalar, FilterValue, FilterValueType, NotGroup, OrGroup } from "./types";
+import type { AndGroup, FieldCondition, FieldKey, FilterNode, FilterOperator, FilterScalar, FilterValue, NotGroup, OrGroup } from "./types";
 
-function field<T>(key: FieldKey<T>, operation: FilterOperator, value?: FilterValue, type?: FilterValueType): FieldCondition<T> {
-  return type === undefined ? { key, operation, value } : { key, operation, value, type };
+function field<T>(key: FieldKey<T>, operation: FilterOperator, value?: FilterValue): FieldCondition<T> {
+  return { key, operation, value };
 }
 
 /**
@@ -35,20 +35,21 @@ export function createFilters<T = Record<string, unknown>>() {
     contains: (key: K, value: string) => field<T>(key, "%_%", value),
     startsWith: (key: K, value: string) => field<T>(key, "%_", value),
     endsWith: (key: K, value: string) => field<T>(key, "_%", value),
+    like: (key: K, value: string) => field<T>(key, "like", value),
+    ilike: (key: K, value: string) => field<T>(key, "ilike", value),
+    notLike: (key: K, value: string) => field<T>(key, "notLike", value),
 
     in: (key: K, value: Array<string | number>) => field<T>(key, "in", value),
     notIn: (key: K, value: Array<string | number>) => field<T>(key, "notIn", value),
+    between: (key: K, min: FilterScalar | Date, max: FilterScalar | Date) => field<T>(key, "between", [min, max] as FilterValue),
 
     isNull: (key: K) => field<T>(key, "isNull"),
     isNotNull: (key: K) => field<T>(key, "isNotNull"),
 
-    /** Sana sharti (`type: "date"` bilan). */
-    dateGte: (key: K, value: FilterScalar | Date) => field<T>(key, ">=", value, "date"),
-    dateLte: (key: K, value: FilterScalar | Date) => field<T>(key, "<=", value, "date"),
     /** Diapazon — ikkita shart (`>=` va `<=`) massivi (flat filterga spread qilinadi). */
-    range: (key: K, from: FilterScalar | Date, to: FilterScalar | Date, type?: FilterValueType): FieldCondition<T>[] => [
-      field<T>(key, ">=", from, type),
-      field<T>(key, "<=", to, type),
+    range: (key: K, from: FilterScalar | Date, to: FilterScalar | Date): FieldCondition<T>[] => [
+      field<T>(key, ">=", from as FilterValue),
+      field<T>(key, "<=", to as FilterValue),
     ],
 
     and: (...nodes: Node[]): AndGroup<T> => ({ and: nodes }),

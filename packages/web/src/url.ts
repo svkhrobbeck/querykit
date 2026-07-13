@@ -39,8 +39,8 @@ export function schemaToFilter(schema: ListSchema, searchParams: URLSearchParams
       const [fromParam, toParam] = descriptor.range;
       const from = searchParams.get(fromParam);
       const to = searchParams.get(toParam);
-      if (from) out.push(cond(key, ">=", from, descriptor.type));
-      if (to) out.push(cond(key, "<=", to, descriptor.type));
+      if (from) out.push(cond(key, ">=", from));
+      if (to) out.push(cond(key, "<=", to));
       continue;
     }
 
@@ -48,14 +48,14 @@ export function schemaToFilter(schema: ListSchema, searchParams: URLSearchParams
     if (value === null || value === "") continue;
     if (descriptor.trim) value = value.trim();
     if (value === "") continue;
-    out.push(cond(key, descriptor.operation ?? "=", value, descriptor.type));
+    out.push(cond(key, descriptor.operation ?? "=", value));
   }
 
   return out;
 }
 
-function cond(key: string, operation: FieldCondition["operation"], value: string, type?: FieldDescriptor["type"]): FieldCondition {
-  return type === undefined ? { key, operation, value } : { key, operation, value, type };
+function cond(key: string, operation: FieldCondition["operation"], value: string): FieldCondition {
+  return { key, operation, value };
 }
 
 /** searchParams → normalizatsiyalanmagan {@link ListParams} (filter/sort/page/perPage). */

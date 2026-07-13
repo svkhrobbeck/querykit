@@ -1,5 +1,19 @@
-import { coerceValue, isEmptyValue } from "./internal/coerce";
-import type { FieldCondition, Filter, FilterNode, FilterValue, ListParams, ListPayload, Params, QueryPayload, Sort, SortInput } from "./types";
+import type {
+  CursorParams,
+  CursorPayload,
+  FieldCondition,
+  Filter,
+  FilterNode,
+  FilterValue,
+  InfiniteParams,
+  InfinitePayload,
+  ListParams,
+  ListPayload,
+  Params,
+  QueryPayload,
+  Sort,
+  SortInput,
+} from "./types";
 
 /** {@link createQuery} sozlamalari — wire field nomlari va default qiymatlar. */
 export interface QueryConfig {
@@ -7,9 +21,14 @@ export interface QueryConfig {
   sortField?: string;
   columnsField?: string;
   withField?: string;
+  withDeletedField?: string;
   pageField?: string;
   perPageField?: string;
+  limitField?: string;
+  offsetField?: string;
+  cursorField?: string;
   defaultPerPage?: number;
+  defaultLimit?: number;
   defaultSort?: Sort;
   /** Bo'sh qiymatli filterlarni tashlash (default `true`). */
   pruneEmpty?: boolean;
@@ -20,12 +39,24 @@ const DEFAULTS: Required<QueryConfig> = {
   sortField: "sort",
   columnsField: "columns",
   withField: "with",
+  withDeletedField: "withDeleted",
   pageField: "page",
   perPageField: "per_page",
+  limitField: "limit",
+  offsetField: "offset",
+  cursorField: "cursor",
   defaultPerPage: 15,
+  defaultLimit: 20,
   defaultSort: { name: "createdAt", direction: "desc" },
   pruneEmpty: true,
 };
+
+/** Bo'sh (yuborilmaydigan) qiymatmi: undefined/null/""/[] . `false`/`0` — bo'sh emas. */
+function isEmptyValue(value: FilterValue | undefined): boolean {
+  if (value === undefined || value === null || value === "") return true;
+  if (Array.isArray(value) && value.length === 0) return true;
+  return false;
+}
 
 /** `"-createdAt"` yoki `{ name, direction }` → `{ name, direction }`. */
 export function normalizeSort(input: SortInput | undefined, fallback: Sort): Sort {
@@ -38,15 +69,14 @@ export function normalizeSort(input: SortInput | undefined, fallback: Sort): Sor
 }
 
 function normalizeCondition(condition: FieldCondition, prune: boolean): FieldCondition | undefined {
-  const operation = condition.operation ?? condition.op ?? "=";
+  const operation = condition.operation ?? "=";
   const noValue = operation === "isNull" || operation === "isNotNull";
-  const value = coerceValue(condition.type, condition.value as FilterValue);
+  const value = condition.value as FilterValue;
 
   if (!noValue && prune && isEmptyValue(value)) return undefined;
 
   const out: FieldCondition = { key: condition.key, operation };
   if (!noValue) out.value = value;
-  if (condition.type) out.type = condition.type;
   return out;
 }
 
@@ -66,7 +96,7 @@ function normalizeNode(node: FilterNode, prune: boolean): FilterNode | undefined
   return normalizeCondition(node, prune);
 }
 
-/** Filterni normalizatsiya qiladi: coerce + bo'shlarni prune. Massiv → flat massiv. */
+/** Filterni normalizatsiya qiladi: bo'sh shartlarni prune. Massiv → flat massiv. */
 export function normalizeFilter(filter: Filter | undefined, prune: boolean): FieldCondition[] | FilterNode {
   if (!filter) return [];
   if (Array.isArray(filter)) {
@@ -75,23 +105,51 @@ export function normalizeFilter(filter: Filter | undefined, prune: boolean): Fie
   return normalizeNode(filter, prune) ?? [];
 }
 
-function build(input: Params, cfg: Required<QueryConfig>): Record<string, unknown> {
-  return {
+/** Umumiy qism: filter/columns/with (+ withDeleted). Sort qo'shilmaydi. */
+function buildBase(input: Params, cfg: Required<QueryConfig>): Record<string, unknown> {
+  const base: Record<string, unknown> = {
     [cfg.filterField]: normalizeFilter(input.filter, cfg.pruneEmpty),
-    [cfg.sortField]: normalizeSort(input.sort, cfg.defaultSort),
     [cfg.columnsField]: input.columns ?? {},
     [cfg.withField]: input.with ?? {},
   };
+  if (input.withDeleted !== undefined) base[cfg.withDeletedField] = input.withDeleted;
+  return base;
+}
+
+function clampInt(value: number | undefined, fallback: number): number {
+  return value === undefined || value < 1 || Number.isNaN(value) ? fallback : Math.trunc(value);
+}
+
+function build(input: Params, cfg: Required<QueryConfig>): Record<string, unknown> {
+  return { ...buildBase(input, cfg), [cfg.sortField]: normalizeSort(input.sort, cfg.defaultSort) };
 }
 
 function buildList(input: ListParams, cfg: Required<QueryConfig>): Record<string, unknown> {
-  const perPage = input.perPage;
-  const validPerPage = perPage === undefined || perPage < 1 || Number.isNaN(perPage) ? cfg.defaultPerPage : perPage;
   return {
     ...build(input, cfg),
-    [cfg.pageField]: input.page && input.page > 0 ? input.page : 1,
-    [cfg.perPageField]: validPerPage,
+    [cfg.pageField]: clampInt(input.page, 1), // page >= 1 (kasr/0/manfiy → 1)
+    [cfg.perPageField]: clampInt(input.perPage, cfg.defaultPerPage),
   };
+}
+
+function buildInfinite(input: InfiniteParams, cfg: Required<QueryConfig>): Record<string, unknown> {
+  return {
+    ...build(input, cfg),
+    [cfg.limitField]: clampInt(input.limit, cfg.defaultLimit),
+    [cfg.offsetField]: input.offset && input.offset > 0 ? Math.trunc(input.offset) : 0,
+  };
+}
+
+function buildCursor(input: CursorParams, cfg: Required<QueryConfig>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    ...buildBase(input, cfg),
+    [cfg.limitField]: clampInt(input.limit, cfg.defaultLimit),
+    [cfg.cursorField]: input.cursor ?? null,
+    order: input.order ?? "asc",
+    direction: input.direction ?? "forward",
+  };
+  if (input.cursorKey !== undefined) payload.cursorKey = input.cursorKey;
+  return payload;
 }
 
 /**
@@ -109,12 +167,14 @@ export function createQuery(config: QueryConfig = {}) {
   return {
     params: (input: Params = {}) => build(input, cfg),
     list: (input: ListParams = {}) => buildList(input, cfg),
+    infinite: (input: InfiniteParams = {}) => buildInfinite(input, cfg),
+    cursor: (input: CursorParams = {}) => buildCursor(input, cfg),
   };
 }
 
 /**
- * Params'ni normalizatsiya qiladi (paginatsiyasiz): filter coerce + prune, sort
- * decode, `with`/`columns` pass-through. Default querykit wire-format.
+ * Params'ni normalizatsiya qiladi (paginatsiyasiz): filter prune, sort decode,
+ * `with`/`columns` pass-through. Default querykit wire-format.
  *
  * @example
  * ```ts
@@ -140,4 +200,32 @@ export function buildParams(input: Params = {}): QueryPayload {
  */
 export function buildListParams(input: ListParams = {}): ListPayload {
   return buildList(input, DEFAULTS) as unknown as ListPayload;
+}
+
+/**
+ * Infinite-scroll payload — {@link buildParams} + `limit`/`offset` (default
+ * `limit = 20`).
+ *
+ * @example
+ * ```ts
+ * const payload = buildInfiniteParams({ filter, limit: 20, offset: 40 });
+ * // -> { filter, sort, columns, with, limit, offset }
+ * ```
+ */
+export function buildInfiniteParams(input: InfiniteParams = {}): InfinitePayload {
+  return buildInfinite(input, DEFAULTS) as unknown as InfinitePayload;
+}
+
+/**
+ * Cursor (keyset) payload — `sort` o'rniga `order`/`direction`. `cursor`
+ * oldingi javob meta'sidagi `next_cursor`/`prev_cursor` tokeni.
+ *
+ * @example
+ * ```ts
+ * const payload = buildCursorParams({ filter, limit: 20, cursor, order: "asc" });
+ * // -> { filter, columns, with, limit, cursor, order, direction }
+ * ```
+ */
+export function buildCursorParams(input: CursorParams = {}): CursorPayload {
+  return buildCursor(input, DEFAULTS) as unknown as CursorPayload;
 }

@@ -8,7 +8,7 @@
 
 > Frontend uchun **tipli query-building**: filter/sort/pagination payloadini quradi, javob meta'sini map qiladi, URL-state sync beradi. **So'rov yubormaydi** — chiqqan payload'ni o'z `fetch`/`axios`ingizga uzatasiz.
 
-React dashboardlar har list sahifasida bir xil boilerplate'ni qo'lda yozadi: `searchParams`'dan `IFilter[]` qurish, filter normalizatsiya + tip coercion (sana ISO), bo'sh filterlarni tashlash, `sortType` ↔ `{name,direction}`, "har o'zgarishda page-reset", meta snake→camel. `@querykit/web` shularni bartaraf qiladi. Payload querykit backend (`@querykit/drizzle-pg`) qabul qiladigan formatda.
+React dashboardlar har list sahifasida bir xil boilerplate'ni qo'lda yozadi: `searchParams`'dan `IFilter[]` qurish, bo'sh filterlarni tashlash, `sortType` ↔ `{name,direction}`, "har o'zgarishda page-reset", meta snake→camel. `@querykit/web` shularni bartaraf qiladi. Payload querykit backend (`@querykit/drizzle-pg`) qabul qiladigan formatda.
 
 ```ts
 import { buildListParams, f, mapMeta } from "@querykit/web";
@@ -25,8 +25,8 @@ setMeta(mapMeta(meta));
 
 ## Imkoniyatlar
 
-- **Ikkala filter uslubi** — `f.eq()...` builder VA object/massiv (`{key, operation, value, type}`). Legacy `IFilter[]` bilan to'liq mos.
-- **Normalizatsiya** — tip coercion (sana→ISO, number, boolean, massiv), bo'sh filterlarni prune, sort decode.
+- **Ikkala filter uslubi** — `f.eq()...` builder VA object/massiv (`{key, operation, value}`). Legacy `IFilter[]` bilan to'liq mos.
+- **Normalizatsiya** — bo'sh filterlarni prune, sort decode. Qiymatlar o'zgartirilmasdan o'tadi.
 - **Declarative schema** — `defineListSchema` bilan URL param → filter; har sahifadagi qo'lda qurishni yo'q qiladi.
 - **URL-state sync** — `searchParams` ↔ params, `sortType` encode/decode, page-reset. `searchParams` tashqaridan olinadi (router-agnostik).
 - **React hook** — `useListParams` (peer `react`, `./react` subpath).
@@ -56,7 +56,7 @@ filter: [
 ];
 ```
 
-**Operatorlar:** `= != > >= < <=`, `%_%` (contains), `%_` (startsWith), `_%` (endsWith), `in`, `notIn`, `between`, `isNull`, `isNotNull`. Sana diapazoni: `f.range("createdAt", from, to, "date")` yoki ikki shart `>=`/`<=`.
+**Operatorlar:** `= != > >= < <=`, `%_%`/`contains`, `%_`/`startsWith`, `_%`/`endsWith`, `like`, `ilike`, `notLike`, `in`, `notIn`, `between`, `isNull`, `isNotNull` (querykit backend bilan bir xil to'plam). Builder helperlar: `f.eq/ne/gt/gte/lt/lte`, `f.contains/startsWith/endsWith`, `f.like/ilike/notLike`, `f.in/notIn`, `f.between`, `f.range` (sana diapazoni → ikki shart), `f.isNull/isNotNull`, `f.and/or/not`.
 
 ## Payload qurish
 
@@ -70,10 +70,33 @@ const payload = buildListParams({
   perPage: 20,
   with: { supervisor: true }, // relations (default `with`)
 });
-// -> { filter:[...coerced+pruned], sort:{name,direction}, columns, with, page, per_page }
+// -> { filter:[...pruned], sort:{name,direction}, columns, with, page, per_page }
 ```
 
-Bo'sh qiymatli filterlar tashlanadi (`""`/`null`/`undefined`/`[]`), lekin `0`/`false` saqlanadi. `type` bo'yicha coerce qilinadi (sana ISO'ga).
+Bo'sh qiymatli filterlar tashlanadi (`""`/`null`/`undefined`/`[]`), lekin `0`/`false` saqlanadi. Qiymatlar o'zgartirilmasdan yuboriladi.
+
+## Paginatsiya rejimlari (offset / infinite / cursor)
+
+Backend'ning 3 rejimiga mos 3 builder. Har birining javob meta'si **har xil**, shuning uchun alohida mapper bor:
+
+```ts
+import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykit/web";
+
+// 1) Offset — page / per_page
+const p = buildListParams({ filter, page: 2, perPage: 20 });
+mapMeta(res.meta); // { totalPages, totalCount, currentPage, perPage, hasNext, hasPrev }
+
+// 2) Infinite — limit / offset
+const p = buildInfiniteParams({ filter, limit: 20, offset: 40 });
+mapInfiniteMeta(res.meta); // { limit, offset, count, hasMore, nextOffset }
+
+// 3) Cursor — limit / cursor / order / direction (sort ishlatilmaydi)
+const p = buildCursorParams({ filter, limit: 20, cursor, order: "asc" });
+mapCursorMeta(res.meta); // { limit, hasNext, hasPrev, nextCursor, prevCursor }
+
+// withDeleted — soft-delete'lilarni ham ko'rish
+buildListParams({ filter, withDeleted: true });
+```
 
 ## Declarative list schema
 
@@ -86,7 +109,7 @@ const buyersSchema = defineListSchema({
   id: { operation: "=" },
   buyerName: { operation: "%_%", trim: true },
   status: { operation: "=" },
-  createdAt: { type: "date", range: ["fromDate", "toDate"] }, // → >= va <=
+  createdAt: { range: ["fromDate", "toDate"] }, // → >= va <=
 });
 
 const params = searchParamsToPayload(buyersSchema, searchParams);
@@ -148,7 +171,9 @@ const params = q.list({ filter, page, perPage });
 | ---------------------------------------------- | -------------------------------------- |
 | `createFilters<T>()` / `f`                     | tipli filter builder / tipsiz          |
 | `buildParams(input)`                           | params normalizatsiya (paginatsiyasiz) |
-| `buildListParams(input)`                       | + `page`/`per_page`                    |
+| `buildListParams(input)`                       | + `page`/`per_page` (offset)           |
+| `buildInfiniteParams(input)`                   | + `limit`/`offset` (infinite)          |
+| `buildCursorParams(input)`                     | + `limit`/`cursor`/`order`/`direction` |
 | `createQuery(config)`                          | custom field nomlari bilan builder     |
 | `defineListSchema(schema)`                     | URL param → filter tavsifi             |
 | `schemaToFilter(schema, sp)`                   | searchParams → `FieldCondition[]`      |
@@ -156,7 +181,9 @@ const params = q.list({ filter, page, perPage });
 | `readListParams(schema, sp)`                   | searchParams → `ListParams`            |
 | `setParam/setPage/setSize/setSort/resetParams` | URL yozish (immutable, page-reset)     |
 | `encodeSort/decodeSort`                        | `{name,direction}` ↔ `"-createdAt"`    |
-| `mapMeta(raw)`                                 | snake → camel meta                     |
+| `mapMeta(raw)`                                 | offset meta → camel                    |
+| `mapInfiniteMeta(raw)`                         | infinite meta → camel                  |
+| `mapCursorMeta(raw)`                           | cursor meta → camel                    |
 | `useListParams(opts)` (`/react`)               | URL-sync hook                          |
 
 ## Ishlab chiqish

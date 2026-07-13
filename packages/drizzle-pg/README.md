@@ -63,7 +63,7 @@ import { users } from "../schema";
 
 export const usersRepository = registry.repository(users, base => ({
   // base metodlar ustiga custom metod
-  findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", op: "=", value: email }] }),
+  findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
 }));
 ```
 
@@ -83,11 +83,11 @@ await usersRepository.findAll({
 await usersRepository.findAll({
   filter: {
     and: [
-      { key: "status", op: "=", value: "active" },
+      { key: "status", operation: "=", value: "active" },
       {
         or: [
-          { key: "age", op: ">=", value: 18 },
-          { key: "role", op: "in", value: ["admin"] },
+          { key: "age", operation: ">=", value: 18 },
+          { key: "role", operation: "in", value: ["admin"] },
         ],
       },
     ],
@@ -97,7 +97,7 @@ await usersRepository.findAll({
 
 **Operatorlar:** `= != > >= < <=` (va `eq ne gt gte lt lte`), `like ilike notLike`, `contains startsWith endsWith` (case-insensitive), `in notIn`, `between notBetween` (`value: [min, max]`), `isNull isNotNull`. Istalgan joyga raw Drizzle `SQL` ham berish mumkin.
 
-Har bir shartga `type` (`"string" | "number" | "boolean" | "date"`) berib, qiymatni so'rovdan oldin coerce qilса bo'ladi — query-string parametrlari uchun qulay.
+Qiymatlar o'zi qanday berilsa, shundayligicha o'tadi (avtomatik tip coercion yo'q).
 
 ## Multi-field sort
 

@@ -21,8 +21,8 @@
  * ```
  */
 export { createFilters, f } from "./filters";
-export { buildParams, buildListParams, createQuery, normalizeFilter, normalizeSort, type QueryConfig } from "./query";
-export { mapMeta } from "./meta";
+export { buildParams, buildListParams, buildInfiniteParams, buildCursorParams, createQuery, normalizeFilter, normalizeSort, type QueryConfig } from "./query";
+export { mapMeta, mapInfiniteMeta, mapCursorMeta } from "./meta";
 export { defineListSchema, type FieldDescriptor, type ListSchema } from "./schema";
 export {
   decodeSort,

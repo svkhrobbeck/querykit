@@ -1,4 +1,4 @@
-import type { FilterOperator, FilterValueType } from "./types";
+import type { FilterOperator } from "./types";
 
 /**
  * Bitta list maydonining deklarativ ta'rifi: URL param → filter shartiga qanday
@@ -9,8 +9,6 @@ export interface FieldDescriptor {
   key?: string;
   /** Filter operatori (default `"="`). */
   operation?: FilterOperator;
-  /** Qiymat tipi (coerce uchun). */
-  type?: FilterValueType;
   /** String qiymatni trim qilish. */
   trim?: boolean;
   /** Diapazon: `[fromParam, toParam]` URL param nomlari → `>=` va `<=` shartlar. */
@@ -22,7 +20,7 @@ export type ListSchema = Record<string, FieldDescriptor>;
 
 /**
  * List filter schema'sini e'lon qiladi (identity helper — tiplarni saqlaydi).
- * URL param'larni `{key, operation, type}` shartlariga bog'laydi, shu bilan har
+ * URL param'larni `{key, operation}` shartlariga bog'laydi, shu bilan har
  * sahifada qo'lda `IFilter[]` qurishni bartaraf qiladi.
  *
  * @example
@@ -31,7 +29,7 @@ export type ListSchema = Record<string, FieldDescriptor>;
  *   id: { operation: "=" },
  *   buyerName: { operation: "%_%", trim: true },
  *   status: { operation: "=" },
- *   createdAt: { type: "date", range: ["fromDate", "toDate"] },
+ *   createdAt: { range: ["fromDate", "toDate"] },
  * });
  * ```
  */

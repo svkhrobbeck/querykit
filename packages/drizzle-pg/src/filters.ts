@@ -2,9 +2,9 @@ import type { AnyPgTable } from "drizzle-orm/pg-core";
 
 import type { AndGroup, ColumnKey, FieldCondition, FilterNode, FilterValue, NotGroup, OrGroup } from "./types";
 
-/** Bitta `{ key, op, value }` shartini quruvchi ichki yordamchi. */
-function field<TTable extends AnyPgTable>(key: ColumnKey<TTable>, op: FieldCondition<TTable>["op"], value?: FilterValue): FieldCondition<TTable> {
-  return { key, op, value };
+/** Bitta `{ key, operation, value }` shartini quruvchi ichki yordamchi. */
+function field<TTable extends AnyPgTable>(key: ColumnKey<TTable>, operation: FieldCondition<TTable>["operation"], value?: FilterValue): FieldCondition<TTable> {
+  return { key, operation, value };
 }
 
 /**
