@@ -1,6 +1,6 @@
 {
   "name": "@querykit/web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Frontend query-building for querykit — typed filters, pagination params & URL sync. Zero-dependency; you send the request.",
   "type": "module",
   "author": {
