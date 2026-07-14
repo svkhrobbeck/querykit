@@ -17,7 +17,7 @@
     "format:check": "prettier --check \"packages/*/{src,test}/**/*.{ts,json,md}\" \"*.{md,json}\"",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "bun run build && node scripts/pin-workspace-deps.mjs && changeset publish",
+    "release": "bun run build && node scripts/pin-workspace-deps.mjs && node scripts/ci-publish.mjs",
     "prepare": "husky"
   },
   "lint-staged": {
