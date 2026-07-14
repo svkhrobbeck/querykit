@@ -1,6 +1,6 @@
 import { buildListParams } from "./query";
 import type { FieldDescriptor, ListSchema } from "./schema";
-import type { FieldCondition, ListParams, ListPayload, Sort, SortInput } from "./types";
+import type { FieldCondition, Filter, FilterNode, FilterValue, ListParams, ListPayload, Sort, SortInput } from "./types";
 
 /** URL param nomlari (sahifa/o'lcham/sort) — sozlanadigan. */
 export interface UrlConfig {
@@ -28,33 +28,68 @@ export function encodeSort(sort: Sort): string {
   return (sort.direction === "desc" ? "-" : "") + sort.name;
 }
 
-/** Schema + searchParams → `FieldCondition[]` (bo'sh param'lar tashlanadi). */
-export function schemaToFilter(schema: ListSchema, searchParams: URLSearchParams): FieldCondition[] {
-  const out: FieldCondition[] = [];
+/**
+ * Schema + searchParams → filter. Applies `range`/`between`/`search`/`split`/
+ * `default`/`trim`; empty/absent params are dropped. Returns a flat
+ * `FieldCondition[]` (implicit AND), or a tree when a `search` OR-group is
+ * present (`{ and: [orGroup, …conditions] }`).
+ */
+export function schemaToFilter(schema: ListSchema, searchParams: URLSearchParams): Filter {
+  const conditions: FieldCondition[] = [];
+  const groups: FilterNode[] = [];
 
-  for (const [param, descriptor] of Object.entries(schema) as [string, FieldDescriptor][]) {
-    const key = descriptor.key ?? param;
+  for (const [param, d] of Object.entries(schema) as [string, FieldDescriptor][]) {
+    const key = d.key ?? param;
 
-    if (descriptor.range) {
-      const [fromParam, toParam] = descriptor.range;
-      const from = searchParams.get(fromParam);
-      const to = searchParams.get(toParam);
-      if (from) out.push(cond(key, ">=", from));
-      if (to) out.push(cond(key, "<=", to));
+    // range → two inclusive conditions (>= , <=)
+    if (d.range) {
+      const from = searchParams.get(d.range[0]);
+      const to = searchParams.get(d.range[1]);
+      if (from) conditions.push(cond(key, ">=", from));
+      if (to) conditions.push(cond(key, "<=", to));
       continue;
     }
 
-    let value = searchParams.get(param);
-    if (value === null || value === "") continue;
-    if (descriptor.trim) value = value.trim();
-    if (value === "") continue;
-    out.push(cond(key, descriptor.operation ?? "=", value));
+    // between → one condition with a 2-tuple value
+    if (d.between) {
+      const from = searchParams.get(d.between[0]);
+      const to = searchParams.get(d.between[1]);
+      if (from && to) conditions.push(cond(key, "between", [from, to]));
+      continue;
+    }
+
+    // read value, falling back to `default` only when the param is ABSENT
+    // (an empty `?x=` means the user cleared the filter → prune, don't default).
+    const raw = searchParams.get(param);
+    let value: FilterValue | undefined = raw !== null ? raw : d.default;
+    if (typeof value === "string" && d.trim) value = value.trim();
+    if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+
+    // search → OR of `contains` across the listed fields (needs a string)
+    if (d.search && typeof value === "string") {
+      groups.push({ or: d.search.map(field => cond(field, "%_%", value as string)) });
+      continue;
+    }
+
+    // split → comma-string → array (for `in`/`notIn`); guarded against empties
+    if (d.split && typeof value === "string") {
+      const delimiter = d.split === true ? "," : d.split;
+      const parts = value
+        .split(delimiter)
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (parts.length === 0) continue;
+      value = parts;
+    }
+
+    conditions.push(cond(key, d.operation ?? "=", value));
   }
 
-  return out;
+  return groups.length === 0 ? conditions : { and: [...groups, ...conditions] };
 }
 
-function cond(key: string, operation: FieldCondition["operation"], value: string): FieldCondition {
+function cond(key: string, operation: FieldCondition["operation"], value: FilterValue): FieldCondition {
   return { key, operation, value };
 }
 

@@ -1,59 +1,42 @@
-import { useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 
+import type { AdapterName, WithFor } from "../adapter";
+import type { Resource } from "../registry";
 import type { ListSchema } from "../schema";
-import type { ListPayload, SortInput } from "../types";
 import type { UrlConfig } from "../url";
-import { resetParams, searchParamsToPayload, setPage, setParam, setSize, setSort } from "../url";
+import { useListParamsBase, type UseListParamsResult } from "./use-list-params-base";
 
-export interface UseListParamsOptions {
-  /** Joriy URL search params (react-router `useSearchParams` yoki boshqa manba). */
-  searchParams: URLSearchParams;
-  /** Yangi search params'ni qo'llovchi setter (`(next) => void`). */
-  setSearchParams: (next: URLSearchParams) => void;
-  /** List filter schema'si ({@link defineListSchema}). Memoize qiling. */
+export interface UseListParamsOptions<A extends AdapterName> {
+  /** URL↔filter schema ({@link defineListSchema} / `resource.schema`). Memoize it. */
   schema: ListSchema;
-  /** URL param nomlari (page/size/sortType) — ixtiyoriy. Memoize qiling. */
+  /** URL param names (page/size/sortType) — optional. Memoize it. */
   url?: UrlConfig;
-}
-
-export interface UseListParamsResult {
-  /** Yuborishga tayyor normalizatsiyalangan payload. */
-  params: ListPayload;
-  searchParams: URLSearchParams;
-  /** Filter param'ini o'rnatadi/o'chiradi (`page` reset). */
-  setParam: (name: string, value: string | null | undefined) => void;
-  setPage: (page: number) => void;
-  setSize: (size: number) => void;
-  setSort: (sort: SortInput) => void;
-  reset: (keep?: string[]) => void;
+  /** Fixed relations to load on every request (not URL-driven). */
+  with?: WithFor<A>;
 }
 
 /**
- * List sahifasi uchun URL-state sync hook'i. `searchParams`ni tashqaridan oladi
- * (router-agnostik), schema'dan yuborishga tayyor `params` quradi va URL'ga
- * yozuvchi setter'lar beradi (filter/sort o'zgarsa `page` avtomatik reset).
+ * List URL-state hook — turnkey with **react-router-dom** (uses `useSearchParams`
+ * internally). Reads filters/sort/page from the URL via the schema, builds a
+ * ready-to-send payload through the `resource`, and returns URL setters (which
+ * reset `page` on filter/sort/size change). Does **not** fetch — pass `params`
+ * to your own axios / TanStack Query.
+ *
+ * For other routers (Next.js, TanStack Router), use {@link useListParamsBase} and
+ * supply `searchParams`/`setSearchParams` yourself.
  *
  * @example
  * ```tsx
- * const [searchParams, setSearchParams] = useSearchParams(); // react-router
- * const { params, setParam, setPage, setSort } = useListParams({
- *   searchParams, setSearchParams, schema: buyersSchema,
- * });
- * // params -> http.post("/buyers/list", params)
+ * const users = qk.resource<IUser>("users");
+ * const { params, setPage, setSort } = useListParams(users, { schema: usersSchema });
+ * const { data } = useQuery({ queryKey: users.keys.list(params), queryFn: () => post("/users/list", params) });
  * ```
  */
-export function useListParams(options: UseListParamsOptions): UseListParamsResult {
-  const { searchParams, setSearchParams, schema, url } = options;
-
-  const params = useMemo(() => searchParamsToPayload(schema, searchParams, url), [schema, searchParams, url]);
-
-  return {
-    params,
+export function useListParams<T, A extends AdapterName>(resource: Resource<T, A>, options: UseListParamsOptions<A>): UseListParamsResult {
+  const [searchParams, setSearchParams] = useSearchParams();
+  return useListParamsBase(resource, {
+    ...options,
     searchParams,
-    setParam: useCallback((name, value) => setSearchParams(setParam(searchParams, name, value, url)), [searchParams, setSearchParams, url]),
-    setPage: useCallback((page: number) => setSearchParams(setPage(searchParams, page, url)), [searchParams, setSearchParams, url]),
-    setSize: useCallback((size: number) => setSearchParams(setSize(searchParams, size, url)), [searchParams, setSearchParams, url]),
-    setSort: useCallback((sort: SortInput) => setSearchParams(setSort(searchParams, sort, url)), [searchParams, setSearchParams, url]),
-    reset: useCallback((keep?: string[]) => setSearchParams(resetParams(searchParams, keep)), [searchParams, setSearchParams]),
-  };
+    setSearchParams: next => setSearchParams(next),
+  });
 }

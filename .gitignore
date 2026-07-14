@@ -14,6 +14,9 @@ coverage
 .env
 .env.*.local
 
+# local files
+*.local.md
+
 # caches
 .eslintcache
 .cache

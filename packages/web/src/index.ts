@@ -22,7 +22,24 @@
  */
 export { createFilters, f } from "./filters";
 export { buildParams, buildListParams, buildInfiniteParams, buildCursorParams, createQuery, normalizeFilter, normalizeSort, type QueryConfig } from "./query";
-export { mapMeta, mapInfiniteMeta, mapCursorMeta } from "./meta";
+// Meta mapping is exposed through the registry's `parse*` (single public API);
+// `mapMeta`/`mapInfiniteMeta`/`mapCursorMeta` stay internal (used by `parse*`).
+export {
+  createRegistry,
+  type Registry,
+  type RegistryConfig,
+  type RegistryDefaults,
+  type Resource,
+  type ResourceKeys,
+  type ResourceListParams,
+  type ResourceInfiniteParams,
+  type ResourceCursorParams,
+  type ResourceParams,
+  type ListResult,
+  type InfiniteResult,
+  type CursorResult,
+} from "./registry";
+export type { AdapterName, WithFor, MongoosePopulate, DrizzleWith, PrismaInclude } from "./adapter";
 export { defineListSchema, type FieldDescriptor, type ListSchema } from "./schema";
 export {
   decodeSort,

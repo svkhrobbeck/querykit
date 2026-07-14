@@ -4,18 +4,10 @@
  *
  *   bun run test/smoke.ts
  */
-import {
-  buildCursorParams,
-  buildInfiniteParams,
-  buildListParams,
-  createFilters,
-  defineListSchema,
-  mapCursorMeta,
-  mapInfiniteMeta,
-  mapMeta,
-} from "../src/index";
+import { buildCursorParams, buildInfiniteParams, buildListParams, createFilters, createRegistry, defineListSchema } from "../src/index";
+import { mapCursorMeta, mapInfiniteMeta, mapMeta } from "../src/meta"; // internal (not public — use registry `parse*`)
 import { readListParams, schemaToFilter, setParam, setSort } from "../src/url";
-import type { FieldCondition } from "../src/types";
+import type { FieldCondition, FilterNode } from "../src/types";
 
 let passed = 0;
 let failed = 0;
@@ -29,6 +21,10 @@ const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 interface Buyer {
   id: number;
   buyerName: string;
+  name: string;
+  email: string;
+  code: string;
+  age: number;
   status: string;
   createdAt: string;
 }
@@ -157,6 +153,90 @@ const wd = buildListParams({ withDeleted: true }) as unknown as { withDeleted?: 
 check("withDeleted passthrough", wd.withDeleted === true);
 const noWd = buildListParams({}) as unknown as { withDeleted?: boolean };
 check("withDeleted omitted when unset", !("withDeleted" in noWd));
+
+/* 14. registry — createRegistry + resource builders */
+const qk = createRegistry({ adapter: "mongoose", defaults: { perPage: 20, sort: "-createdAt", cursor: { order: "asc" } }, pruneEmpty: true });
+const users = qk.resource<Buyer>("users");
+
+const lp = users.list({ filter: [users.f.contains("buyerName", "ali")], page: 2 });
+check("registry list payload", lp.page === 2 && lp.perPage === 20 && Array.isArray(lp.filter));
+const lp2 = users.list({});
+check("registry default sort from config", eq(lp2.sort, { name: "createdAt", direction: "desc" }));
+const ip = users.infinite({ limit: 10, offset: 30 });
+check("registry infinite payload", ip.limit === 10 && ip.offset === 30);
+const cp = users.cursor({ limit: 15, cursor: "abc" });
+check("registry cursor default order", cp.order === "asc" && cp.direction === "forward" && cp.cursor === "abc" && !("sort" in cp));
+
+// adapter-aware `with` (mongoose): `select` is allowed and passes through…
+const withPayload = users.list({ with: { author: { select: "name email" } } });
+check("registry with (mongoose select) passthrough", eq((withPayload.with as { author?: unknown }).author, { select: "name email" }));
+// …and a Drizzle-only option is a compile-time error for the mongoose adapter:
+// @ts-expect-error `columns` is drizzle-only — not offered for adapter "mongoose"
+users.list({ with: { author: { columns: { name: true } } } });
+
+// search preset — OR of contains across fields
+const searchFilter = users.search("ali", ["buyerName", "status"]);
+check(
+  "registry search preset",
+  eq(searchFilter, {
+    or: [
+      { key: "buyerName", operation: "%_%", value: "ali" },
+      { key: "status", operation: "%_%", value: "ali" },
+    ],
+  }),
+);
+
+/* 15. registry — query keys */
+check("registry keys", eq(users.keys.list(lp), ["users", "list", lp]) && eq(users.keys.detail(5), ["users", "detail", 5]) && eq(users.keys.all, ["users"]));
+
+/* 16. registry — parse* (meta snake→camel) */
+const parsed = users.parseList({
+  data: [{ id: 1 }] as unknown as Buyer[],
+  meta: { total_pages: 3, total_items: 50, current_page: 2, per_page: 20, has_next: true, has_prev: true },
+});
+check("registry parseList maps meta", parsed.data.length === 1 && parsed.meta.totalPages === 3 && parsed.meta.currentPage === 2 && parsed.meta.hasNext);
+const pInf = users.parseInfinite({ data: [], meta: { limit: 20, offset: 40, count: 20, has_more: true, next_offset: 60 } });
+check("registry parseInfinite", pInf.meta.hasMore && pInf.meta.nextOffset === 60);
+const pCur = users.parseCursor({ data: [], meta: { limit: 20, has_next: true, has_prev: false, next_cursor: "n", prev_cursor: null } });
+check("registry parseCursor", pCur.meta.hasNext && pCur.meta.nextCursor === "n");
+check("registry-level parseList (entity-agnostic)", qk.parseList({ data: [1, 2], meta: { total_items: 2 } }).meta.totalCount === 2);
+
+/* 17. schema enhancements — default / trim / split / between / search */
+const sch = users.schema({
+  status: { operation: "=", default: "active" },
+  ids: { operation: "in", split: true },
+  q: { search: ["buyerName", "status"] },
+  price: { between: ["minPrice", "maxPrice"] },
+  createdAt: { range: ["fromDate", "toDate"] },
+  buyerName: { operation: "%_%", trim: true },
+});
+
+const s1 = schemaToFilter(sch, new URLSearchParams({ buyerName: "  ali  " })) as FieldCondition[];
+check(
+  "schema default value (absent status→active)",
+  s1.some(c => c.key === "status" && c.value === "active"),
+);
+check(
+  "schema trim",
+  s1.some(c => c.key === "buyerName" && c.value === "ali"),
+);
+// empty `?status=` means "cleared" → prune, do NOT re-inject the default
+const s1b = schemaToFilter(sch, new URLSearchParams({ status: "" })) as FieldCondition[];
+check("schema empty param prunes (no default re-inject)", !s1b.some(c => c.key === "status"));
+
+const s2 = schemaToFilter(sch, new URLSearchParams({ ids: "1, 2 ,3" })) as FieldCondition[];
+const idsC = s2.find(c => c.key === "ids");
+check("schema split → array", eq(idsC?.value, ["1", "2", "3"]) && idsC?.operation === "in");
+
+const s3 = schemaToFilter(sch, new URLSearchParams({ minPrice: "10", maxPrice: "99" })) as FieldCondition[];
+const priceC = s3.find(c => c.key === "price");
+check("schema between → 2-tuple", priceC?.operation === "between" && eq(priceC?.value, ["10", "99"]));
+
+const s4 = schemaToFilter(sch, new URLSearchParams({ q: "ali", status: "x" }));
+check(
+  "schema search → or-group tree",
+  !Array.isArray(s4) && "and" in s4 && (s4 as { and: FilterNode[] }).and.some(n => typeof n === "object" && n !== null && "or" in n),
+);
 
 console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

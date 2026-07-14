@@ -9,6 +9,6 @@
       "@querykitjs/core": ["../core/src/index.ts"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "exclude": ["node_modules", "dist"]
 }
