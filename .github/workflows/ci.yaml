@@ -45,6 +45,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      # Node + npm are needed for `changeset publish` (invokes `npm publish`).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+      # OIDC trusted publishing requires npm >= 11.5.1.
+      - run: npm install -g npm@latest
       - run: bun install --frozen-lockfile
       - name: Create Release PR or publish
         uses: changesets/action@v1
@@ -52,4 +59,5 @@ jobs:
           publish: bun run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # No NPM_TOKEN: auth comes from OIDC trusted publishing (id-token: write).
+          NPM_CONFIG_PROVENANCE: "true"
