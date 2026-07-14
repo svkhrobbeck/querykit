@@ -9,16 +9,16 @@ result types inferred automatically.
 
 ## Packages
 
-| Package                                         | Status       | Description                                               |
-| ----------------------------------------------- | ------------ | --------------------------------------------------------- |
-| [`@querykit/core`](./packages/core)             | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared) |
-| [`@querykit/drizzle-pg`](./packages/drizzle-pg) | ✅ available | Drizzle ORM + PostgreSQL (backend repository)             |
-| [`@querykit/web`](./packages/web)               | ✅ available | Frontend query-building (filters, pagination, URL sync)   |
-| [`@querykit/zod`](./packages/zod)               | ✅ available | Zod schemas validating the request contract (backend)     |
-| `@querykit/drizzle-sqlite`                      | 🚧 planned   | Drizzle ORM + SQLite                                      |
-| `@querykit/prisma-pg`                           | 🚧 planned   | Prisma + PostgreSQL                                       |
+| Package                                           | Status       | Description                                               |
+| ------------------------------------------------- | ------------ | --------------------------------------------------------- |
+| [`@querykitjs/core`](./packages/core)             | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared) |
+| [`@querykitjs/drizzle-pg`](./packages/drizzle-pg) | ✅ available | Drizzle ORM + PostgreSQL (backend repository)             |
+| [`@querykitjs/web`](./packages/web)               | ✅ available | Frontend query-building (filters, pagination, URL sync)   |
+| [`@querykitjs/zod`](./packages/zod)               | ✅ available | Zod schemas validating the request contract (backend)     |
+| `@querykitjs/drizzle-sqlite`                      | 🚧 planned   | Drizzle ORM + SQLite                                      |
+| `@querykitjs/prisma-pg`                           | 🚧 planned   | Prisma + PostgreSQL                                       |
 
-Shared logic is moved into `@querykit/core` gradually as it emerges.
+Shared logic is moved into `@querykitjs/core` gradually as it emerges.
 
 ## Development (monorepo)
 

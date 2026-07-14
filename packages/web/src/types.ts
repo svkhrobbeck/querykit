@@ -1,9 +1,9 @@
 /**
- * Filter/query DSL tiplari — `@querykit/core`dan, entity maydoni (`FieldKey`)
- * bilan ixtisoslashtirilgan. querykit backend (`@querykit/drizzle-pg`) qabul
+ * Filter/query DSL tiplari — `@querykitjs/core`dan, entity maydoni (`FieldKey`)
+ * bilan ixtisoslashtirilgan. querykit backend (`@querykitjs/drizzle-pg`) qabul
  * qiladigan wire-format bilan mos (`{key, operation, value}`).
  */
-import type * as Core from "@querykit/core";
+import type * as Core from "@querykitjs/core";
 
 export type FilterOperator = Core.FilterOperator;
 export type FilterScalar = Core.FilterScalar;
@@ -106,7 +106,7 @@ export interface CursorPayload {
 /* Har uch paginatsiya rejimi turli meta qaytaradi — alohida map qilinadi.     */
 
 /**
- * Xom (server, snake_case) meta tiplari — `@querykit/core`dan (adapter shu
+ * Xom (server, snake_case) meta tiplari — `@querykitjs/core`dan (adapter shu
  * shaklda qaytaradi). Server ba'zi maydonlarni bermasligi mumkinligi uchun
  * mapper'lar `Partial` qabul qiladi.
  */

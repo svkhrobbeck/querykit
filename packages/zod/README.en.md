@@ -4,24 +4,24 @@
 
 </div>
 
-# @querykit/zod
+# @querykitjs/zod
 
-> **Zod** schemas that validate the querykit request contract (filters, sort, pagination). Operators come from `@querykit/core`; `z.infer` output is **assignable** to core types.
+> **Zod** schemas that validate the querykit request contract (filters, sort, pagination). Operators come from `@querykitjs/core`; `z.infer` output is **assignable** to core types.
 
 Validates the incoming JSON body of backend list endpoints — the full operator set, nested `and/or/not` filters, and **all three paginations** (offset/infinite/cursor). Pass the validated payload straight to a querykit repository.
 
 ## Install
 
 ```bash
-bun add @querykit/zod zod
-# @querykit/core comes transitively (dependency); zod is a peer
+bun add @querykitjs/zod zod
+# @querykitjs/core comes transitively (dependency); zod is a peer
 ```
 
 ## Usage (Hono example)
 
 ```ts
 import { sValidator } from "@hono/zod-validator";
-import { offsetParamsSchema } from "@querykit/zod";
+import { offsetParamsSchema } from "@querykitjs/zod";
 import { buyersRepository } from "@/db/repositories/buyers.repository";
 
 buyersRoute.post("/list", sValidator("json", offsetParamsSchema), async ctx => {
@@ -55,7 +55,7 @@ Use `infiniteParamsSchema` / `cursorParamsSchema` for the other modes.
 | `infiniteParamsSchema`              | + `limit`/`offset`                                 |
 | `cursorParamsSchema`                | + `limit`/`cursor`/`cursorKey`/`order`/`direction` |
 
-Inferred types are also exported: `OffsetParams`, `InfiniteParams`, `CursorParams`, `FilterInput`, … — all assignable to `@querykit/core` types.
+Inferred types are also exported: `OffsetParams`, `InfiniteParams`, `CursorParams`, `FilterInput`, … — all assignable to `@querykitjs/core` types.
 
 ## Core alignment
 

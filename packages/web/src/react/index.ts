@@ -1,9 +1,9 @@
 /**
- * `@querykit/web/react` — React hook'lar (peer `react`).
+ * `@querykitjs/web/react` — React hook'lar (peer `react`).
  *
  * @example
  * ```tsx
- * import { useListParams } from "@querykit/web/react";
+ * import { useListParams } from "@querykitjs/web/react";
  * ```
  */
 export { useListParams, type UseListParamsOptions, type UseListParamsResult } from "./use-list-params";

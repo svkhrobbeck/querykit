@@ -1,5 +1,5 @@
 /**
- * Smoke test for @querykit/zod — validates the querykit request contract with
+ * Smoke test for @querykitjs/zod — validates the querykit request contract with
  * real zod. No network. `bun run test/smoke.ts`
  */
 import { cursorParamsSchema, fieldConditionSchema, filterSchema, infiniteParamsSchema, offsetParamsSchema } from "../src/index";

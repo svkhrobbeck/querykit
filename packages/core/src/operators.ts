@@ -1,6 +1,6 @@
 /**
  * Filter operatorlari — yagona runtime manba. `FilterOperator` tipi (`types.ts`)
- * shundan chiqadi; `@querykit/zod` shu massivdan zod enum quradi.
+ * shundan chiqadi; `@querykitjs/zod` shu massivdan zod enum quradi.
  */
 export const FILTER_OPERATORS = [
   "=",

@@ -1,6 +1,6 @@
 import type { BuildQueryResult, DBQueryConfig, ExtractTablesWithRelations, InferInsertModel, InferSelectModel, SQL } from "drizzle-orm";
 import type { AnyPgTable, PgDatabase } from "drizzle-orm/pg-core";
-import type * as Core from "@querykit/core";
+import type * as Core from "@querykitjs/core";
 
 /** Any Drizzle Postgres database or transaction, regardless of the driver. */
 export type AnyDb = PgDatabase<any, any, any>;
@@ -73,7 +73,7 @@ export type TableNameOf<TSchema extends Record<string, unknown>, TTable extends 
 export type ColumnKey<TTable extends AnyPgTable> = keyof Row<TTable> & string;
 
 /* -------------------------------- filters --------------------------------- */
-/* DSL `@querykit/core`dan; jadval ustuni (`ColumnKey`) va raw `SQL` bilan ixtisos. */
+/* DSL `@querykitjs/core`dan; jadval ustuni (`ColumnKey`) va raw `SQL` bilan ixtisos. */
 
 export type FilterOperator = Core.FilterOperator;
 export type FilterScalar = Core.FilterScalar;

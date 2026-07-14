@@ -1,5 +1,5 @@
 import type { AnyPgTable } from "drizzle-orm/pg-core";
-import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykit/core";
+import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykitjs/core";
 
 import type { AnyDb, Registry, RegistryOptions, Repository, RepositoryExtender } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
@@ -19,7 +19,7 @@ import { createContextStore } from "./internal/context";
  * @param db - Drizzle Postgres bazasi (`drizzle-orm/postgres-js` va h.k.).
  * @param schema - `db.query` uchun ishlatilgan to'liq schema obyekti.
  * @param options - `defaultPerPage` (findList) / `defaultLimit` (infinite/cursor).
- *   Berilmasa `@querykit/core`ning `DEFAULT_PER_PAGE`/`DEFAULT_LIMIT` (20).
+ *   Berilmasa `@querykitjs/core`ning `DEFAULT_PER_PAGE`/`DEFAULT_LIMIT` (20).
  * @returns Jadval repositorylari chiqaruvchi {@link Registry}.
  * @example
  * ```ts

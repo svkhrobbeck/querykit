@@ -4,14 +4,14 @@
 
 </div>
 
-# @querykit/web
+# @querykitjs/web
 
 > Frontend uchun **tipli query-building**: filter/sort/pagination payloadini quradi, javob meta'sini map qiladi, URL-state sync beradi. **So'rov yubormaydi** — chiqqan payload'ni o'z `fetch`/`axios`ingizga uzatasiz.
 
-React dashboardlar har list sahifasida bir xil boilerplate'ni qo'lda yozadi: `searchParams`'dan `IFilter[]` qurish, bo'sh filterlarni tashlash, `sortType` ↔ `{name,direction}`, "har o'zgarishda page-reset", meta snake→camel. `@querykit/web` shularni bartaraf qiladi. Payload querykit backend (`@querykit/drizzle-pg`) qabul qiladigan formatda.
+React dashboardlar har list sahifasida bir xil boilerplate'ni qo'lda yozadi: `searchParams`'dan `IFilter[]` qurish, bo'sh filterlarni tashlash, `sortType` ↔ `{name,direction}`, "har o'zgarishda page-reset", meta snake→camel. `@querykitjs/web` shularni bartaraf qiladi. Payload querykit backend (`@querykitjs/drizzle-pg`) qabul qiladigan formatda.
 
 ```ts
-import { buildListParams, f, mapMeta } from "@querykit/web";
+import { buildListParams, f, mapMeta } from "@querykitjs/web";
 
 const params = buildListParams({
   filter: f.and(f.contains("buyerName", search), f.eq("status", status)),
@@ -36,14 +36,14 @@ setMeta(mapMeta(meta));
 ## O'rnatish
 
 ```bash
-bun add @querykit/web
+bun add @querykitjs/web
 # React hook uchun loyihangizda react bo'lishi kifoya (peer)
 ```
 
 ## Filter — ikkala uslub
 
 ```ts
-import { createFilters } from "@querykit/web";
+import { createFilters } from "@querykitjs/web";
 const f = createFilters<Buyer>(); // maydon nomi autocomplete
 
 // 1) Builder
@@ -61,7 +61,7 @@ filter: [
 ## Payload qurish
 
 ```ts
-import { buildParams, buildListParams } from "@querykit/web";
+import { buildParams, buildListParams } from "@querykitjs/web";
 
 const payload = buildListParams({
   filter, // builder yoki massiv
@@ -80,7 +80,7 @@ Bo'sh qiymatli filterlar tashlanadi (`""`/`null`/`undefined`/`[]`), lekin `0`/`f
 Backend'ning 3 rejimiga mos 3 builder. Har birining javob meta'si **har xil**, shuning uchun alohida mapper bor:
 
 ```ts
-import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykit/web";
+import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykitjs/web";
 
 // 1) Offset — page / perPage
 const p = buildListParams({ filter, page: 2, perPage: 20 });
@@ -103,7 +103,7 @@ buildListParams({ filter, withDeleted: true });
 Har sahifada qo'lda `IFilter[]` qurish o'rniga bir marta e'lon qiling:
 
 ```ts
-import { defineListSchema, searchParamsToPayload } from "@querykit/web";
+import { defineListSchema, searchParamsToPayload } from "@querykitjs/web";
 
 const buyersSchema = defineListSchema({
   id: { operation: "=" },
@@ -119,7 +119,7 @@ const params = searchParamsToPayload(buyersSchema, searchParams);
 
 ```tsx
 import { useSearchParams } from "react-router-dom"; // yoki boshqa manba
-import { useListParams } from "@querykit/web/react";
+import { useListParams } from "@querykitjs/web/react";
 
 function BuyersList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -161,7 +161,7 @@ setMeta(mapMeta(data.meta));
 Default querykit-canonical camelCase (`perPage`, `with`). Eski snake-backend (masalan idistr) uchun sozlang:
 
 ```ts
-import { createQuery } from "@querykit/web";
+import { createQuery } from "@querykitjs/web";
 
 const q = createQuery({ perPageField: "per_page", withField: "withPopulates" });
 const params = q.list({ filter, page, perPage });
@@ -195,7 +195,7 @@ bun install
 bun run typecheck
 bun run lint
 bun run build       # tsup -> dist (index + react, ESM + CJS + .d.ts)
-bun run --filter @querykit/web test:smoke
+bun run --filter @querykitjs/web test:smoke
 ```
 
 ## Litsenziya

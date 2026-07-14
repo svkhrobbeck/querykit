@@ -1,7 +1,7 @@
 {
-  "name": "@querykit/zod",
+  "name": "@querykitjs/zod",
   "version": "1.0.0",
-  "description": "Zod schemas that validate the querykit request contract (filters, sort, pagination) — types stay in sync with @querykit/core.",
+  "description": "Zod schemas that validate the querykit request contract (filters, sort, pagination) — types stay in sync with @querykitjs/core.",
   "type": "module",
   "author": {
     "name": "Suhrobbek Soatov",
@@ -45,7 +45,7 @@
     "test:smoke": "bun run test/smoke.ts"
   },
   "dependencies": {
-    "@querykit/core": "workspace:*"
+    "@querykitjs/core": "workspace:*"
   },
   "peerDependencies": {
     "zod": "^4"

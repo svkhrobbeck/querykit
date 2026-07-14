@@ -4,7 +4,7 @@
 
 </div>
 
-# @querykit/drizzle-pg
+# @querykitjs/drizzle-pg
 
 > Drizzle ORM (PostgreSQL) uchun **advanced filtering** va **moslashuvchan paginatsiya** beruvchi repository qatlami.
 
@@ -35,8 +35,8 @@ const { data, meta } = await usersRepository.findList({
 ## O'rnatish
 
 ```bash
-bun add @querykit/drizzle-pg drizzle-orm
-# yoki: npm i @querykit/drizzle-pg drizzle-orm
+bun add @querykitjs/drizzle-pg drizzle-orm
+# yoki: npm i @querykitjs/drizzle-pg drizzle-orm
 ```
 
 `drizzle-orm` — peer dependency.
@@ -47,7 +47,7 @@ bun add @querykit/drizzle-pg drizzle-orm
 
 ```ts
 // db/registry.ts
-import { createRegistry } from "@querykit/drizzle-pg";
+import { createRegistry } from "@querykitjs/drizzle-pg";
 import { db } from "./index"; // drizzle(client, { schema })
 import * as schema from "./schema";
 
@@ -56,7 +56,7 @@ export const registry = createRegistry(db, schema);
 // export const registry = createRegistry(db, schema, { defaultPerPage: 20, defaultLimit: 20 });
 ```
 
-`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) berilmasa `@querykit/core`ning **20** default'i ishlatiladi.
+`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) berilmasa `@querykitjs/core`ning **20** default'i ishlatiladi.
 
 ### 2. Jadval repositorylari
 
@@ -76,7 +76,7 @@ export const usersRepository = registry.repository(users, base => ({
 Filter — field shartlari va mantiqiy guruhlar (`and`/`or`/`not`) daraxti. Flat massiv implicit `AND` sifatida qabul qilinadi.
 
 ```ts
-import { createFilters } from "@querykit/drizzle-pg";
+import { createFilters } from "@querykitjs/drizzle-pg";
 const f = createFilters<typeof users>(); // ustun-nomi autocomplete
 
 await usersRepository.findAll({
@@ -217,7 +217,7 @@ bun install
 bun run typecheck
 bun run lint
 bun run build       # tsup -> dist (ESM + CJS + .d.ts)
-DATABASE_URL=... bun run --filter @querykit/drizzle-pg test:smoke
+DATABASE_URL=... bun run --filter @querykitjs/drizzle-pg test:smoke
 ```
 
 ## Litsenziya

@@ -4,24 +4,24 @@
 
 </div>
 
-# @querykit/zod
+# @querykitjs/zod
 
-> querykit so'rov kontraktini (filter/sort/pagination) tekshiruvchi **zod** schema'lar. Operatorlar `@querykit/core`dan; `z.infer` chiqishi core tiplariga **mos**.
+> querykit so'rov kontraktini (filter/sort/pagination) tekshiruvchi **zod** schema'lar. Operatorlar `@querykitjs/core`dan; `z.infer` chiqishi core tiplariga **mos**.
 
 Backend list endpoint'lariga kelayotgan JSON body'ni validatsiya qiladi — to'liq operatorlar to'plami, nested `and/or/not` filter, va **uchala paginatsiya** (offset/infinite/cursor). Validatsiyalangan payload'ni to'g'ridan-to'g'ri querykit repository'ga uzatasiz.
 
 ## O'rnatish
 
 ```bash
-bun add @querykit/zod zod
-# @querykit/core avtomatik keladi (dependency); zod — peer
+bun add @querykitjs/zod zod
+# @querykitjs/core avtomatik keladi (dependency); zod — peer
 ```
 
 ## Foydalanish (Hono misol)
 
 ```ts
 import { sValidator } from "@hono/zod-validator";
-import { offsetParamsSchema } from "@querykit/zod";
+import { offsetParamsSchema } from "@querykitjs/zod";
 import { buyersRepository } from "@/db/repositories/buyers.repository";
 
 buyersRoute.post("/list", sValidator("json", offsetParamsSchema), async ctx => {
@@ -55,11 +55,11 @@ Infinite/cursor uchun `infiniteParamsSchema` / `cursorParamsSchema`.
 | `infiniteParamsSchema`              | + `limit`/`offset`                                 |
 | `cursorParamsSchema`                | + `limit`/`cursor`/`cursorKey`/`order`/`direction` |
 
-Inferred tiplar ham eksport qilinadi: `OffsetParams`, `InfiniteParams`, `CursorParams`, `FilterInput`, ... — barchasi `@querykit/core` tiplariga assignable.
+Inferred tiplar ham eksport qilinadi: `OffsetParams`, `InfiniteParams`, `CursorParams`, `FilterInput`, ... — barchasi `@querykitjs/core` tiplariga assignable.
 
 ## Core moslik
 
-`filterOperatorSchema = z.enum(FILTER_OPERATORS)` — operatorlar core'dan bir marta. `z.infer` chiqishi `@querykit/core`ning `FieldCondition`/`Filter`/`FilterOperator` tiplariga **assignable** (typecheck darajasida qat'iy tekshiriladi), shuning uchun validatsiyalangan natijani repo'ga uzatish tipli mos keladi.
+`filterOperatorSchema = z.enum(FILTER_OPERATORS)` — operatorlar core'dan bir marta. `z.infer` chiqishi `@querykitjs/core`ning `FieldCondition`/`Filter`/`FilterOperator` tiplariga **assignable** (typecheck darajasida qat'iy tekshiriladi), shuning uchun validatsiyalangan natijani repo'ga uzatish tipli mos keladi.
 
 ## Litsenziya
 

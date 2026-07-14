@@ -1,5 +1,5 @@
 /**
- * Real-DB smoke test for @querykit/drizzle-pg. Not published (see package.json
+ * Real-DB smoke test for @querykitjs/drizzle-pg. Not published (see package.json
  * "files"). Requires a reachable Postgres via DATABASE_URL.
  *
  *   DATABASE_URL=postgres://user:pass@localhost:5432/db bun run test/smoke.ts

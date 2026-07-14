@@ -1,5 +1,5 @@
 /**
- * Pure smoke test for @querykit/web — no network, no React. Verifies the
+ * Pure smoke test for @querykitjs/web — no network, no React. Verifies the
  * query-building, normalization, schema→filter, URL logic and meta mapping.
  *
  *   bun run test/smoke.ts

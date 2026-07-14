@@ -1,4 +1,4 @@
-import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykit/core";
+import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykitjs/core";
 
 import type {
   CursorParams,
@@ -192,7 +192,7 @@ export function buildParams(input: Params = {}): QueryPayload {
 }
 
 /**
- * {@link buildParams} + `page`/`perPage` (default `perPage = 20`, `@querykit/core`).
+ * {@link buildParams} + `page`/`perPage` (default `perPage = 20`, `@querykitjs/core`).
  *
  * @example
  * ```ts

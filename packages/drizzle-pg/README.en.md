@@ -4,7 +4,7 @@
 
 </div>
 
-# @querykit/drizzle-pg
+# @querykitjs/drizzle-pg
 
 > Advanced filtering + flexible pagination repository layer for Drizzle ORM (PostgreSQL).
 
@@ -35,8 +35,8 @@ const { data, meta } = await usersRepository.findList({
 ## Install
 
 ```bash
-bun add @querykit/drizzle-pg drizzle-orm
-# or: npm i @querykit/drizzle-pg drizzle-orm
+bun add @querykitjs/drizzle-pg drizzle-orm
+# or: npm i @querykitjs/drizzle-pg drizzle-orm
 ```
 
 `drizzle-orm` is a peer dependency.
@@ -47,7 +47,7 @@ bun add @querykit/drizzle-pg drizzle-orm
 
 ```ts
 // db/registry.ts
-import { createRegistry } from "@querykit/drizzle-pg";
+import { createRegistry } from "@querykitjs/drizzle-pg";
 import { db } from "./index"; // drizzle(client, { schema })
 import * as schema from "./schema";
 
@@ -56,7 +56,7 @@ export const registry = createRegistry(db, schema);
 // export const registry = createRegistry(db, schema, { defaultPerPage: 20, defaultLimit: 20 });
 ```
 
-`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) fall back to `@querykit/core`'s **20** when omitted.
+`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) fall back to `@querykitjs/core`'s **20** when omitted.
 
 ### 2. Per-table repositories
 
@@ -75,7 +75,7 @@ export const usersRepository = registry.repository(users, base => ({
 A filter is a tree of field conditions and logical groups (`and`/`or`/`not`). A flat array is treated as implicit `AND`.
 
 ```ts
-import { createFilters } from "@querykit/drizzle-pg";
+import { createFilters } from "@querykitjs/drizzle-pg";
 const f = createFilters<typeof users>(); // column-name autocomplete
 
 await usersRepository.findAll({
@@ -188,7 +188,7 @@ bun install
 bun run typecheck
 bun run lint
 bun run build       # tsup -> dist (ESM + CJS + .d.ts)
-DATABASE_URL=... bun run --filter @querykit/drizzle-pg test:smoke
+DATABASE_URL=... bun run --filter @querykitjs/drizzle-pg test:smoke
 ```
 
 ## License

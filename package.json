@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "bun run --filter @querykit/core build && bun run --filter @querykit/zod build && bun run --filter @querykit/drizzle-pg build && bun run --filter @querykit/web build",
+    "build": "bun run --filter @querykitjs/core build && bun run --filter @querykitjs/zod build && bun run --filter @querykitjs/drizzle-pg build && bun run --filter @querykitjs/web build",
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -1,5 +1,5 @@
 /**
- * `@querykit/drizzle-pg` — Drizzle ORM (PostgreSQL) uchun **advanced filtering**
+ * `@querykitjs/drizzle-pg` — Drizzle ORM (PostgreSQL) uchun **advanced filtering**
  * va **moslashuvchan paginatsiya** beruvchi repository qatlami.
  *
  * Bir marta registry'ni Drizzle `db` + `schema` bilan ulaysiz, so'ng undan
@@ -8,7 +8,7 @@
  * @example
  * ```ts
  * // registry.ts (bir marta)
- * import { createRegistry } from "@querykit/drizzle-pg";
+ * import { createRegistry } from "@querykitjs/drizzle-pg";
  * import { db } from "./db";
  * import * as schema from "./schema";
  *

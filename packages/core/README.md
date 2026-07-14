@@ -4,11 +4,11 @@
 
 </div>
 
-# @querykit/core
+# @querykitjs/core
 
 > querykit oilasi uchun umumiy, **ORM-agnostik** query DSL: filter tiplari, operatorlar, `createFilters` builder va wire-meta shakllari.
 
-Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykit/drizzle-pg` (backend) va `@querykit/web` (frontend) tomonidan ishlatiladigan umumiy poydevor. Tiplar ustun-kaliti (`TKey`) bo'yicha generic; har bir adapter uni o'z kalit tipiga ixtisoslashtiradi (Drizzle jadval ustuni yoki entity maydoni).
+Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle-pg` (backend) va `@querykitjs/web` (frontend) tomonidan ishlatiladigan umumiy poydevor. Tiplar ustun-kaliti (`TKey`) bo'yicha generic; har bir adapter uni o'z kalit tipiga ixtisoslashtiradi (Drizzle jadval ustuni yoki entity maydoni).
 
 ## Ichida nima bor
 
@@ -21,8 +21,8 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykit/drizzle-p
 ## Foydalanish (adapter ichida)
 
 ```ts
-import { createFilters } from "@querykit/core";
-import type { Filter } from "@querykit/core";
+import { createFilters } from "@querykitjs/core";
+import type { Filter } from "@querykitjs/core";
 
 // adapter o'z kalit tipiga ixtisoslashtiradi:
 type MyFilter = Filter<"status" | "age", MyRawSql>;

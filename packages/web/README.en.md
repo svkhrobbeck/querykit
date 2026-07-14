@@ -4,14 +4,14 @@
 
 </div>
 
-# @querykit/web
+# @querykitjs/web
 
 > Typed **query-building** for frontends: build filter/sort/pagination payloads, map response meta, sync URL state. It **does not send requests** — you pass the payload to your own `fetch`/`axios`.
 
-React dashboards hand-write the same boilerplate on every list page: build `IFilter[]` from `searchParams`, drop empty filters, `sortType` ↔ `{name,direction}`, "reset page on any change", snake→camel meta. `@querykit/web` removes all of it. The payload matches what the querykit backend (`@querykit/drizzle-pg`) accepts.
+React dashboards hand-write the same boilerplate on every list page: build `IFilter[]` from `searchParams`, drop empty filters, `sortType` ↔ `{name,direction}`, "reset page on any change", snake→camel meta. `@querykitjs/web` removes all of it. The payload matches what the querykit backend (`@querykitjs/drizzle-pg`) accepts.
 
 ```ts
-import { buildListParams, f, mapMeta } from "@querykit/web";
+import { buildListParams, f, mapMeta } from "@querykitjs/web";
 
 const params = buildListParams({
   filter: f.and(f.contains("buyerName", search), f.eq("status", status)),
@@ -36,14 +36,14 @@ setMeta(mapMeta(meta));
 ## Install
 
 ```bash
-bun add @querykit/web
+bun add @querykitjs/web
 # For the React hook, having react in your project (peer) is enough
 ```
 
 ## Filters — two styles
 
 ```ts
-import { createFilters } from "@querykit/web";
+import { createFilters } from "@querykitjs/web";
 const f = createFilters<Buyer>(); // column-name autocomplete
 
 // 1) Builder
@@ -61,7 +61,7 @@ filter: [
 ## Building the payload
 
 ```ts
-import { buildParams, buildListParams } from "@querykit/web";
+import { buildParams, buildListParams } from "@querykitjs/web";
 
 const payload = buildListParams({
   filter, // builder or array
@@ -80,7 +80,7 @@ Empty filters are dropped (`""`/`null`/`undefined`/`[]`), but `0`/`false` are ke
 Three builders matching the backend's three modes. Each mode's response meta is **different**, so there's a separate mapper for each:
 
 ```ts
-import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykit/web";
+import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykitjs/web";
 
 // 1) Offset — page / perPage
 const p = buildListParams({ filter, page: 2, perPage: 20 });
@@ -103,7 +103,7 @@ buildListParams({ filter, withDeleted: true });
 Declare once instead of hand-building `IFilter[]` on each page:
 
 ```ts
-import { defineListSchema, searchParamsToPayload } from "@querykit/web";
+import { defineListSchema, searchParamsToPayload } from "@querykitjs/web";
 
 const buyersSchema = defineListSchema({
   id: { operation: "=" },
@@ -119,7 +119,7 @@ const params = searchParamsToPayload(buyersSchema, searchParams);
 
 ```tsx
 import { useSearchParams } from "react-router-dom"; // or any source
-import { useListParams } from "@querykit/web/react";
+import { useListParams } from "@querykitjs/web/react";
 
 function BuyersList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -161,7 +161,7 @@ setMeta(mapMeta(data.meta));
 Defaults are querykit-canonical camelCase (`perPage`, `with`). For a legacy snake-case backend (e.g. idistr), configure it:
 
 ```ts
-import { createQuery } from "@querykit/web";
+import { createQuery } from "@querykitjs/web";
 
 const q = createQuery({ perPageField: "per_page", withField: "withPopulates" });
 const params = q.list({ filter, page, perPage });
@@ -195,7 +195,7 @@ bun install
 bun run typecheck
 bun run lint
 bun run build       # tsup -> dist (index + react, ESM + CJS + .d.ts)
-bun run --filter @querykit/web test:smoke
+bun run --filter @querykitjs/web test:smoke
 ```
 
 ## License

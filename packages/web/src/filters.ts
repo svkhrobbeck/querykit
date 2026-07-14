@@ -1,11 +1,11 @@
-import { createFilters as coreCreateFilters, f } from "@querykit/core";
+import { createFilters as coreCreateFilters, f } from "@querykitjs/core";
 
 import type { FieldKey } from "./types";
 
 /**
  * Filter shartlarini tipli, ergonomik quruvchilar to'plamini qaytaradi. Entity
  * tipiga bog'lasangiz, maydon nomlari uchun autocomplete ishlaydi.
- * `@querykit/core`ning builder'i ustidagi qobiq.
+ * `@querykitjs/core`ning builder'i ustidagi qobiq.
  *
  * @typeParam T - list qilinadigan entity tipi (`Buyer`, `Product`, ...).
  * @example

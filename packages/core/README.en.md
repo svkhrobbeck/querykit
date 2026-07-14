@@ -4,11 +4,11 @@
 
 </div>
 
-# @querykit/core
+# @querykitjs/core
 
 > Shared, **ORM-agnostic** query DSL for the querykit family: filter types, operators, the `createFilters` builder, and wire-meta shapes.
 
-You usually **don't install this directly** — it's the shared foundation used by `@querykit/drizzle-pg` (backend) and `@querykit/web` (frontend). Types are generic over a key (`TKey`); each adapter specializes it to its own key type (a Drizzle table column or an entity field).
+You usually **don't install this directly** — it's the shared foundation used by `@querykitjs/drizzle-pg` (backend) and `@querykitjs/web` (frontend). Types are generic over a key (`TKey`); each adapter specializes it to its own key type (a Drizzle table column or an entity field).
 
 ## What's inside
 
@@ -21,8 +21,8 @@ You usually **don't install this directly** — it's the shared foundation used 
 ## Usage (inside an adapter)
 
 ```ts
-import { createFilters } from "@querykit/core";
-import type { Filter } from "@querykit/core";
+import { createFilters } from "@querykitjs/core";
+import type { Filter } from "@querykitjs/core";
 
 // an adapter specializes it to its own key type:
 type MyFilter = Filter<"status" | "age", MyRawSql>;

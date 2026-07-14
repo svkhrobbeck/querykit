@@ -1,14 +1,14 @@
 /**
- * `@querykit/zod` — querykit so'rov kontraktini (filter/sort/pagination)
- * tekshiruvchi zod schema'lar. Operatorlar `@querykit/core`ning `FILTER_OPERATORS`
+ * `@querykitjs/zod` — querykit so'rov kontraktini (filter/sort/pagination)
+ * tekshiruvchi zod schema'lar. Operatorlar `@querykitjs/core`ning `FILTER_OPERATORS`
  * manbasidan olinadi; schema'lar `z.infer` chiqishi core tiplariga **mos**
  * (assignable) — validatsiyalangan payload'ni to'g'ridan-to'g'ri repo'ga uzatasiz.
  *
  * Backend (Hono, Express, …) so'rov body'sini shu bilan validatsiya qiladi.
  */
 import { z } from "zod";
-import { FILTER_OPERATORS } from "@querykit/core";
-import type { FieldCondition, Filter, FilterNode, FilterOperator, FilterValue } from "@querykit/core";
+import { FILTER_OPERATORS } from "@querykitjs/core";
+import type { FieldCondition, Filter, FilterNode, FilterOperator, FilterValue } from "@querykitjs/core";
 
 /* --------------------------------- filter --------------------------------- */
 

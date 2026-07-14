@@ -1,15 +1,15 @@
 /**
- * `@querykit/web` — frontend query-building for querykit.
+ * `@querykitjs/web` — frontend query-building for querykit.
  *
  * Filter/sort/pagination payloadini **tipli** quradi, javob meta'sini map qiladi
  * va URL-state sync uchun toza yordamchilar beradi. **So'rov yubormaydi** — chiqqan
  * payload'ni o'z `fetch`/`axios`ingizga uzatasiz. Zero-dependency.
  *
- * React hook'lar uchun: `import { useListParams } from "@querykit/web/react"`.
+ * React hook'lar uchun: `import { useListParams } from "@querykitjs/web/react"`.
  *
  * @example
  * ```ts
- * import { buildListParams, f, mapMeta } from "@querykit/web";
+ * import { buildListParams, f, mapMeta } from "@querykitjs/web";
  *
  * const params = buildListParams({
  *   filter: f.and(f.contains("name", search), f.eq("status", status)),

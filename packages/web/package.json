@@ -1,5 +1,5 @@
 {
-  "name": "@querykit/web",
+  "name": "@querykitjs/web",
   "version": "1.0.0",
   "description": "Frontend query-building for querykit — typed filters, pagination params & URL sync. Zero-dependency; you send the request.",
   "type": "module",
@@ -50,7 +50,7 @@
     "test:smoke": "bun run test/smoke.ts"
   },
   "dependencies": {
-    "@querykit/core": "workspace:*"
+    "@querykitjs/core": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18"

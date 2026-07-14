@@ -1,6 +1,6 @@
 /**
- * `@querykit/core` — ORM-agnostik query DSL tiplari. Backend adapterlar
- * (`@querykit/drizzle-pg`) va frontend (`@querykit/web`) shu bir xil kontraktga
+ * `@querykitjs/core` — ORM-agnostik query DSL tiplari. Backend adapterlar
+ * (`@querykitjs/drizzle-pg`) va frontend (`@querykitjs/web`) shu bir xil kontraktga
  * tayanadi. Tiplar ustun-kaliti (`TKey`) bo'yicha generic; adapterlar uni o'z
  * kalit tipiga (Drizzle jadval ustuni yoki entity maydoni) ixtisoslashtiradi.
  */

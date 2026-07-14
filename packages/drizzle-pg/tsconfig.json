@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@querykit/core": ["../core/src/index.ts"]
+      "@querykitjs/core": ["../core/src/index.ts"]
     }
   },
   "include": ["src"],

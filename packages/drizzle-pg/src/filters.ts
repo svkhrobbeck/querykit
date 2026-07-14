@@ -1,12 +1,12 @@
 import type { SQL } from "drizzle-orm";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
-import { createFilters as coreCreateFilters, f } from "@querykit/core";
+import { createFilters as coreCreateFilters, f } from "@querykitjs/core";
 
 import type { ColumnKey } from "./types";
 
 /**
  * Filter shartlarini tipli, ergonomik quruvchilar to'plamini qaytaradi (jadval
- * ustunlari uchun autocomplete). `@querykit/core`ning builder'i ustidagi qobiq —
+ * ustunlari uchun autocomplete). `@querykitjs/core`ning builder'i ustidagi qobiq —
  * kalit tipi jadval ustuni, raw tugun tipi Drizzle `SQL`.
  *
  * @typeParam TTable - filter quriladigan Drizzle jadval tipi (`typeof users`).

@@ -1,5 +1,5 @@
 /**
- * Pure smoke test for @querykit/core — no deps. Verifies the filter builder
+ * Pure smoke test for @querykitjs/core — no deps. Verifies the filter builder
  * emits the right operations/tokens and the tree/group shapes.
  *
  *   bun run test/smoke.ts

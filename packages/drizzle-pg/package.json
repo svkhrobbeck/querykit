@@ -1,5 +1,5 @@
 {
-  "name": "@querykit/drizzle-pg",
+  "name": "@querykitjs/drizzle-pg",
   "version": "1.0.0",
   "description": "Advanced filtering + flexible pagination repository layer for Drizzle ORM (PostgreSQL).",
   "type": "module",
@@ -45,7 +45,7 @@
     "test:smoke": "bun run test/smoke.ts"
   },
   "dependencies": {
-    "@querykit/core": "workspace:*"
+    "@querykitjs/core": "workspace:*"
   },
   "peerDependencies": {
     "drizzle-orm": ">=0.30"
