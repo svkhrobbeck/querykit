@@ -94,7 +94,7 @@ sort: [
 ]; // ORDER BY name ASC, created_at DESC
 ```
 
-Falls back to `created_at DESC` when no sort is given.
+Falls back to `createdAt DESC`, then `id DESC`, when no sort is given — a deterministic order so pagination stays stable.
 
 ## Pagination — three strategies
 

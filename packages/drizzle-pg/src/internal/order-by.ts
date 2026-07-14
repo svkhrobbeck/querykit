@@ -10,8 +10,10 @@ interface NormalizedSort {
 }
 
 /**
- * Build an `ORDER BY` clause list. Falls back to `created_at DESC` (or
- * `createdAt`) when no valid sort is provided, matching db-service behaviour.
+ * Build an `ORDER BY` clause list. Falls back to `createdAt DESC`, then to
+ * `id DESC`, when no valid sort is provided — a deterministic order so
+ * pagination is stable (matches the mongoose adapter). `resolveColumn` matches
+ * by JS property or DB column name, so `createdAt` also finds a `created_at` column.
  */
 export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: Sort<TTable>): SQL[] {
   const orderBy: SQL[] = [];
@@ -23,8 +25,14 @@ export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: So
 
   if (orderBy.length > 0) return orderBy;
 
-  const createdAt = resolveColumn(table, "created_at") ?? resolveColumn(table, "createdAt");
-  return createdAt ? [desc(createdAt)] : [];
+  const createdAt = resolveColumn(table, "createdAt");
+  if (createdAt) return [desc(createdAt)];
+
+  // Deterministic tiebreaker so offset/keyset pagination is stable when neither a
+  // sort nor a createdAt column exists (matches the mongoose adapter's `_id`
+  // fallback — without it Postgres returns rows in arbitrary order).
+  const id = resolveColumn(table, "id");
+  return id ? [desc(id)] : [];
 }
 
 function normalize(sort?: Sort): NormalizedSort[] {

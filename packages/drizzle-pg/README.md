@@ -112,7 +112,7 @@ sort: [
 ]; // ORDER BY name ASC, created_at DESC
 ```
 
-Sort berilmasa, mavjud bo'lsa `created_at DESC` ga tushadi.
+Sort berilmasa `createdAt DESC` ga, u bo'lmasa `id DESC` ga tushadi — pagination barqaror bo'lishi uchun deterministik tartib.
 
 ## Paginatsiya — 3 strategiya
 

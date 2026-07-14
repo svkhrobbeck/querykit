@@ -35,9 +35,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
-      id-token: write
+      contents: read
+      id-token: write # OIDC trusted publishing (no NPM_TOKEN, no PR permissions)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,7 +44,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      # Node + npm are needed for `changeset publish` (invokes `npm publish`).
+      # Node + npm are needed for `npm publish` (invoked by scripts/ci-publish.mjs).
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -53,11 +52,13 @@ jobs:
       # OIDC trusted publishing requires npm >= 11.5.1.
       - run: npm install -g npm@latest
       - run: bun install --frozen-lockfile
-      - name: Create Release PR or publish
-        uses: changesets/action@v1
-        with:
-          publish: bun run release
+      # Publish directly — versions are bumped locally (`bun run version-packages`)
+      # and committed, so no changesets remain and nothing opens a PR. This
+      # replaces changesets/action, which needed PR-creation permission and went
+      # red on the post-publish GitHub-Release step. `scripts/ci-publish.mjs`
+      # publishes only versions not yet on npm, via OIDC trusted publishing.
+      - name: Publish (version-gated, OIDC)
+        run: bun run release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No NPM_TOKEN: auth comes from OIDC trusted publishing (id-token: write).
           NPM_CONFIG_PROVENANCE: "true"

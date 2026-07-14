@@ -104,7 +104,14 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     return { and: [filter, idCondition] } as Filter<TTable>;
   };
 
-  const pickColumns = (columns?: QueryParams<TTable>["columns"]) => (columns && Object.keys(columns).length > 0 ? columns : undefined);
+  // Inclusion-only: drop `false` selections so `{a:true,b:false}` includes only
+  // `a`, and an all-`false`/empty object returns the full row (matches the
+  // mongoose adapter and the `Pick<Row,K>` contract).
+  const pickColumns = (columns?: QueryParams<TTable>["columns"]) => {
+    if (!columns) return undefined;
+    const picked = Object.fromEntries(Object.entries(columns).filter(([, v]) => v));
+    return Object.keys(picked).length > 0 ? picked : undefined;
+  };
 
   /** Apply scope defaults to insert values (scope wins). */
   const forInsert = (values: object): object => ({
