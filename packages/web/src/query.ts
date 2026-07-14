@@ -41,7 +41,7 @@ const DEFAULTS: Required<QueryConfig> = {
   withField: "with",
   withDeletedField: "withDeleted",
   pageField: "page",
-  perPageField: "per_page",
+  perPageField: "perPage",
   limitField: "limit",
   offsetField: "offset",
   cursorField: "cursor",

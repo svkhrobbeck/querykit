@@ -1,0 +1,66 @@
+{
+  "name": "@querykit/zod",
+  "version": "1.0.0",
+  "description": "Zod schemas that validate the querykit request contract (filters, sort, pagination) — types stay in sync with @querykit/core.",
+  "type": "module",
+  "author": {
+    "name": "Suhrobbek Soatov",
+    "url": "https://soatov.uz",
+    "email": "svkhrobbeck@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svkhrobbeck/querykit.git",
+    "directory": "packages/zod"
+  },
+  "homepage": "https://github.com/svkhrobbeck/querykit/tree/main/packages/zod#readme",
+  "bugs": {
+    "url": "https://github.com/svkhrobbeck/querykit/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "bun run test/smoke.ts"
+  },
+  "dependencies": {
+    "@querykit/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "zod": "^4.1.12"
+  },
+  "keywords": [
+    "querykit",
+    "zod",
+    "validation",
+    "schema",
+    "filter",
+    "pagination",
+    "hono",
+    "typescript"
+  ]
+}

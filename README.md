@@ -14,6 +14,7 @@ result types inferred automatically.
 | [`@querykit/core`](./packages/core)             | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared) |
 | [`@querykit/drizzle-pg`](./packages/drizzle-pg) | ✅ available | Drizzle ORM + PostgreSQL (backend repository)             |
 | [`@querykit/web`](./packages/web)               | ✅ available | Frontend query-building (filters, pagination, URL sync)   |
+| [`@querykit/zod`](./packages/zod)               | ✅ available | Zod schemas validating the request contract (backend)     |
 | `@querykit/drizzle-sqlite`                      | 🚧 planned   | Drizzle ORM + SQLite                                      |
 | `@querykit/prisma-pg`                           | 🚧 planned   | Prisma + PostgreSQL                                       |
 

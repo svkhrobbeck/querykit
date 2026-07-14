@@ -4,36 +4,10 @@
  * tayanadi. Tiplar ustun-kaliti (`TKey`) bo'yicha generic; adapterlar uni o'z
  * kalit tipiga (Drizzle jadval ustuni yoki entity maydoni) ixtisoslashtiradi.
  */
+import { FILTER_OPERATORS } from "./operators";
 
 /** Qo'llab-quvvatlanadigan filter operatorlari (token va nom aliaslari). */
-export type FilterOperator =
-  | "="
-  | "!="
-  | ">"
-  | ">="
-  | "<"
-  | "<="
-  | "eq"
-  | "ne"
-  | "gt"
-  | "gte"
-  | "lt"
-  | "lte"
-  | "like"
-  | "ilike"
-  | "notLike"
-  | "contains"
-  | "startsWith"
-  | "endsWith"
-  | "%_%" // contains
-  | "%_" // startsWith
-  | "_%" // endsWith
-  | "in"
-  | "notIn"
-  | "between"
-  | "notBetween"
-  | "isNull"
-  | "isNotNull";
+export type FilterOperator = (typeof FILTER_OPERATORS)[number];
 
 export type FilterScalar = string | number | boolean | Date | null;
 export type FilterValue = FilterScalar | FilterScalar[];
