@@ -1,5 +1,11 @@
 # @querykitjs/web
 
+## 2.0.1
+
+### Patch Changes
+
+- Docs: add npm/license badges to the README (en + uz).
+
 ## 2.0.0
 
 ### Major Changes

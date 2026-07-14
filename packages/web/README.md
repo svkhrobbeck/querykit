@@ -6,6 +6,8 @@
 
 # @querykitjs/web
 
+[![npm](https://img.shields.io/npm/v/@querykitjs/web.svg)](https://www.npmjs.com/package/@querykitjs/web) [![license](https://img.shields.io/npm/l/@querykitjs/web.svg)](./LICENSE)
+
 > Frontend uchun **tipli query-building**: filter/sort/pagination payloadini quradi, javob meta'sini map qiladi, URL-state sync beradi. **So'rov yubormaydi** — chiqqan payload'ni o'z `fetch`/`axios`ingizga uzatasiz. Zero-dependency.
 
 React dashboardlar har list sahifasida bir xil boilerplate'ni qo'lda yozadi: `searchParams`'dan `IFilter[]` qurish, bo'sh filterlarni tashlash, `sortType` ↔ `{name,direction}`, "har o'zgarishda page-reset", meta snake→camel. `@querykitjs/web` shularni bartaraf qiladi. Payload querykit backend (`@querykitjs/drizzle-pg`, mongoose adapter, ...) qabul qiladigan formatда.

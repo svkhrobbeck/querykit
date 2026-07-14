@@ -6,6 +6,8 @@
 
 # @querykitjs/web
 
+[![npm](https://img.shields.io/npm/v/@querykitjs/web.svg)](https://www.npmjs.com/package/@querykitjs/web) [![license](https://img.shields.io/npm/l/@querykitjs/web.svg)](./LICENSE)
+
 > Typed **query-building** for frontends: build filter/sort/pagination payloads, map response meta, sync URL state. It **does not send requests** — you pass the payload to your own `fetch`/`axios`. Zero-dependency.
 
 React dashboards hand-write the same boilerplate on every list page: build `IFilter[]` from `searchParams`, drop empty filters, `sortType` ↔ `{name,direction}`, "reset page on any change", snake→camel meta. `@querykitjs/web` removes all of it. The payload matches what the querykit backend (`@querykitjs/drizzle-pg`, a mongoose adapter, …) accepts.
