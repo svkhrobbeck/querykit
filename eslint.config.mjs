@@ -15,5 +15,19 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Node build/CI scripts run in the Node runtime.
+    files: ["scripts/**/*.{mjs,js}"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+        Buffer: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+      },
+    },
+  },
   prettier,
 );
