@@ -60,5 +60,8 @@ toPublish.sort((a, b) => (a.name.endsWith("/core") ? -1 : b.name.endsWith("/core
 for (const p of toPublish) {
   console.log(`\nPublishing ${p.name}@${p.version} ...`);
   execFileSync("npm", ["publish", "--access", "public"], { cwd: p.dir, stdio: "inherit" });
+  // changesets/action greps the publish command's stdout for these lines and,
+  // for each, creates the git tag and a GitHub Release from the CHANGELOG.
+  console.log(`New tag: ${p.name}@${p.version}`);
 }
 console.log(`\nPublished ${toPublish.length} package(s).`);
