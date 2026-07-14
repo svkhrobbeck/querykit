@@ -25,3 +25,4 @@ coverage
 # logs
 logs
 *.log
+.npmrc
