@@ -1,7 +1,7 @@
 {
-  "name": "@querykit/drizzle-pg",
+  "name": "@querykit/core",
   "version": "1.0.0",
-  "description": "Advanced filtering + flexible pagination repository layer for Drizzle ORM (PostgreSQL).",
+  "description": "ORM-agnostic query DSL shared by querykit packages — filters, operators & wire types.",
   "type": "module",
   "author": {
     "name": "Suhrobbek Soatov",
@@ -12,9 +12,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/svkhrobbeck/querykit.git",
-    "directory": "packages/drizzle-pg"
+    "directory": "packages/core"
   },
-  "homepage": "https://github.com/svkhrobbeck/querykit/tree/main/packages/drizzle-pg#readme",
+  "homepage": "https://github.com/svkhrobbeck/querykit/tree/main/packages/core#readme",
   "bugs": {
     "url": "https://github.com/svkhrobbeck/querykit/issues"
   },
@@ -44,28 +44,13 @@
     "typecheck": "tsc --noEmit",
     "test:smoke": "bun run test/smoke.ts"
   },
-  "dependencies": {
-    "@querykit/core": "workspace:*"
-  },
-  "peerDependencies": {
-    "drizzle-orm": ">=0.30"
-  },
-  "devDependencies": {
-    "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.9"
-  },
   "keywords": [
-    "drizzle",
-    "drizzle-orm",
-    "postgres",
-    "postgresql",
-    "repository",
-    "pagination",
-    "cursor",
-    "keyset",
-    "filter",
+    "querykit",
     "query",
-    "orm",
+    "filter",
+    "dsl",
+    "operators",
+    "pagination",
     "typescript"
   ]
 }

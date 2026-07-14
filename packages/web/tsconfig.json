@@ -3,7 +3,11 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM"],
     "types": ["node", "react"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@querykit/core": ["../core/src/index.ts"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

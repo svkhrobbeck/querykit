@@ -1,5 +1,6 @@
 import type { BuildQueryResult, DBQueryConfig, ExtractTablesWithRelations, InferInsertModel, InferSelectModel, SQL } from "drizzle-orm";
 import type { AnyPgTable, PgDatabase } from "drizzle-orm/pg-core";
+import type * as Core from "@querykit/core";
 
 /** Any Drizzle Postgres database or transaction, regardless of the driver. */
 export type AnyDb = PgDatabase<any, any, any>;
@@ -72,79 +73,33 @@ export type TableNameOf<TSchema extends Record<string, unknown>, TTable extends 
 export type ColumnKey<TTable extends AnyPgTable> = keyof Row<TTable> & string;
 
 /* -------------------------------- filters --------------------------------- */
+/* DSL `@querykit/core`dan; jadval ustuni (`ColumnKey`) va raw `SQL` bilan ixtisos. */
 
-export type FilterScalar = string | number | boolean | Date | null;
-export type FilterValue = FilterScalar | FilterScalar[];
-
-/**
- * All supported operators. Canonical names plus a few aliases:
- *  - `=`/`eq`, `!=`/`ne`, `>`/`gt`, `>=`/`gte`, `<`/`lt`, `<=`/`lte`
- *  - text: `contains`/`%_%`, `startsWith`/`%_`, `endsWith`/`_%`, `like`, `ilike`, `notLike`
- *  - sets: `in`, `notIn`
- *  - ranges: `between`, `notBetween` (value = `[min, max]`)
- *  - null checks: `isNull`, `isNotNull`
- */
-export type FilterOperator =
-  | "="
-  | "!="
-  | ">"
-  | ">="
-  | "<"
-  | "<="
-  | "eq"
-  | "ne"
-  | "gt"
-  | "gte"
-  | "lt"
-  | "lte"
-  | "like"
-  | "ilike"
-  | "notLike"
-  | "contains"
-  | "startsWith"
-  | "endsWith"
-  | "%_%"
-  | "%_"
-  | "_%"
-  | "in"
-  | "notIn"
-  | "between"
-  | "notBetween"
-  | "isNull"
-  | "isNotNull";
+export type FilterOperator = Core.FilterOperator;
+export type FilterScalar = Core.FilterScalar;
+export type FilterValue = Core.FilterValue;
 
 /** A single field comparison (`operation` defaults to `"="`). */
-export interface FieldCondition<TTable extends AnyPgTable = AnyPgTable> {
-  key: ColumnKey<TTable>;
-  operation?: FilterOperator;
-  value?: FilterValue;
-}
-
-export interface AndGroup<TTable extends AnyPgTable = AnyPgTable> {
-  and: FilterNode<TTable>[];
-}
-export interface OrGroup<TTable extends AnyPgTable = AnyPgTable> {
-  or: FilterNode<TTable>[];
-}
-export interface NotGroup<TTable extends AnyPgTable = AnyPgTable> {
-  not: FilterNode<TTable>;
-}
+export type FieldCondition<TTable extends AnyPgTable = AnyPgTable> = Core.FieldCondition<ColumnKey<TTable>>;
+export type AndGroup<TTable extends AnyPgTable = AnyPgTable> = Core.AndGroup<ColumnKey<TTable>, SQL>;
+export type OrGroup<TTable extends AnyPgTable = AnyPgTable> = Core.OrGroup<ColumnKey<TTable>, SQL>;
+export type NotGroup<TTable extends AnyPgTable = AnyPgTable> = Core.NotGroup<ColumnKey<TTable>, SQL>;
 
 /**
  * Any node in a filter tree: a field comparison, a logical group, or a raw
  * Drizzle `SQL` fragment (escape hatch for expressions the DSL can't express).
  */
-export type FilterNode<TTable extends AnyPgTable = AnyPgTable> = FieldCondition<TTable> | AndGroup<TTable> | OrGroup<TTable> | NotGroup<TTable> | SQL;
+export type FilterNode<TTable extends AnyPgTable = AnyPgTable> = Core.FilterNode<ColumnKey<TTable>, SQL>;
 
 /**
  * Public filter input. Either a filter tree/node, or a flat array of
  * conditions (treated as implicit AND — backward compatible with db-service).
  */
-export type Filter<TTable extends AnyPgTable = AnyPgTable> = FilterNode<TTable> | FieldCondition<TTable>[];
+export type Filter<TTable extends AnyPgTable = AnyPgTable> = Core.Filter<ColumnKey<TTable>, SQL>;
 
 /* --------------------------------- sorting -------------------------------- */
 
-export type SortDirection = "asc" | "desc";
+export type SortDirection = Core.SortDirection;
 
 export interface SortItem<TTable extends AnyPgTable = AnyPgTable> {
   key: ColumnKey<TTable>;
@@ -227,14 +182,7 @@ export interface OffsetParams<TTable extends AnyPgTable> extends QueryParams<TTa
   perPage?: number;
 }
 
-export interface OffsetMeta {
-  total_items: number;
-  total_pages: number;
-  current_page: number;
-  per_page: number;
-  has_next: boolean;
-  has_prev: boolean;
-}
+export type OffsetMeta = Core.OffsetMeta;
 
 export interface OffsetResult<T> {
   data: T[];
@@ -247,13 +195,7 @@ export interface InfiniteParams<TTable extends AnyPgTable> extends QueryParams<T
   offset?: number;
 }
 
-export interface InfiniteMeta {
-  limit: number;
-  offset: number;
-  count: number;
-  has_more: boolean;
-  next_offset: number | null;
-}
+export type InfiniteMeta = Core.InfiniteMeta;
 
 export interface InfiniteResult<T> {
   data: T[];
@@ -273,13 +215,7 @@ export interface CursorParams<TTable extends AnyPgTable> extends QueryParams<TTa
   direction?: "forward" | "backward";
 }
 
-export interface CursorMeta {
-  limit: number;
-  has_next: boolean;
-  has_prev: boolean;
-  next_cursor: string | null;
-  prev_cursor: string | null;
-}
+export type CursorMeta = Core.CursorMeta;
 
 export interface CursorResult<T> {
   data: T[];

@@ -49,6 +49,9 @@
     "typecheck": "tsc --noEmit",
     "test:smoke": "bun run test/smoke.ts"
   },
+  "dependencies": {
+    "@querykit/core": "workspace:*"
+  },
   "peerDependencies": {
     "react": ">=18"
   },

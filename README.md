@@ -9,13 +9,13 @@ result types inferred automatically.
 
 ## Packages
 
-| Package                                         | Status       | Description                                             |
-| ----------------------------------------------- | ------------ | ------------------------------------------------------- |
-| [`@querykit/drizzle-pg`](./packages/drizzle-pg) | ✅ available | Drizzle ORM + PostgreSQL (backend repository)           |
-| [`@querykit/web`](./packages/web)               | ✅ available | Frontend query-building (filters, pagination, URL sync) |
-| `@querykit/core`                                | 🚧 planned   | ORM-agnostic filter DSL, pagination & types             |
-| `@querykit/drizzle-sqlite`                      | 🚧 planned   | Drizzle ORM + SQLite                                    |
-| `@querykit/prisma-pg`                           | 🚧 planned   | Prisma + PostgreSQL                                     |
+| Package                                         | Status       | Description                                               |
+| ----------------------------------------------- | ------------ | --------------------------------------------------------- |
+| [`@querykit/core`](./packages/core)             | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared) |
+| [`@querykit/drizzle-pg`](./packages/drizzle-pg) | ✅ available | Drizzle ORM + PostgreSQL (backend repository)             |
+| [`@querykit/web`](./packages/web)               | ✅ available | Frontend query-building (filters, pagination, URL sync)   |
+| `@querykit/drizzle-sqlite`                      | 🚧 planned   | Drizzle ORM + SQLite                                      |
+| `@querykit/prisma-pg`                           | 🚧 planned   | Prisma + PostgreSQL                                       |
 
 Shared logic is moved into `@querykit/core` gradually as it emerges.
 

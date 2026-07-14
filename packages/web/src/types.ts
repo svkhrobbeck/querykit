@@ -1,77 +1,35 @@
 /**
- * Filter/query DSL tiplari — querykit backend (`@querykit/drizzle-pg`) qabul
- * qiladigan wire-format bilan mos (`{key, operation, value}`). Kelajakda
- * `@querykit/core`ga ajratiladi.
+ * Filter/query DSL tiplari — `@querykit/core`dan, entity maydoni (`FieldKey`)
+ * bilan ixtisoslashtirilgan. querykit backend (`@querykit/drizzle-pg`) qabul
+ * qiladigan wire-format bilan mos (`{key, operation, value}`).
  */
+import type * as Core from "@querykit/core";
 
-/**
- * Qo'llab-quvvatlanadigan filter operatorlari — querykit backend bilan bir xil
- * to'plam (token va nom aliaslari).
- */
-export type FilterOperator =
-  | "="
-  | "!="
-  | ">"
-  | ">="
-  | "<"
-  | "<="
-  | "eq"
-  | "ne"
-  | "gt"
-  | "gte"
-  | "lt"
-  | "lte"
-  | "like"
-  | "ilike"
-  | "notLike"
-  | "contains"
-  | "startsWith"
-  | "endsWith"
-  | "%_%" // contains
-  | "%_" // startsWith
-  | "_%" // endsWith
-  | "in"
-  | "notIn"
-  | "between"
-  | "notBetween"
-  | "isNull"
-  | "isNotNull";
-
-export type FilterScalar = string | number | boolean | null;
-export type FilterValue = FilterScalar | FilterScalar[] | Date;
+export type FilterOperator = Core.FilterOperator;
+export type FilterScalar = Core.FilterScalar;
+export type FilterValue = Core.FilterValue;
 
 /** Entity ustun (maydon) kaliti. */
 export type FieldKey<T> = Extract<keyof T, string>;
 
 /** Bitta maydon sharti (`operation` default `"="`). */
-export interface FieldCondition<T = Record<string, unknown>> {
-  key: FieldKey<T>;
-  operation?: FilterOperator;
-  value?: FilterValue;
-}
-
-export interface AndGroup<T = Record<string, unknown>> {
-  and: FilterNode<T>[];
-}
-export interface OrGroup<T = Record<string, unknown>> {
-  or: FilterNode<T>[];
-}
-export interface NotGroup<T = Record<string, unknown>> {
-  not: FilterNode<T>;
-}
+export type FieldCondition<T = Record<string, unknown>> = Core.FieldCondition<FieldKey<T>>;
+export type AndGroup<T = Record<string, unknown>> = Core.AndGroup<FieldKey<T>>;
+export type OrGroup<T = Record<string, unknown>> = Core.OrGroup<FieldKey<T>>;
+export type NotGroup<T = Record<string, unknown>> = Core.NotGroup<FieldKey<T>>;
 
 /** Filter daraxti tuguni: shart yoki mantiqiy guruh. */
-export type FilterNode<T = Record<string, unknown>> = FieldCondition<T> | AndGroup<T> | OrGroup<T> | NotGroup<T>;
+export type FilterNode<T = Record<string, unknown>> = Core.FilterNode<FieldKey<T>>;
 
 /**
  * Public filter: daraxt/tugun yoki flat massiv. Flat massiv implicit `AND` va
  * legacy backend (idistr) `IFilter[]` bilan to'liq mos.
  */
-export type Filter<T = Record<string, unknown>> = FilterNode<T> | FieldCondition<T>[];
+export type Filter<T = Record<string, unknown>> = Core.Filter<FieldKey<T>>;
 
 /* --------------------------------- sorting -------------------------------- */
 
-export type SortDirection = "asc" | "desc";
+export type SortDirection = Core.SortDirection;
 
 export interface Sort {
   name?: string;
@@ -147,15 +105,14 @@ export interface CursorPayload {
 /* --------------------------------- meta ----------------------------------- */
 /* Har uch paginatsiya rejimi turli meta qaytaradi — alohida map qilinadi.     */
 
-/** Offset (list) — xom meta (snake_case). */
-export interface RawMeta {
-  total_pages?: number;
-  total_items?: number;
-  current_page?: number;
-  per_page?: number;
-  has_next?: boolean;
-  has_prev?: boolean;
-}
+/**
+ * Xom (server, snake_case) meta tiplari — `@querykit/core`dan (adapter shu
+ * shaklda qaytaradi). Server ba'zi maydonlarni bermasligi mumkinligi uchun
+ * mapper'lar `Partial` qabul qiladi.
+ */
+export type RawMeta = Partial<Core.OffsetMeta>;
+export type RawInfiniteMeta = Partial<Core.InfiniteMeta>;
+export type RawCursorMeta = Partial<Core.CursorMeta>;
 
 /** Offset (list) — normalizatsiya qilingan meta (camelCase). */
 export interface Meta {
@@ -167,15 +124,6 @@ export interface Meta {
   hasPrev: boolean;
 }
 
-/** Infinite-scroll — xom meta. */
-export interface RawInfiniteMeta {
-  limit?: number;
-  offset?: number;
-  count?: number;
-  has_more?: boolean;
-  next_offset?: number | null;
-}
-
 /** Infinite-scroll — normalizatsiya qilingan meta. */
 export interface InfiniteMeta {
   limit: number;
@@ -183,15 +131,6 @@ export interface InfiniteMeta {
   count: number;
   hasMore: boolean;
   nextOffset: number | null;
-}
-
-/** Cursor — xom meta. */
-export interface RawCursorMeta {
-  limit?: number;
-  has_next?: boolean;
-  has_prev?: boolean;
-  next_cursor?: string | null;
-  prev_cursor?: string | null;
 }
 
 /** Cursor — normalizatsiya qilingan meta. */

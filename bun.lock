@@ -20,9 +20,16 @@
         "typescript-eslint": "^8.19.0",
       },
     },
+    "packages/core": {
+      "name": "@querykit/core",
+      "version": "1.0.0",
+    },
     "packages/drizzle-pg": {
       "name": "@querykit/drizzle-pg",
-      "version": "0.1.0",
+      "version": "1.0.0",
+      "dependencies": {
+        "@querykit/core": "workspace:*",
+      },
       "devDependencies": {
         "drizzle-orm": "^0.45.2",
         "postgres": "^3.4.9",
@@ -33,7 +40,10 @@
     },
     "packages/web": {
       "name": "@querykit/web",
-      "version": "0.1.0",
+      "version": "1.0.0",
+      "dependencies": {
+        "@querykit/core": "workspace:*",
+      },
       "devDependencies": {
         "@types/react": "^19.0.0",
         "react": "^19.0.0",
@@ -220,6 +230,8 @@
     "@nodelib/fs.stat": ["@nodelib/fs.stat@2.0.5", "", {}, "sha512-RkhPPp2zrqDAQA/2jNhnztcPAlv64XdhIp7a7454A5ovI7Bukxgt7MX7udwAu3zg1DcpPU0rz3VV1SeaqvY4+A=="],
 
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
+
+    "@querykit/core": ["@querykit/core@workspace:packages/core"],
 
     "@querykit/drizzle-pg": ["@querykit/drizzle-pg@workspace:packages/drizzle-pg"],
 
