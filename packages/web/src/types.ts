@@ -82,7 +82,7 @@ export interface QueryPayload {
 
 export interface ListPayload extends QueryPayload {
   page: number;
-  per_page: number;
+  perPage: number;
 }
 
 export interface InfinitePayload extends QueryPayload {

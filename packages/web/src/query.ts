@@ -190,12 +190,12 @@ export function buildParams(input: Params = {}): QueryPayload {
 }
 
 /**
- * {@link buildParams} + `page`/`per_page` (default `per_page = 15`).
+ * {@link buildParams} + `page`/`perPage` (default `perPage = 15`).
  *
  * @example
  * ```ts
  * const payload = buildListParams({ filter, sort: "-createdAt", page: 2, perPage: 20 });
- * // -> { filter, sort:{name,direction}, columns, with, page, per_page }
+ * // -> { filter, sort:{name,direction}, columns, with, page, perPage }
  * ```
  */
 export function buildListParams(input: ListParams = {}): ListPayload {

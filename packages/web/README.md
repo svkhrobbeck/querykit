@@ -70,7 +70,7 @@ const payload = buildListParams({
   perPage: 20,
   with: { supervisor: true }, // relations (default `with`)
 });
-// -> { filter:[...pruned], sort:{name,direction}, columns, with, page, per_page }
+// -> { filter:[...pruned], sort:{name,direction}, columns, with, page, perPage }
 ```
 
 Bo'sh qiymatli filterlar tashlanadi (`""`/`null`/`undefined`/`[]`), lekin `0`/`false` saqlanadi. Qiymatlar o'zgartirilmasdan yuboriladi.
@@ -82,7 +82,7 @@ Backend'ning 3 rejimiga mos 3 builder. Har birining javob meta'si **har xil**, s
 ```ts
 import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykit/web";
 
-// 1) Offset — page / per_page
+// 1) Offset — page / perPage
 const p = buildListParams({ filter, page: 2, perPage: 20 });
 mapMeta(res.meta); // { totalPages, totalCount, currentPage, perPage, hasNext, hasPrev }
 
@@ -156,12 +156,14 @@ const { data } = await http.post("/buyers/list", params);
 setMeta(mapMeta(data.meta));
 ```
 
-## Boshqa backend (custom field nomlari)
+## Boshqa / legacy backend (custom field nomlari)
+
+Default querykit-canonical camelCase (`perPage`, `with`). Eski snake-backend (masalan idistr) uchun sozlang:
 
 ```ts
 import { createQuery } from "@querykit/web";
 
-const q = createQuery({ withField: "withPopulates", perPageField: "perPage", defaultPerPage: 20 });
+const q = createQuery({ perPageField: "per_page", withField: "withPopulates" });
 const params = q.list({ filter, page, perPage });
 ```
 
@@ -171,7 +173,7 @@ const params = q.list({ filter, page, perPage });
 | ---------------------------------------------- | -------------------------------------- |
 | `createFilters<T>()` / `f`                     | tipli filter builder / tipsiz          |
 | `buildParams(input)`                           | params normalizatsiya (paginatsiyasiz) |
-| `buildListParams(input)`                       | + `page`/`per_page` (offset)           |
+| `buildListParams(input)`                       | + `page`/`perPage` (offset)            |
 | `buildInfiniteParams(input)`                   | + `limit`/`offset` (infinite)          |
 | `buildCursorParams(input)`                     | + `limit`/`cursor`/`order`/`direction` |
 | `createQuery(config)`                          | custom field nomlari bilan builder     |

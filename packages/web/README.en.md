@@ -70,7 +70,7 @@ const payload = buildListParams({
   perPage: 20,
   with: { supervisor: true }, // relations (default `with`)
 });
-// -> { filter:[...pruned], sort:{name,direction}, columns, with, page, per_page }
+// -> { filter:[...pruned], sort:{name,direction}, columns, with, page, perPage }
 ```
 
 Empty filters are dropped (`""`/`null`/`undefined`/`[]`), but `0`/`false` are kept. Values are sent through unchanged.
@@ -82,7 +82,7 @@ Three builders matching the backend's three modes. Each mode's response meta is 
 ```ts
 import { buildListParams, buildInfiniteParams, buildCursorParams, mapMeta, mapInfiniteMeta, mapCursorMeta } from "@querykit/web";
 
-// 1) Offset — page / per_page
+// 1) Offset — page / perPage
 const p = buildListParams({ filter, page: 2, perPage: 20 });
 mapMeta(res.meta); // { totalPages, totalCount, currentPage, perPage, hasNext, hasPrev }
 
@@ -156,12 +156,14 @@ const { data } = await http.post("/buyers/list", params);
 setMeta(mapMeta(data.meta));
 ```
 
-## Other backends (custom field names)
+## Other / legacy backends (custom field names)
+
+Defaults are querykit-canonical camelCase (`perPage`, `with`). For a legacy snake-case backend (e.g. idistr), configure it:
 
 ```ts
 import { createQuery } from "@querykit/web";
 
-const q = createQuery({ withField: "withPopulates", perPageField: "perPage", defaultPerPage: 20 });
+const q = createQuery({ perPageField: "per_page", withField: "withPopulates" });
 const params = q.list({ filter, page, perPage });
 ```
 
@@ -171,7 +173,7 @@ const params = q.list({ filter, page, perPage });
 | ---------------------------------------------- | -------------------------------------- |
 | `createFilters<T>()` / `f`                     | typed / untyped filter builder         |
 | `buildParams(input)`                           | normalize params (no pagination)       |
-| `buildListParams(input)`                       | + `page`/`per_page` (offset)           |
+| `buildListParams(input)`                       | + `page`/`perPage` (offset)            |
 | `buildInfiniteParams(input)`                   | + `limit`/`offset` (infinite)          |
 | `buildCursorParams(input)`                     | + `limit`/`cursor`/`order`/`direction` |
 | `createQuery(config)`                          | builder with custom field names        |
