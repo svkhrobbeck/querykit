@@ -186,6 +186,16 @@ check(
   }),
 );
 
+// operator-per-field-type (C5): comparison ok on numbers, string-match rejected on numbers
+users.f.gte("age", 18);
+// @ts-expect-error `contains` is string-only; `age` is a number
+users.f.contains("age", "x");
+
+// fromSearchParams (SSR / no-hook): build a list payload straight from the URL
+const ssrSchema = users.schema({ status: { key: "status" }, buyerName: { key: "buyerName", operation: "%_%" } });
+const ssr = users.fromSearchParams(new URLSearchParams({ status: "active", page: "3" }), { schema: ssrSchema });
+check("registry fromSearchParams (SSR)", ssr.page === 3 && (ssr.filter as FieldCondition[]).some(c => c.key === "status" && c.value === "active"));
+
 /* 15. registry — query keys */
 check("registry keys", eq(users.keys.list(lp), ["users", "list", lp]) && eq(users.keys.detail(5), ["users", "detail", 5]) && eq(users.keys.all, ["users"]));
 

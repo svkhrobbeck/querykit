@@ -1,5 +1,5 @@
 import { createQuery, type QueryConfig } from "./query";
-import { createFilters } from "./filters";
+import { createFilters, f as rawF } from "./filters";
 import { mapMeta, mapInfiniteMeta, mapCursorMeta } from "./meta";
 import { defineListSchema, type ListSchema } from "./schema";
 import { decodeSort, readListParams, type UrlConfig } from "./url";
@@ -170,7 +170,7 @@ export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>)
       cursor: input => q.cursor({ ...(input as unknown as CursorParams), order: input?.order ?? cursorOrder }) as unknown as CursorPayload,
       params: input => q.params(input as unknown as Params) as unknown as QueryPayload,
       f,
-      search: (term, fields) => f.or(...fields.map(field => f.contains(field, term))) as unknown as Filter<T>,
+      search: (term, fields) => rawF.or(...fields.map(field => rawF.contains(field, term))) as unknown as Filter<T>,
       schema: s => defineListSchema(s),
       fromSearchParams: (searchParams, options) =>
         q.list({ ...readListParams(options.schema, searchParams, options.url), with: options.with } as unknown as ListParams) as unknown as ListPayload,

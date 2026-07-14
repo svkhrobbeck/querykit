@@ -9,15 +9,13 @@
  *
  * @example
  * ```ts
- * import { buildListParams, f, mapMeta } from "@querykitjs/web";
+ * import { createRegistry } from "@querykitjs/web";
  *
- * const params = buildListParams({
- *   filter: f.and(f.contains("name", search), f.eq("status", status)),
- *   sort: "-createdAt",
- *   page, perPage: 20,
- * });
- * const { data, meta } = (await http.post("/buyers/list", params)).data;
- * setMeta(mapMeta(meta));
+ * const qk = createRegistry({ adapter: "drizzle-pg", defaults: { perPage: 20, sort: "-createdAt" } });
+ * const users = qk.resource<IUser>("users");
+ *
+ * const body = users.list({ filter: users.f.eq("status", "active"), page });
+ * const { data, meta } = users.parseList((await http.post("/users/list", body)).data);
  * ```
  */
 export { createFilters, f } from "./filters";
