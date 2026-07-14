@@ -108,6 +108,12 @@ async function main() {
     const list = await usersRepo.findList({ page: 1, perPage: 2 });
     check("offset pagination", list.data.length === 2 && list.meta.total_items === 3 && list.meta.has_next);
 
+    // 3b. default perPage: 20 (core) when omitted; configurable via registry options
+    const defList = await usersRepo.findList({});
+    check("default perPage = 20 (core)", defList.meta.per_page === 20);
+    const cfgRepo = createRegistry(db, schema, { defaultPerPage: 25 }).repository(users);
+    check("registry option overrides default perPage", (await cfgRepo.findList({})).meta.per_page === 25);
+
     // 4. infinite
     const inf = await usersRepo.findInfinite({ limit: 2, offset: 0 });
     check("infinite scroll", inf.data.length === 2 && inf.meta.has_more && inf.meta.next_offset === 2);

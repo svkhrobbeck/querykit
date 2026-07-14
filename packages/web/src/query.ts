@@ -1,3 +1,5 @@
+import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykit/core";
+
 import type {
   CursorParams,
   CursorPayload,
@@ -45,8 +47,8 @@ const DEFAULTS: Required<QueryConfig> = {
   limitField: "limit",
   offsetField: "offset",
   cursorField: "cursor",
-  defaultPerPage: 15,
-  defaultLimit: 20,
+  defaultPerPage: DEFAULT_PER_PAGE,
+  defaultLimit: DEFAULT_LIMIT,
   defaultSort: { name: "createdAt", direction: "desc" },
   pruneEmpty: true,
 };
@@ -190,7 +192,7 @@ export function buildParams(input: Params = {}): QueryPayload {
 }
 
 /**
- * {@link buildParams} + `page`/`perPage` (default `perPage = 15`).
+ * {@link buildParams} + `page`/`perPage` (default `perPage = 20`, `@querykit/core`).
  *
  * @example
  * ```ts

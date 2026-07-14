@@ -35,6 +35,10 @@ export interface RepoRuntime {
   baseDb: AnyDb;
   /** Current executor — the active transaction if any, else `baseDb`. */
   getExecutor: () => AnyDb;
+  /** Default page size for `findList` when `perPage` is omitted. */
+  defaultPerPage: number;
+  /** Default `limit` for `findInfinite`/`findCursor` when omitted. */
+  defaultLimit: number;
 }
 
 /** Per-repository configuration (scope). */
@@ -181,7 +185,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
 
     async findList(params: OffsetParams<TTable> = {}) {
       const page = Math.max(1, Math.trunc(params.page ?? 1));
-      const perPage = Math.max(1, Math.trunc(params.perPage ?? 10));
+      const perPage = Math.max(1, Math.trunc(params.perPage ?? runtime.defaultPerPage));
       const where = composeWhere(params.filter, params.withDeleted);
 
       const [data, total_items] = await Promise.all([
@@ -211,7 +215,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     },
 
     async findInfinite(params: InfiniteParams<TTable> = {}) {
-      const limit = Math.max(1, Math.trunc(params.limit ?? 20));
+      const limit = Math.max(1, Math.trunc(params.limit ?? runtime.defaultLimit));
       const offset = Math.max(0, Math.trunc(params.offset ?? 0));
 
       const rows = await handle().findMany({
@@ -238,7 +242,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     },
 
     async findCursor(params: CursorParams<TTable> = {}) {
-      const limit = Math.max(1, Math.trunc(params.limit ?? 20));
+      const limit = Math.max(1, Math.trunc(params.limit ?? runtime.defaultLimit));
       const cursorKey = (params.cursorKey ?? "id") as string;
       const order: SortDirection = params.order ?? "asc";
       const direction = params.direction ?? "forward";

@@ -52,7 +52,11 @@ import { db } from "./index"; // drizzle(client, { schema })
 import * as schema from "./schema";
 
 export const registry = createRegistry(db, schema);
+// yoki pagination default'larini sozlab:
+// export const registry = createRegistry(db, schema, { defaultPerPage: 20, defaultLimit: 20 });
 ```
+
+`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) berilmasa `@querykit/core`ning **20** default'i ishlatiladi.
 
 ### 2. Jadval repositorylari
 

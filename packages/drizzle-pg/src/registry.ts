@@ -1,6 +1,7 @@
 import type { AnyPgTable } from "drizzle-orm/pg-core";
+import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykit/core";
 
-import type { AnyDb, Registry, Repository, RepositoryExtender } from "./types";
+import type { AnyDb, Registry, RegistryOptions, Repository, RepositoryExtender } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
 import { createContextStore } from "./internal/context";
 
@@ -17,11 +18,13 @@ import { createContextStore } from "./internal/context";
  * @typeParam TSchema - `drizzle(client, { schema })` ga berilgan schema tipi.
  * @param db - Drizzle Postgres bazasi (`drizzle-orm/postgres-js` va h.k.).
  * @param schema - `db.query` uchun ishlatilgan to'liq schema obyekti.
+ * @param options - `defaultPerPage` (findList) / `defaultLimit` (infinite/cursor).
+ *   Berilmasa `@querykit/core`ning `DEFAULT_PER_PAGE`/`DEFAULT_LIMIT` (20).
  * @returns Jadval repositorylari chiqaruvchi {@link Registry}.
  * @example
  * ```ts
  * // registry.ts (bir marta)
- * export const registry = createRegistry(db, schema);
+ * export const registry = createRegistry(db, schema, { defaultPerPage: 20 });
  *
  * // users.repository.ts — custom metodlar bilan kengaytirish
  * export const usersRepository = registry.repository(users, base => ({
@@ -30,11 +33,13 @@ import { createContextStore } from "./internal/context";
  * }));
  * ```
  */
-export function createRegistry<TSchema extends Record<string, unknown>>(db: AnyDb, schema: TSchema): Registry<TSchema> {
+export function createRegistry<TSchema extends Record<string, unknown>>(db: AnyDb, schema: TSchema, options: RegistryOptions = {}): Registry<TSchema> {
   const ctx = createContextStore();
   const runtime: RepoRuntime = {
     baseDb: db,
     getExecutor: () => ctx.get()?.executor ?? db,
+    defaultPerPage: options.defaultPerPage ?? DEFAULT_PER_PAGE,
+    defaultLimit: options.defaultLimit ?? DEFAULT_LIMIT,
   };
 
   function repository<TTable extends AnyPgTable>(table: TTable): Repository<TTable, TSchema>;

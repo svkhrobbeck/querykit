@@ -79,7 +79,7 @@ check("sortType asc", eq(sortedAsc.sort, { name: "name", direction: "asc" }));
 const paged = buildListParams({ page: 2, perPage: 20 });
 check("pagination fields", paged.page === 2 && paged.perPage === 20);
 const defPaged = buildListParams({});
-check("pagination defaults", defPaged.page === 1 && defPaged.perPage === 15);
+check("pagination defaults (20 from core)", defPaged.page === 1 && defPaged.perPage === 20);
 check(
   "page < 1 (0.5 / 0 / -3) → 1",
   buildListParams({ page: 0.5 }).page === 1 && buildListParams({ page: 0 }).page === 1 && buildListParams({ page: -3 }).page === 1,

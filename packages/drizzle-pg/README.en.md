@@ -52,7 +52,11 @@ import { db } from "./index"; // drizzle(client, { schema })
 import * as schema from "./schema";
 
 export const registry = createRegistry(db, schema);
+// or configure pagination defaults:
+// export const registry = createRegistry(db, schema, { defaultPerPage: 20, defaultLimit: 20 });
 ```
+
+`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) fall back to `@querykit/core`'s **20** when omitted.
 
 ### 2. Per-table repositories
 

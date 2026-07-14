@@ -451,6 +451,14 @@ export type RepositoryExtender<TTable extends AnyPgTable, TSchema extends Record
   base: Repository<TTable, TSchema>,
 ) => TExt;
 
+/** {@link createRegistry} sozlamalari — pagination default'lari. */
+export interface RegistryOptions {
+  /** `findList` uchun default sahifa o'lchami (core `DEFAULT_PER_PAGE` = 20). */
+  defaultPerPage?: number;
+  /** `findInfinite`/`findCursor` uchun default `limit` (core `DEFAULT_LIMIT` = 20). */
+  defaultLimit?: number;
+}
+
 /** DB registry: bir marta yaratiladi, jadval repositorylarini chiqaradi. */
 export interface Registry<TSchema extends Record<string, unknown>> {
   /** Registry yaratishda berilgan schema. */
