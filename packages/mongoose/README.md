@@ -6,11 +6,39 @@
 
 # @querykitjs/mongoose
 
+[![npm](https://img.shields.io/npm/v/@querykitjs/mongoose.svg)](https://www.npmjs.com/package/@querykitjs/mongoose) [![license](https://img.shields.io/npm/l/@querykitjs/mongoose.svg)](./LICENSE)
+
 > Mongoose (MongoDB) uchun ilg'or filtrlash + moslashuvchan paginatsiya repository qatlami.
 
-Mongoose ustiga qo'lda yozadigan kodni — murakkab filterlar, 3 xil paginatsiya, tranzaksiya, RBAC scope, soft-delete, bulk/aggregatsiya — bitta tipli repository'ga jamlaydi. Natija tiplari `with`/`columns`dan avtomatik chiqariladi. Ommaviy yuza [`@querykitjs/drizzle-pg`](https://www.npmjs.com/package/@querykitjs/drizzle-pg) bilan bir xil — shuning uchun **bitta frontend kontrakti** ham Postgres, ham MongoDB backend'ini boshqaradi.
+Mongoose ustiga qo'lda yozadigan kodni — murakkab filterlar, 3 xil paginatsiya, tranzaksiya, RBAC scope, soft-delete, bulk/aggregatsiya — bitta tipli repository'ga jamlaydi. Natija tiplari `with`/`columns`dan avtomatik chiqariladi. Ommaviy yuza [`@querykitjs/drizzle-pg`](https://www.npmjs.com/package/@querykitjs/drizzle-pg) bilan bir xil — shuning uchun **bitta frontend kontrakti** ([`@querykitjs/web`](https://www.npmjs.com/package/@querykitjs/web)) ham Postgres, ham MongoDB backend'ini boshqaradi.
+
+## Tez boshlash
 
 ```ts
+import mongoose, { Schema } from "mongoose";
+import { createRegistry, createFilters } from "@querykitjs/mongoose";
+
+// 1. oddiy Mongoose modeli
+interface IUser {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  age: number | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+const User = mongoose.model<IUser>("User", new Schema<IUser>({ name: String, email: String, age: Number, status: String }, { timestamps: true }));
+
+// 2. ulaning, so'ng connection'dan registry quring
+await mongoose.connect(process.env.MONGO_URL!);
+export const registry = createRegistry(mongoose.connection);
+
+// 3. har model uchun bitta tipli repository
+export const usersRepository = registry.repository(User);
+
+// 4. so'rov — filter, sort, pagination, hammasi tipli
+const f = createFilters<IUser>();
 const { data, meta } = await usersRepository.findList({
   page: 2,
   perPage: 20,
@@ -68,6 +96,18 @@ export const usersRepository = registry.repository(User, base => ({
   findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
 }));
 ```
+
+## MongoDB-ga xos jihatlar
+
+- **`id` ↔ `_id`.** Istalgan joyda `"id"` ishlating (filter, `columns`, `idKey`, `cursorKey`) — u Mongo'ning `_id`siga o'giriladi, wire kontrakti SQL adapter bilan bir xil. Frontend'дан kelган string id'lar avtomatik `ObjectId`ga cast bo'ladi:
+  ```ts
+  await usersRepository.findById("665f0e...b3a"); // string → ObjectId
+  await usersRepository.findAll({ filter: [{ key: "id", operation: "in", value: [id1, id2] }] });
+  ```
+- **Qiymat cast.** Wire string'lar schema tomonidan cast qilinadi — ISO sana → `Date`, hex string → `ObjectId` — `find`, `aggregate` `$match` va cursor tokenlarда birxil.
+- **O'qishlar `.lean()`** — oddiy POJO (hydrate qilinган Mongoose hujjati emas), SQL adapter qatorlari bilan mos.
+- **Cursor** default `_id` bo'yicha (`cursorKey` bilan o'zgartiring) — insert'larда barqaror.
+- **Tranzaksiya replica set talab qiladi** — lokal dev uchun bir-nodали yetarli (`mongod --replSet rs0` so'ng `rs.initiate()`, yoki testда [`mongodb-memory-server`](https://github.com/typegoose/mongodb-memory-server)).
 
 ## Ilg'or filterlar
 

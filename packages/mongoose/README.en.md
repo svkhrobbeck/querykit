@@ -6,11 +6,39 @@
 
 # @querykitjs/mongoose
 
+[![npm](https://img.shields.io/npm/v/@querykitjs/mongoose.svg)](https://www.npmjs.com/package/@querykitjs/mongoose) [![license](https://img.shields.io/npm/l/@querykitjs/mongoose.svg)](./LICENSE)
+
 > Advanced filtering + flexible pagination repository layer for Mongoose (MongoDB).
 
-Collapses the code you'd otherwise hand-write on top of Mongoose — complex filters, three pagination styles, transactions, RBAC scoping, soft-delete, bulk/aggregation — into one typed repository. Result types are inferred automatically from `with`/`columns`. The public surface mirrors [`@querykitjs/drizzle-pg`](https://www.npmjs.com/package/@querykitjs/drizzle-pg), so the **same frontend contract** drives both a Postgres and a MongoDB backend.
+Collapses the code you'd otherwise hand-write on top of Mongoose — complex filters, three pagination styles, transactions, RBAC scoping, soft-delete, bulk/aggregation — into one typed repository. Result types are inferred automatically from `with`/`columns`. The public surface mirrors [`@querykitjs/drizzle-pg`](https://www.npmjs.com/package/@querykitjs/drizzle-pg), so the **same frontend contract** ([`@querykitjs/web`](https://www.npmjs.com/package/@querykitjs/web)) drives both a Postgres and a MongoDB backend.
+
+## Quick start
 
 ```ts
+import mongoose, { Schema } from "mongoose";
+import { createRegistry, createFilters } from "@querykitjs/mongoose";
+
+// 1. a normal Mongoose model
+interface IUser {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  age: number | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+const User = mongoose.model<IUser>("User", new Schema<IUser>({ name: String, email: String, age: Number, status: String }, { timestamps: true }));
+
+// 2. connect, then build the registry from the connection
+await mongoose.connect(process.env.MONGO_URL!);
+export const registry = createRegistry(mongoose.connection);
+
+// 3. one typed repository per model
+export const usersRepository = registry.repository(User);
+
+// 4. query — filters, sort, pagination, all typed
+const f = createFilters<IUser>();
 const { data, meta } = await usersRepository.findList({
   page: 2,
   perPage: 20,
@@ -68,6 +96,18 @@ export const usersRepository = registry.repository(User, base => ({
   findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
 }));
 ```
+
+## MongoDB specifics
+
+- **`id` ↔ `_id`.** Use `"id"` anywhere (filters, `columns`, `idKey`, `cursorKey`) — it resolves to Mongo's `_id`, so the wire contract is identical to the SQL adapter. String ids from the frontend cast to `ObjectId` automatically:
+  ```ts
+  await usersRepository.findById("665f0e...b3a"); // string → ObjectId
+  await usersRepository.findAll({ filter: [{ key: "id", operation: "in", value: [id1, id2] }] });
+  ```
+- **Value casting.** Wire strings are cast by the schema — an ISO date string → `Date`, a hex string → `ObjectId` — consistently in `find`, `aggregate` `$match`, and cursor tokens.
+- **Reads are `.lean()`** — plain POJOs (not hydrated Mongoose documents), matching the SQL adapter's rows.
+- **Cursor** keys on `_id` by default (override with `cursorKey`) — stable under inserts.
+- **Transactions need a replica set** — a single-node one is enough for local dev (`mongod --replSet rs0` then `rs.initiate()`, or [`mongodb-memory-server`](https://github.com/typegoose/mongodb-memory-server) in tests).
 
 ## Advanced filters
 
