@@ -37,22 +37,5 @@ export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: So
 
 function normalize(sort?: Sort): NormalizedSort[] {
   if (!sort) return [];
-
-  if (Array.isArray(sort)) {
-    return sort.map(item => ({
-      key: item.key,
-      direction: item.direction ?? "asc",
-    }));
-  }
-
-  if ("key" in sort) {
-    return [{ key: sort.key, direction: sort.direction ?? "asc" }];
-  }
-
-  // Legacy { name, direction } shape.
-  if (sort.name) {
-    return [{ key: sort.name, direction: sort.direction ?? "asc" }];
-  }
-
-  return [];
+  return sort.map(item => ({ key: item.key, direction: item.direction ?? "asc" }));
 }

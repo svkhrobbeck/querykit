@@ -10,7 +10,7 @@
 
 > Frontend uchun **tipli query-building**: filter/sort/pagination payloadini quradi, javob meta'sini map qiladi, URL-state sync beradi. **So'rov yubormaydi** — chiqqan payload'ni o'z `fetch`/`axios`ingizga uzatasiz. Zero-dependency.
 
-React dashboardlar har list sahifasida bir xil boilerplate'ni qo'lda yozadi: `searchParams`'dan `IFilter[]` qurish, bo'sh filterlarni tashlash, `sortType` ↔ `{name,direction}`, "har o'zgarishda page-reset", meta snake→camel. `@querykitjs/web` shularni bartaraf qiladi. Payload querykit backend (`@querykitjs/drizzle-pg`, mongoose adapter, ...) qabul qiladigan formatда.
+React dashboardlar har list sahifasida bir xil boilerplate'ni qo'lda yozadi: `searchParams`'dan `IFilter[]` qurish, bo'sh filterlarni tashlash, `sortType` ↔ `[{key,direction}]` (ko'p-maydon), "har o'zgarishda page-reset", meta snake→camel. `@querykitjs/web` shularni bartaraf qiladi. Payload querykit backend (`@querykitjs/drizzle-pg`, mongoose adapter, ...) qabul qiladigan formatда.
 
 ```ts
 // src/lib/query.ts — bir marta sozlang
@@ -18,7 +18,7 @@ import { createRegistry } from "@querykitjs/web";
 
 export const qk = createRegistry({
   adapter: "drizzle-pg", // `with` intellisense'ini backend'ga moslaydi
-  defaults: { perPage: 20, sort: "-createdAt" },
+  defaults: { perPage: 20, sort: ["-createdAt"] },
 });
 ```
 
@@ -81,7 +81,7 @@ export const qk = createRegistry({
   defaults: {
     perPage: 20, // list (offset) sahifa hajmi
     limit: 20, // infinite + cursor hajmi
-    sort: "-createdAt", // list + infinite tartibi (boshidagi "-" = desc)
+    sort: ["-createdAt"], // list + infinite tartibi (boshidagi "-" = desc)
     cursor: { order: "asc" }, // faqat cursor: kalit bo'ylab yurish tartibi
   },
   pruneEmpty: true, // bo'sh filterlarni tashlash (""/null/undefined/[]); 0/false qoladi
@@ -93,7 +93,7 @@ export const qk = createRegistry({
 | `adapter`               | Backend turi — `with` tipini moslaydi (faqat intellisense).                       |
 | `defaults.perPage`      | `list` uchun default `perPage`.                                                   |
 | `defaults.limit`        | `infinite` va `cursor` uchun default `limit`.                                     |
-| `defaults.sort`         | `list`/`infinite` default sort (`"-field"` string yoki `{name,direction}`).       |
+| `defaults.sort`         | `list`/`infinite` default sort — `[{key,direction}]` yoki `["-field"]` shorthand. |
 | `defaults.cursor.order` | Default cursor tartibi (`"asc"`/`"desc"`).                                        |
 | `pruneEmpty`            | Form input'lardan qurilgan bo'sh filterlarni avtomatik tashlash (default `true`). |
 
@@ -159,6 +159,30 @@ users.search("ali", ["buyerName", "email"]);
 
 Tipsiz `f` ham bor: `import { f } from "@querykitjs/web"` (maydon-tip tekshiruvisiz, tez ishlatish).
 
+## Sort — hamisha `[{ key, direction }]` (ko'p-maydon)
+
+Sort **hamisha** `{ key, direction }` elementlar massivi — butun querykit stеки bo'ylab (frontend + har bir backend adapter) bir xil shakl.
+
+```ts
+// canonical
+users.list({ sort: [{ key: "createdAt", direction: "desc" }] });
+
+// ko'p-maydon — ORDER BY name ASC, createdAt DESC
+users.list({ sort: [{ key: "name" }, { key: "createdAt", direction: "desc" }] });
+
+// shorthand — builder `"-field"` / `"field"` string'larни o'zi maplaydi
+users.list({ sort: ["-createdAt", "name"] }); // → [{ key:"createdAt", direction:"desc" }, { key:"name", direction:"asc" }]
+```
+
+**URL round-trip.** `setSort` bitta vergul bilan ajratilgan `sortType` param'ga kodlaydi; o'qiganда yana massivga dekodlanadi — ko'p-sort URL'да saqlanadi:
+
+```ts
+setSort(searchParams, ["-createdAt", "id"]); // ?sortType=-createdAt,id
+decodeSort("-createdAt,id"); // → [{ key:"createdAt", direction:"desc" }, { key:"id", direction:"asc" }]
+```
+
+**Backend faqat** canonical `[{ key, direction }]`ни oladi — `"-field"` shorthand frontend'да resolve qilinadi, wire'га hech qачон yuborilmaydi.
+
 ## Builder'lar — kirish va **nima qaytaradi**
 
 Bular **sof, sinxron** funksiyalar. **Payload obyekt** qaytaradi (Promise emas, data emas). O'zingiz yuborasiz.
@@ -166,7 +190,7 @@ Bular **sof, sinxron** funksiyalar. **Payload obyekt** qaytaradi (Promise emas, 
 ```ts
 // list — offset (page)
 users.list({ filter?, sort?, columns?, with?, withDeleted?, page?, perPage? });
-// → { filter, sort:{name,direction}, columns, with, page, perPage, withDeleted? }
+// → { filter, sort: [{ key, direction }], columns, with, page, perPage, withDeleted? }
 
 // infinite — limit/offset
 users.infinite({ filter?, sort?, columns?, with?, withDeleted?, limit?, offset? });
@@ -340,7 +364,7 @@ const users = qk.resource<IUser>("users");
 function useUsers(filters: { status?: string; search?: string }, page: number) {
   const body = users.list({
     filter: [users.f.eq("status", filters.status), users.f.contains("name", filters.search)],
-    sort: "-createdAt",
+    sort: ["-createdAt"],
     page,
   });
   return useQuery({
@@ -409,7 +433,7 @@ import { buildListParams, buildInfiniteParams, buildCursorParams, f } from "@que
 
 const body = buildListParams({
   filter: f.and(f.contains("name", search), f.eq("status", status)),
-  sort: "-createdAt",
+  sort: ["-createdAt"],
   page,
   perPage: 20,
   with: { supervisor: true },
@@ -459,7 +483,7 @@ const { data, meta } = users.parseList(await res.json());
 | `searchParamsToPayload(schema, sp)`                                               | searchParams → to'liq payload                          |
 | `readListParams(schema, sp)`                                                      | searchParams → `ListParams`                            |
 | `setParam/setPage/setSize/setSort/resetParams`                                    | URL yozish (immutable, page-reset)                     |
-| `encodeSort/decodeSort`                                                           | `{name,direction}` ↔ `"-createdAt"`                    |
+| `encodeSort/decodeSort`                                                           | `[{key,direction}]` ↔ `"-createdAt,id"` (multi-field)  |
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router-dom)                       |
 | `useListParamsBase(resource, {schema, searchParams, setSearchParams})` (`/react`) | router-agnostik hook                                   |
 

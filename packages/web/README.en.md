@@ -10,7 +10,7 @@
 
 > Typed **query-building** for frontends: build filter/sort/pagination payloads, map response meta, sync URL state. It **does not send requests** — you pass the payload to your own `fetch`/`axios`. Zero-dependency.
 
-React dashboards hand-write the same boilerplate on every list page: build `IFilter[]` from `searchParams`, drop empty filters, `sortType` ↔ `{name,direction}`, "reset page on any change", snake→camel meta. `@querykitjs/web` removes all of it. The payload matches what the querykit backend (`@querykitjs/drizzle-pg`, a mongoose adapter, …) accepts.
+React dashboards hand-write the same boilerplate on every list page: build `IFilter[]` from `searchParams`, drop empty filters, `sortType` ↔ `[{key,direction}]` (multi-field), "reset page on any change", snake→camel meta. `@querykitjs/web` removes all of it. The payload matches what the querykit backend (`@querykitjs/drizzle-pg`, a mongoose adapter, …) accepts.
 
 ```ts
 // src/lib/query.ts — configure once
@@ -18,7 +18,7 @@ import { createRegistry } from "@querykitjs/web";
 
 export const qk = createRegistry({
   adapter: "drizzle-pg", // tailors `with` intellisense to the backend
-  defaults: { perPage: 20, sort: "-createdAt" },
+  defaults: { perPage: 20, sort: ["-createdAt"] },
 });
 ```
 
@@ -81,21 +81,21 @@ export const qk = createRegistry({
   defaults: {
     perPage: 20, // list (offset) page size
     limit: 20, // infinite + cursor page size
-    sort: "-createdAt", // list + infinite ordering (leading "-" = desc)
+    sort: ["-createdAt"], // list + infinite ordering (leading "-" = desc)
     cursor: { order: "asc" }, // cursor-only key traversal order
   },
   pruneEmpty: true, // drop empty filter values (""/null/undefined/[]); keep 0/false
 });
 ```
 
-| Config                  | Meaning                                                                       |
-| ----------------------- | ----------------------------------------------------------------------------- |
-| `adapter`               | Target backend — tailors `with` typing (intellisense only).                   |
-| `defaults.perPage`      | Default `perPage` for `list`.                                                 |
-| `defaults.limit`        | Default `limit` for `infinite` and `cursor`.                                  |
-| `defaults.sort`         | Default sort for `list`/`infinite` (`"-field"` string or `{name,direction}`). |
-| `defaults.cursor.order` | Default cursor traversal order (`"asc"`/`"desc"`).                            |
-| `pruneEmpty`            | Auto-drop empty filter conditions built from form inputs (default `true`).    |
+| Config                  | Meaning                                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `adapter`               | Target backend — tailors `with` typing (intellisense only).                         |
+| `defaults.perPage`      | Default `perPage` for `list`.                                                       |
+| `defaults.limit`        | Default `limit` for `infinite` and `cursor`.                                        |
+| `defaults.sort`         | Default sort for `list`/`infinite` — `[{key,direction}]` or `["-field"]` shorthand. |
+| `defaults.cursor.order` | Default cursor traversal order (`"asc"`/`"desc"`).                                  |
+| `pruneEmpty`            | Auto-drop empty filter conditions built from form inputs (default `true`).          |
 
 Every default is overridable per call.
 
@@ -159,6 +159,30 @@ users.search("ali", ["buyerName", "email"]);
 
 An untyped `f` is also exported: `import { f } from "@querykitjs/web"` (no field-type checks, quick use).
 
+## Sort — always `[{ key, direction }]` (multi-field)
+
+Sort is **always an array** of `{ key, direction }` items — one shape across the whole querykit stack (frontend + every backend adapter).
+
+```ts
+// canonical
+users.list({ sort: [{ key: "createdAt", direction: "desc" }] });
+
+// multi-field — ORDER BY name ASC, createdAt DESC
+users.list({ sort: [{ key: "name" }, { key: "createdAt", direction: "desc" }] });
+
+// shorthand — the builder maps `"-field"` / `"field"` strings for you
+users.list({ sort: ["-createdAt", "name"] }); // → [{ key:"createdAt", direction:"desc" }, { key:"name", direction:"asc" }]
+```
+
+**URL round-trip.** `setSort` encodes to a single comma-separated `sortType` param; reading it back decodes to the array — so multi-sort survives the URL:
+
+```ts
+setSort(searchParams, ["-createdAt", "id"]); // ?sortType=-createdAt,id
+decodeSort("-createdAt,id"); // → [{ key:"createdAt", direction:"desc" }, { key:"id", direction:"asc" }]
+```
+
+The **backend only ever receives** the canonical `[{ key, direction }]` — the `"-field"` shorthand is resolved on the frontend, never sent over the wire.
+
 ## Builders — inputs and **what they return**
 
 These are **pure, synchronous** functions. They return a **payload object** (not a Promise, not data). You send it yourself.
@@ -166,7 +190,7 @@ These are **pure, synchronous** functions. They return a **payload object** (not
 ```ts
 // list — offset (page)
 users.list({ filter?, sort?, columns?, with?, withDeleted?, page?, perPage? });
-// → { filter, sort:{name,direction}, columns, with, page, perPage, withDeleted? }
+// → { filter, sort: [{ key, direction }], columns, with, page, perPage, withDeleted? }
 
 // infinite — limit/offset
 users.infinite({ filter?, sort?, columns?, with?, withDeleted?, limit?, offset? });
@@ -340,7 +364,7 @@ const users = qk.resource<IUser>("users");
 function useUsers(filters: { status?: string; search?: string }, page: number) {
   const body = users.list({
     filter: [users.f.eq("status", filters.status), users.f.contains("name", filters.search)],
-    sort: "-createdAt",
+    sort: ["-createdAt"],
     page,
   });
   return useQuery({
@@ -409,7 +433,7 @@ import { buildListParams, buildInfiniteParams, buildCursorParams, f } from "@que
 
 const body = buildListParams({
   filter: f.and(f.contains("name", search), f.eq("status", status)),
-  sort: "-createdAt",
+  sort: ["-createdAt"],
   page,
   perPage: 20,
   with: { supervisor: true },
@@ -459,7 +483,7 @@ const { data, meta } = users.parseList(await res.json());
 | `searchParamsToPayload(schema, sp)`                                               | searchParams → full payload                             |
 | `readListParams(schema, sp)`                                                      | searchParams → `ListParams`                             |
 | `setParam/setPage/setSize/setSort/resetParams`                                    | write URL (immutable, page-reset)                       |
-| `encodeSort/decodeSort`                                                           | `{name,direction}` ↔ `"-createdAt"`                     |
+| `encodeSort/decodeSort`                                                           | `[{key,direction}]` ↔ `"-createdAt,id"` (multi-field)   |
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router-dom)                        |
 | `useListParamsBase(resource, {schema, searchParams, setSearchParams})` (`/react`) | router-agnostic hook                                    |
 

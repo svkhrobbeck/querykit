@@ -1,8 +1,8 @@
-import { createQuery, type QueryConfig } from "./query";
+import { createQuery, normalizeSort, type QueryConfig } from "./query";
 import { createFilters, f as rawF } from "./filters";
 import { mapMeta, mapInfiniteMeta, mapCursorMeta } from "./meta";
 import { defineListSchema, type ListSchema } from "./schema";
-import { decodeSort, readListParams, type UrlConfig } from "./url";
+import { readListParams, type UrlConfig } from "./url";
 import type { AdapterName, WithFor } from "./adapter";
 import type {
   CursorMeta,
@@ -96,7 +96,7 @@ export interface RegistryDefaults {
   perPage?: number;
   /** `infinite` + `cursor` page size. */
   limit?: number;
-  /** `list`/`infinite` sort (`"-createdAt"` or `{name,direction}`). */
+  /** `list`/`infinite` sort — `[{key,direction}]` or `["-createdAt", "id"]` shorthand. */
   sort?: SortInput;
   /** Cursor-only defaults. */
   cursor?: { order?: SortDirection };
@@ -126,14 +126,14 @@ export interface Registry<A extends AdapterName> {
  *
  * @example
  * ```ts
- * export const qk = createRegistry({ adapter: "mongoose", defaults: { perPage: 20, sort: "-createdAt" } });
+ * export const qk = createRegistry({ adapter: "mongoose", defaults: { perPage: 20, sort: ["-createdAt"] } });
  * const users = qk.resource<IUser>("users");
  * const body = users.list({ filter: users.f.eq("status", "active"), page });
  * ```
  */
 export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>): Registry<A> {
   const defaults = config.defaults ?? {};
-  const sort: Sort | undefined = typeof defaults.sort === "string" ? decodeSort(defaults.sort) : defaults.sort;
+  const sort: Sort = normalizeSort(defaults.sort, []); // accepts {key,direction}[] or "-field"[] shorthand
   const cursorOrder: SortDirection = defaults.cursor?.order ?? "asc";
 
   // Only set keys that are provided — createQuery merges over its own defaults,
@@ -141,7 +141,7 @@ export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>)
   const qcfg: QueryConfig = {};
   if (defaults.perPage !== undefined) qcfg.defaultPerPage = defaults.perPage;
   if (defaults.limit !== undefined) qcfg.defaultLimit = defaults.limit;
-  if (sort?.name) qcfg.defaultSort = sort; // only override when a real sort field is given
+  if (sort.length) qcfg.defaultSort = sort; // only override when a real sort is given
   if (config.pruneEmpty !== undefined) qcfg.pruneEmpty = config.pruneEmpty;
   const q = createQuery(qcfg);
 

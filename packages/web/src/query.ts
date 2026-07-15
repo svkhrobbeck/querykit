@@ -49,7 +49,7 @@ const DEFAULTS: Required<QueryConfig> = {
   cursorField: "cursor",
   defaultPerPage: DEFAULT_PER_PAGE,
   defaultLimit: DEFAULT_LIMIT,
-  defaultSort: { name: "createdAt", direction: "desc" },
+  defaultSort: [{ key: "createdAt", direction: "desc" }],
   pruneEmpty: true,
 };
 
@@ -60,14 +60,21 @@ function isEmptyValue(value: FilterValue | undefined): boolean {
   return false;
 }
 
-/** `"-createdAt"` yoki `{ name, direction }` → `{ name, direction }`. */
-export function normalizeSort(input: SortInput | undefined, fallback: Sort): Sort {
-  if (input === undefined || input === "") return fallback;
-  if (typeof input === "string") {
-    const desc = input.startsWith("-");
-    return { name: desc ? input.slice(1) : input, direction: desc ? "desc" : "asc" };
+/** A `"-field"`/`"field"` shorthand string or a `{ key, direction }` item → a `SortItem`. */
+function toSortItem(item: Sort[number] | string): Sort[number] | undefined {
+  if (typeof item === "string") {
+    const desc = item.startsWith("-");
+    const key = (desc ? item.slice(1) : item).trim();
+    return key ? { key, direction: desc ? "desc" : "asc" } : undefined;
   }
-  return { name: input.name ?? fallback.name, direction: input.direction ?? fallback.direction };
+  return item && item.key ? { key: item.key, direction: item.direction ?? "asc" } : undefined;
+}
+
+/** Normalize a sort array (objects and/or `"-field"` strings) → canonical `SortItem[]`; empty → fallback. */
+export function normalizeSort(input: SortInput | undefined, fallback: Sort): Sort {
+  if (!input || input.length === 0) return fallback;
+  const items = input.map(toSortItem).filter((i): i is Sort[number] => i !== undefined);
+  return items.length ? items : fallback;
 }
 
 function normalizeCondition(condition: FieldCondition, prune: boolean): FieldCondition | undefined {
@@ -182,7 +189,7 @@ export function createQuery(config: QueryConfig = {}) {
  * ```ts
  * const payload = buildParams({
  *   filter: [{ key: "name", operation: "%_%", value: s }],
- *   sort: "-createdAt",
+ *   sort: [{ key: "createdAt", direction: "desc" }],
  *   with: { supervisor: true },
  * });
  * ```
@@ -196,8 +203,8 @@ export function buildParams(input: Params = {}): QueryPayload {
  *
  * @example
  * ```ts
- * const payload = buildListParams({ filter, sort: "-createdAt", page: 2, perPage: 20 });
- * // -> { filter, sort:{name,direction}, columns, with, page, perPage }
+ * const payload = buildListParams({ filter, sort: [{ key: "createdAt", direction: "desc" }], page: 2, perPage: 20 });
+ * // -> { filter, sort: [{ key, direction }], columns, with, page, perPage }
  * ```
  */
 export function buildListParams(input: ListParams = {}): ListPayload {

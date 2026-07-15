@@ -52,30 +52,15 @@ export type Filter<TDoc = Record<string, unknown>> = Core.Filter<FieldKey<TDoc>,
 
 export type SortDirection = Core.SortDirection;
 
-/** Single-field sort by typed field key (`{ key, direction }`) — autocomplete. */
-export interface SortItem<TDoc = Record<string, unknown>> {
-  key: FieldKey<TDoc>;
-  direction?: SortDirection;
-}
+/** One sort field by typed field key (`{ key, direction }`) — autocomplete. */
+export type SortItem<TDoc = Record<string, unknown>> = Core.SortItem<FieldKey<TDoc>>;
 
 /**
- * Single-field sort by wire field name (`{ name, direction }`) — this is the
- * exact shape the querykit frontend sends (`@querykitjs/web`). The `"-createdAt"`
- * sortType string is decoded to this on the frontend; the backend never sees the
- * string form (parity with `@querykitjs/drizzle-pg`).
+ * Sort — **always an array** of `{ key, direction }` (multi-field). This is the
+ * exact shape the querykit frontend sends (`@querykitjs/web` decodes its
+ * `sortType=-createdAt,id` URL string into it).
  */
-export interface NamedSort {
-  name?: string;
-  direction?: SortDirection;
-}
-
-/**
- * Sort input accepted by every read method (matches the request contract):
- * - `{ name, direction }` — the frontend wire shape;
- * - `{ key, direction }` — a typed single-field sort;
- * - `{ key, direction }[]` — multi-field sort.
- */
-export type Sort<TDoc = Record<string, unknown>> = NamedSort | SortItem<TDoc> | SortItem<TDoc>[];
+export type Sort<TDoc = Record<string, unknown>> = SortItem<TDoc>[];
 
 /* ---------------------------- selection / params -------------------------- */
 

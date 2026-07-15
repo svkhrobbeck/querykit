@@ -37,7 +37,7 @@ Use `infiniteParamsSchema` / `cursorParamsSchema` for the other modes.
 
 - **Filter** — a flat array (`{key, operation, value}[]`) or a nested `and`/`or`/`not` tree.
 - **Operators** — the full core set: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ tokens `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
-- **Sort** — `"-createdAt"` string, `{ name, direction }`, or `{ key, direction }[]`.
+- **Sort** — `{ key, direction }[]` (multi-field).
 - **Pagination** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **`with`** (relations), **`columns`**, **`withDeleted`**.
 - The legacy `type` field is **ignored** (stripped, not rejected) — easy migration.

@@ -1,6 +1,6 @@
 import { buildListParams } from "./query";
 import type { FieldDescriptor, ListSchema } from "./schema";
-import type { FieldCondition, Filter, FilterNode, FilterValue, ListParams, ListPayload, Sort, SortInput } from "./types";
+import type { FieldCondition, Filter, FilterNode, FilterValue, ListParams, ListPayload, Sort, SortDirection, SortInput } from "./types";
 
 /** URL param nomlari (sahifa/o'lcham/sort) — sozlanadigan. */
 export interface UrlConfig {
@@ -15,17 +15,30 @@ const URL_DEFAULTS: Required<UrlConfig> = {
   sortParam: "sortType",
 };
 
-/** `"-createdAt"` → `{ name, direction }` (bo'sh bo'lsa `undefined`). */
+/**
+ * `"-createdAt,id,-appNumber"` → `[{ key, direction }, …]` — comma-separated,
+ * order preserved, `-` prefix = `desc` (else `asc`). Empty → `undefined`.
+ */
 export function decodeSort(value: string | null | undefined): Sort | undefined {
   if (!value) return undefined;
-  const desc = value.startsWith("-");
-  return { name: desc ? value.slice(1) : value, direction: desc ? "desc" : "asc" };
+  const items = value
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(tok => {
+      const desc = tok.startsWith("-");
+      return { key: desc ? tok.slice(1) : tok, direction: (desc ? "desc" : "asc") as SortDirection };
+    })
+    .filter(i => i.key); // drop empty keys (e.g. a lone "-")
+  return items.length ? items : undefined;
 }
 
-/** `{ name, direction }` → `"-createdAt"` / `"createdAt"` (nomsiz bo'lsa `""`). */
-export function encodeSort(sort: Sort): string {
-  if (!sort.name) return "";
-  return (sort.direction === "desc" ? "-" : "") + sort.name;
+/** `[{ key, direction }, …]` (or `"-field"` shorthand strings) → `"-createdAt,id,-appNumber"` (empty → `""`). */
+export function encodeSort(sort: SortInput): string {
+  return sort
+    .map(i => (typeof i === "string" ? i.trim() : i && i.key ? (i.direction === "desc" ? "-" : "") + i.key : ""))
+    .filter(Boolean)
+    .join(",");
 }
 
 /**
@@ -99,7 +112,7 @@ export function readListParams(schema: ListSchema, searchParams: URLSearchParams
   const size = searchParams.get(cfg.sizeParam);
   return {
     filter: schemaToFilter(schema, searchParams),
-    sort: searchParams.get(cfg.sortParam) ?? undefined,
+    sort: decodeSort(searchParams.get(cfg.sortParam)),
     page: Number(searchParams.get(cfg.pageParam)) || 1,
     perPage: size ? Number(size) : undefined,
   };
@@ -144,12 +157,12 @@ export function setSize(searchParams: URLSearchParams, size: number, url: UrlCon
   return next;
 }
 
-/** Sortni o'rnatadi (`"-createdAt"` yoki `{name,direction}`) va `page`ni reset qiladi. */
+/** Sortni o'rnatadi (`[{ key, direction }, …]`) va `page`ni reset qiladi. */
 export function setSort(searchParams: URLSearchParams, sort: SortInput, url: UrlConfig = {}): URLSearchParams {
   const cfg = { ...URL_DEFAULTS, ...url };
   const next = clone(searchParams);
   next.delete(cfg.pageParam);
-  const encoded = typeof sort === "string" ? sort : encodeSort(sort);
+  const encoded = encodeSort(sort);
   if (encoded) next.set(cfg.sortParam, encoded);
   else next.delete(cfg.sortParam);
   return next;

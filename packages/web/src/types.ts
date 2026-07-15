@@ -30,14 +30,17 @@ export type Filter<T = Record<string, unknown>> = Core.Filter<FieldKey<T>>;
 /* --------------------------------- sorting -------------------------------- */
 
 export type SortDirection = Core.SortDirection;
+export type SortItem = Core.SortItem; // { key, direction? }
 
-export interface Sort {
-  name?: string;
-  direction?: SortDirection;
-}
+/** Sort — **always an array** of `{ key, direction }` (multi-field). */
+export type Sort = Core.Sort; // SortItem[]
 
-/** Sort kirishi: `"-createdAt"` (sortType string) yoki `{ name, direction }`. */
-export type SortInput = string | Sort;
+/**
+ * Sort input — an array where each item is a `{ key, direction }` object OR a
+ * `"-field"` / `"field"` shorthand string (`["-createdAt", "id"]`). Builders map
+ * it to the canonical {@link Sort} (`SortItem[]`).
+ */
+export type SortInput = ReadonlyArray<SortItem | string>;
 
 /* -------------------------------- params ---------------------------------- */
 

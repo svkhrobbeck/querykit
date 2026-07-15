@@ -6,7 +6,7 @@
  */
 import { buildCursorParams, buildInfiniteParams, buildListParams, createFilters, createRegistry, defineListSchema } from "../src/index";
 import { mapCursorMeta, mapInfiniteMeta, mapMeta } from "../src/meta"; // internal (not public — use registry `parse*`)
-import { readListParams, schemaToFilter, setParam, setSort } from "../src/url";
+import { decodeSort, readListParams, schemaToFilter, setParam, setSort } from "../src/url";
 import type { FieldCondition, FilterNode } from "../src/types";
 
 let passed = 0;
@@ -65,11 +65,19 @@ const raw = buildListParams({
 }).filter as FieldCondition[];
 check("values pass through unchanged", eq(raw[0]!.value, ["1", "2"]));
 
-/* 4. sort "-createdAt" → { name, direction } */
-const sorted = buildListParams({ sort: "-createdAt" });
-check("sortType decode", eq(sorted.sort, { name: "createdAt", direction: "desc" }));
-const sortedAsc = buildListParams({ sort: "name" });
-check("sortType asc", eq(sortedAsc.sort, { name: "name", direction: "asc" }));
+/* 4. sort shorthand ["-createdAt"] / objects → always canonical [{ key, direction }] */
+const sorted = buildListParams({ sort: ["-createdAt"] });
+check("sort string shorthand → array", eq(sorted.sort, [{ key: "createdAt", direction: "desc" }]));
+const sortedMulti = buildListParams({ sort: ["name", "-createdAt"] });
+check(
+  "multi-sort shorthand",
+  eq(sortedMulti.sort, [
+    { key: "name", direction: "asc" },
+    { key: "createdAt", direction: "desc" },
+  ]),
+);
+const sortedObj = buildListParams({ sort: [{ key: "age", direction: "desc" }] });
+check("sort object form", eq(sortedObj.sort, [{ key: "age", direction: "desc" }]));
 
 /* 5. pagination defaults */
 const paged = buildListParams({ page: 2, perPage: 20 });
@@ -102,14 +110,24 @@ check(
 /* 7. readListParams reads page/size/sortType */
 const sp2 = new URLSearchParams({ page: "3", size: "50", sortType: "-createdAt", buyerName: "x" });
 const read = readListParams(schema, sp2);
-check("readListParams", read.page === 3 && read.perPage === 50 && read.sort === "-createdAt");
+check("readListParams (sortType → array)", read.page === 3 && read.perPage === 50 && eq(read.sort, [{ key: "createdAt", direction: "desc" }]));
 
 /* 8. page-reset invariant on filter & sort change */
 const withPage = new URLSearchParams({ page: "5", buyerName: "x" });
 const afterFilter = setParam(withPage, "status", "active");
 check("setParam resets page", !afterFilter.has("page") && afterFilter.get("status") === "active");
-const afterSort = setSort(withPage, { name: "name", direction: "asc" });
+const afterSort = setSort(withPage, [{ key: "name", direction: "asc" }]);
 check("setSort resets page + encodes", !afterSort.has("page") && afterSort.get("sortType") === "name");
+// multi-sort round-trip: set → sortType=name,-createdAt → decode back to array
+const afterMulti = setSort(withPage, ["name", "-createdAt"]);
+check("setSort multi encodes to comma string", afterMulti.get("sortType") === "name,-createdAt");
+check(
+  "decodeSort multi round-trip",
+  eq(decodeSort(afterMulti.get("sortType")), [
+    { key: "name", direction: "asc" },
+    { key: "createdAt", direction: "desc" },
+  ]),
+);
 
 /* 9. meta mappers — offset / infinite / cursor (alohida) */
 const meta = mapMeta({ total_pages: 4, total_items: 73, current_page: 2, per_page: 20, has_next: true, has_prev: true });
@@ -155,13 +173,13 @@ const noWd = buildListParams({}) as unknown as { withDeleted?: boolean };
 check("withDeleted omitted when unset", !("withDeleted" in noWd));
 
 /* 14. registry — createRegistry + resource builders */
-const qk = createRegistry({ adapter: "mongoose", defaults: { perPage: 20, sort: "-createdAt", cursor: { order: "asc" } }, pruneEmpty: true });
+const qk = createRegistry({ adapter: "mongoose", defaults: { perPage: 20, sort: ["-createdAt"], cursor: { order: "asc" } }, pruneEmpty: true });
 const users = qk.resource<Buyer>("users");
 
 const lp = users.list({ filter: [users.f.contains("buyerName", "ali")], page: 2 });
 check("registry list payload", lp.page === 2 && lp.perPage === 20 && Array.isArray(lp.filter));
 const lp2 = users.list({});
-check("registry default sort from config", eq(lp2.sort, { name: "createdAt", direction: "desc" }));
+check("registry default sort from config", eq(lp2.sort, [{ key: "createdAt", direction: "desc" }]));
 const ip = users.infinite({ limit: 10, offset: 30 });
 check("registry infinite payload", ip.limit === 10 && ip.offset === 30);
 const cp = users.cursor({ limit: 15, cursor: "abc" });

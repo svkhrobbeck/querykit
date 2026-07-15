@@ -1,8 +1,8 @@
-# @querykitjs/drizzle-pg
+# @querykitjs/core
 
-## 2.0.0
+## 1.1.0
 
-### Major Changes
+### Minor Changes
 
 - Standardize sort on one canonical shape: `{ key, direction }[]` — always an array, multi-field capable.
 
@@ -10,17 +10,3 @@
   - **web:** `Sort`/`SortInput` are now `{ key, direction }[]`; `SortInput` also accepts a `["-field"]` shorthand that `normalizeSort` maps for you. `encodeSort`/`decodeSort` handle multi-field URL sync (`sortType=-createdAt,id`). **BREAKING:** the single `"-createdAt"` string and `{ name, direction }` sort forms are removed.
   - **drizzle-pg:** `Sort` is `{ key, direction }[]`. **BREAKING:** the `{ name }` and single-object sort shapes are removed. `buildOrderBy` also gains an `id DESC` fallback for deterministic pagination when no `createdAt` exists.
   - **zod:** `sortSchema` validates `{ key, direction }[]` only. **BREAKING:** string and `{ name }` sort inputs are now rejected.
-
-### Patch Changes
-
-- Updated dependencies
-  - @querykitjs/core@1.1.0
-
-## 1.1.0
-
-### Minor Changes
-
-- Parity fixes (align with the mongoose adapter):
-
-  - `buildOrderBy` now adds a deterministic `id DESC` fallback after `createdAt`, so offset/keyset pagination is stable even when a table has no `createdAt` column (previously arbitrary order).
-  - `pickColumns` is now inclusion-only — a selection drops `false` keys, so `{a:true,b:false}` includes only `a` and an all-`false`/empty object returns the full row (matches `Pick<Row,K>`).

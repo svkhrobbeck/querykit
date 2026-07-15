@@ -11,7 +11,7 @@
  * ```ts
  * import { createRegistry } from "@querykitjs/web";
  *
- * const qk = createRegistry({ adapter: "drizzle-pg", defaults: { perPage: 20, sort: "-createdAt" } });
+ * const qk = createRegistry({ adapter: "drizzle-pg", defaults: { perPage: 20, sort: ["-createdAt"] } });
  * const users = qk.resource<IUser>("users");
  *
  * const body = users.list({ filter: users.f.eq("status", "active"), page });

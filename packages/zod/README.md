@@ -37,7 +37,7 @@ Infinite/cursor uchun `infiniteParamsSchema` / `cursorParamsSchema`.
 
 - **Filter** — flat massiv (`{key, operation, value}[]`) yoki nested `and`/`or`/`not` daraxt.
 - **Operatorlar** — core'ning to'liq to'plami: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ token `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
-- **Sort** — `"-createdAt"` string, `{ name, direction }`, yoki `{ key, direction }[]`.
+- **Sort** — `{ key, direction }[]` (ko'p-maydon).
 - **Paginatsiya** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **`with`** (relations), **`columns`**, **`withDeleted`**.
 - Eski `type` maydoni **e'tiborsiz** qoldiriladi (rad etilmaydi) — migratsiya oson.

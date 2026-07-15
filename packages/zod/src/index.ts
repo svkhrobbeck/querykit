@@ -44,12 +44,8 @@ export const filterSchema = z.union([filterNodeSchema, z.array(fieldConditionSch
 
 const directionSchema = z.enum(["asc", "desc"]);
 
-/** Sort — `"-createdAt"` string, `{ name, direction }`, yoki `{ key, direction }[]`. */
-export const sortSchema = z.union([
-  z.string(),
-  z.object({ name: z.string().optional(), direction: directionSchema.optional() }),
-  z.array(z.object({ key: z.string(), direction: directionSchema.optional() })),
-]);
+/** Sort — an array of `{ key, direction }`. */
+export const sortSchema = z.array(z.object({ key: z.string(), direction: directionSchema.optional() }));
 
 /* -------------------------------- params ---------------------------------- */
 

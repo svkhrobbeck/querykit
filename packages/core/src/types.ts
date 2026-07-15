@@ -41,6 +41,15 @@ export type Filter<TKey extends string = string, TRaw = never> = FilterNode<TKey
 
 export type SortDirection = "asc" | "desc";
 
+/** One sort field — `{ key, direction }`. */
+export interface SortItem<TKey extends string = string> {
+  key: TKey;
+  direction?: SortDirection;
+}
+
+/** Sort is **always an array** of {@link SortItem} (multi-field capable). */
+export type Sort<TKey extends string = string> = SortItem<TKey>[];
+
 /* --------------------- wire meta (server javobi, snake) ------------------- */
 /* Adapterlar shu shakllarni qaytaradi; frontend ularni camelCase'ga map qiladi. */
 

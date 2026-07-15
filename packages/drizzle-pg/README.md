@@ -112,6 +112,8 @@ sort: [
 ]; // ORDER BY name ASC, created_at DESC
 ```
 
+Sort — `{ key, direction }[]` massivi, `@querykitjs/web` va barcha adapterlar bilan bir xil shakl.
+
 Sort berilmasa `createdAt DESC` ga, u bo'lmasa `id DESC` ga tushadi — pagination barqaror bo'lishi uchun deterministik tartib.
 
 ## Paginatsiya — 3 strategiya

@@ -101,18 +101,10 @@ export type Filter<TTable extends AnyPgTable = AnyPgTable> = Core.Filter<ColumnK
 
 export type SortDirection = Core.SortDirection;
 
-export interface SortItem<TTable extends AnyPgTable = AnyPgTable> {
-  key: ColumnKey<TTable>;
-  direction?: SortDirection;
-}
+export type SortItem<TTable extends AnyPgTable = AnyPgTable> = Core.SortItem<ColumnKey<TTable>>;
 
-/** Legacy single-sort shape from db-service. */
-export interface LegacySort {
-  name?: string;
-  direction?: SortDirection;
-}
-
-export type Sort<TTable extends AnyPgTable = AnyPgTable> = SortItem<TTable> | SortItem<TTable>[] | LegacySort;
+/** Sort is **always an array** of `{ key, direction }` items (multi-field). */
+export type Sort<TTable extends AnyPgTable = AnyPgTable> = SortItem<TTable>[];
 
 /* ---------------------------- selection / params -------------------------- */
 

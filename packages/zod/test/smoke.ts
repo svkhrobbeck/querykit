@@ -58,7 +58,7 @@ check("missing key rejected", !fieldConditionSchema.safeParse({ operation: "=", 
 /* 6. Offset params */
 const offset = offsetParamsSchema.safeParse({
   filter: [{ key: "name", operation: "%_%", value: "a" }],
-  sort: "-createdAt",
+  sort: [{ key: "createdAt", direction: "desc" }],
   page: 2,
   perPage: 20,
   with: { author: true },
@@ -75,10 +75,10 @@ const cur = cursorParamsSchema.safeParse({ limit: 20, cursor: null, cursorKey: "
 check("cursor params valid", cur.success);
 check("cursor rejects bad direction", !cursorParamsSchema.safeParse({ direction: "sideways" }).success);
 
-/* 9. sort shapes */
-check("sort string", offsetParamsSchema.safeParse({ sort: "-createdAt" }).success);
-check("sort object", offsetParamsSchema.safeParse({ sort: { name: "createdAt", direction: "desc" } }).success);
-check("sort array", offsetParamsSchema.safeParse({ sort: [{ key: "name", direction: "asc" }] }).success);
+/* 9. sort — `{ key, direction }[]` only */
+check("sort array valid", offsetParamsSchema.safeParse({ sort: [{ key: "name", direction: "asc" }] }).success);
+check("sort string rejected", !offsetParamsSchema.safeParse({ sort: "-createdAt" }).success);
+check("sort object (non-array) rejected", !offsetParamsSchema.safeParse({ sort: { key: "createdAt", direction: "desc" } }).success);
 
 /* 10. realistic full list payload (querykit contract) */
 const payload = {
@@ -87,7 +87,7 @@ const payload = {
     { key: "createdAt", operation: ">=", value: "2026-01-01" },
     { key: "createdAt", operation: "<=", value: "2026-02-01" },
   ],
-  sort: "-createdAt",
+  sort: [{ key: "createdAt", direction: "desc" }],
   page: 1,
   perPage: 15,
   with: { supervisor: true },

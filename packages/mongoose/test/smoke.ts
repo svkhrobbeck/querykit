@@ -99,7 +99,7 @@ async function main() {
     );
 
     // 6. with (populate) relation
-    const withRel = await postsRepo.findAll({ with: { author: true }, sort: { key: "title", direction: "asc" } });
+    const withRel = await postsRepo.findAll({ with: { author: true }, sort: [{ key: "title", direction: "asc" }] });
     const author = (withRel[0] as { author?: { name?: string } }).author;
     check("with relation populated", Boolean(author && author.name), author?.name ?? "none");
 
@@ -136,11 +136,11 @@ async function main() {
 
     /* ---- contract robustness: sort forms + string values from the wire ---- */
 
-    // 12. wire sort { name, direction } — the exact (and only) shape the backend receives
-    const wireAsc = await usersRepo.findAll({ sort: { name: "name", direction: "asc" }, columns: { name: true } });
-    check("wire sort { name, asc }", wireAsc[0]!.name === "Ali Valiyev" && wireAsc[2]!.name === "Vali Aliyev");
-    const wireDesc = await usersRepo.findAll({ sort: { name: "name", direction: "desc" }, columns: { name: true } });
-    check("wire sort { name, desc }", wireDesc[0]!.name === "Vali Aliyev" && wireDesc[2]!.name === "Ali Valiyev");
+    // 12. sort [{ key, direction }] — the array shape the backend receives
+    const wireAsc = await usersRepo.findAll({ sort: [{ key: "name", direction: "asc" }], columns: { name: true } });
+    check("sort [{ key: name, asc }]", wireAsc[0]!.name === "Ali Valiyev" && wireAsc[2]!.name === "Vali Aliyev");
+    const wireDesc = await usersRepo.findAll({ sort: [{ key: "name", direction: "desc" }], columns: { name: true } });
+    check("sort [{ key: name, desc }]", wireDesc[0]!.name === "Vali Aliyev" && wireDesc[2]!.name === "Ali Valiyev");
 
     // 13. string id — the frontend sends ids as JSON strings (Mongoose casts to ObjectId)
     const byStringId = await usersRepo.findById(String(guli!._id));

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Advanced filtering + flexible pagination repository layer for Mongoose (MongoDB).",
   "type": "module",
+  "private": true,
   "author": {
     "name": "Suhrobbek Soatov",
     "url": "https://soatov.uz",

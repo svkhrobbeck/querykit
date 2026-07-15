@@ -93,6 +93,8 @@ sort: [
 ]; // { name: 1, createdAt: -1 }
 ```
 
+Sort is always a `{ key, direction }[]` array — the same shape across `@querykitjs/web` and every adapter.
+
 Falls back to `createdAt DESC`, then `_id DESC`, when no sort is given — a deterministic order so pagination stays stable.
 
 ## Pagination — three strategies
