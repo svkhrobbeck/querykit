@@ -9,6 +9,11 @@ import { FILTER_OPERATORS } from "./operators";
 /** Qo'llab-quvvatlanadigan filter operatorlari (token va nom aliaslari). */
 export type FilterOperator = (typeof FILTER_OPERATORS)[number];
 
+/**
+ * A filter scalar. `Date` is accepted **in-memory** (adapters cast it for local
+ * queries); over the JSON wire it serializes to an ISO string, so
+ * `@querykitjs/zod` validates scalars **without** `Date` (string/number/boolean/null).
+ */
 export type FilterScalar = string | number | boolean | Date | null;
 export type FilterValue = FilterScalar | FilterScalar[];
 
@@ -49,6 +54,34 @@ export interface SortItem<TKey extends string = string> {
 
 /** Sort is **always an array** of {@link SortItem} (multi-field capable). */
 export type Sort<TKey extends string = string> = SortItem<TKey>[];
+
+/* ---------------------- shared param building blocks ---------------------- */
+/* Generic shapes shared by every backend adapter (drizzle-pg, mongoose, …);
+ * each binds its own key type (`ColumnKey`/`FieldKey`) and insert/filter types. */
+
+/** Equality scope applied to every operation of a scoped repository. */
+export type Scope<TKey extends string = string> = Partial<Record<TKey, FilterScalar>>;
+
+/** Options for upsert / upsertMany — conflict target(s) + optional update set. */
+export interface UpsertOptions<TKey extends string = string, TInsert = Record<string, unknown>> {
+  /** Unique/conflict key(s) whose match triggers an update instead of an insert. */
+  target: TKey | TKey[];
+  /** Columns/fields to update on conflict. Defaults to the inserted values minus `target`. */
+  set?: Partial<TInsert>;
+}
+
+/** Aggregate query spec — group + count/sum/avg/min/max, each keyed by field. */
+export interface AggregateSpec<TKey extends string = string, TFilter = unknown> {
+  filter?: TFilter;
+  /** Group rows by these field(s); each appears in the output rows. */
+  groupBy?: TKey | TKey[];
+  count?: boolean;
+  sum?: TKey | TKey[];
+  avg?: TKey | TKey[];
+  min?: TKey | TKey[];
+  max?: TKey | TKey[];
+  withDeleted?: boolean;
+}
 
 /* --------------------- wire meta (server javobi, snake) ------------------- */
 /* Adapterlar shu shakllarni qaytaradi; frontend ularni camelCase'ga map qiladi. */

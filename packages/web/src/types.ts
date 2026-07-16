@@ -81,6 +81,8 @@ export interface QueryPayload {
   sort: Sort;
   columns: Record<string, boolean>;
   with: Record<string, unknown>;
+  /** Soft-delete qatorlarni ham qo'shish — faqat kirishда berilса payloadga qo'shiladi. */
+  withDeleted?: boolean;
 }
 
 export interface ListPayload extends QueryPayload {
@@ -103,6 +105,7 @@ export interface CursorPayload {
   order: SortDirection;
   direction: "forward" | "backward";
   cursorKey?: string;
+  withDeleted?: boolean;
 }
 
 /* --------------------------------- meta ----------------------------------- */

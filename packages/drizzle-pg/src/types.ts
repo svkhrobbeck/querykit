@@ -123,7 +123,7 @@ export interface QueryParams<TTable extends AnyPgTable> {
 }
 
 /** Equality scope applied to every operation of a scoped repository. */
-export type Scope<TTable extends AnyPgTable> = Partial<Record<ColumnKey<TTable>, FilterScalar>>;
+export type Scope<TTable extends AnyPgTable> = Core.Scope<ColumnKey<TTable>>;
 
 export interface ByIdParams<TTable extends AnyPgTable> extends QueryParams<TTable> {
   /** Column to match against the id. Defaults to `"id"`. */
@@ -131,37 +131,12 @@ export interface ByIdParams<TTable extends AnyPgTable> extends QueryParams<TTabl
 }
 
 /** Options for {@link Repository.upsert} / {@link Repository.upsertMany}. */
-export interface UpsertOptions<TTable extends AnyPgTable> {
-  /** Unique/PK column(s) whose conflict triggers an update. */
-  target: ColumnKey<TTable> | ColumnKey<TTable>[];
-  /**
-   * Columns to update on conflict. Defaults to the inserted `values` minus the
-   * `target` column(s).
-   */
-  set?: Partial<Insert<TTable>>;
-}
+export type UpsertOptions<TTable extends AnyPgTable> = Core.UpsertOptions<ColumnKey<TTable>, Insert<TTable>>;
 
 /* ------------------------------ aggregation ------------------------------- */
 
-type Keys<TTable extends AnyPgTable> = ColumnKey<TTable> | ColumnKey<TTable>[];
-
-/** Aggregate query specification. */
-export interface AggregateSpec<TTable extends AnyPgTable> {
-  filter?: Filter<TTable>;
-  /** Group rows by these column(s); each appears in the output rows. */
-  groupBy?: Keys<TTable>;
-  /** `count(*)` → `count`. */
-  count?: boolean;
-  /** `sum(col)` → `sum_<col>`. */
-  sum?: Keys<TTable>;
-  /** `avg(col)` → `avg_<col>`. */
-  avg?: Keys<TTable>;
-  /** `min(col)` → `min_<col>`. */
-  min?: Keys<TTable>;
-  /** `max(col)` → `max_<col>`. */
-  max?: Keys<TTable>;
-  withDeleted?: boolean;
-}
+/** Aggregate query specification (`count`/`sum`/`avg`/`min`/`max` + `groupBy`). */
+export type AggregateSpec<TTable extends AnyPgTable> = Core.AggregateSpec<ColumnKey<TTable>, Filter<TTable>>;
 
 /** One aggregated result row (group columns + aggregate values). */
 export type AggregateRow = Record<string, string | number | boolean | null>;

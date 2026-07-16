@@ -79,7 +79,7 @@ export interface QueryParams<TDoc = Record<string, unknown>> {
 }
 
 /** Equality scope applied to every operation of a scoped repository. */
-export type Scope<TDoc = Record<string, unknown>> = Partial<Record<FieldKey<TDoc>, FilterScalar>>;
+export type Scope<TDoc = Record<string, unknown>> = Core.Scope<FieldKey<TDoc>>;
 
 export interface ByIdParams<TDoc = Record<string, unknown>> extends QueryParams<TDoc> {
   /** Field to match against the id. Defaults to `"id"` (→ `_id`). */
@@ -89,34 +89,12 @@ export interface ByIdParams<TDoc = Record<string, unknown>> extends QueryParams<
 /* --------------------------------- writes --------------------------------- */
 
 /** Options for {@link Repository.upsert} / {@link Repository.upsertMany}. */
-export interface UpsertOptions<TDoc = Record<string, unknown>> {
-  /** Unique field(s) whose match triggers an update instead of an insert. */
-  target: FieldKey<TDoc> | FieldKey<TDoc>[];
-  /** Fields to update on conflict. Defaults to the inserted values minus `target`. */
-  set?: Partial<Insert<TDoc>>;
-}
+export type UpsertOptions<TDoc = Record<string, unknown>> = Core.UpsertOptions<FieldKey<TDoc>, Insert<TDoc>>;
 
 /* ------------------------------ aggregation ------------------------------- */
 
-type AggKeys<TDoc> = FieldKey<TDoc> | FieldKey<TDoc>[];
-
-/** Aggregate query specification (mirrors drizzle-pg). */
-export interface AggregateSpec<TDoc = Record<string, unknown>> {
-  filter?: Filter<TDoc>;
-  /** Group by these field(s); each appears in the output rows. */
-  groupBy?: AggKeys<TDoc>;
-  /** `$sum:1` → `count`. */
-  count?: boolean;
-  /** `$sum` → `sum_<field>`. */
-  sum?: AggKeys<TDoc>;
-  /** `$avg` → `avg_<field>`. */
-  avg?: AggKeys<TDoc>;
-  /** `$min` → `min_<field>`. */
-  min?: AggKeys<TDoc>;
-  /** `$max` → `max_<field>`. */
-  max?: AggKeys<TDoc>;
-  withDeleted?: boolean;
-}
+/** Aggregate query specification (`count`/`sum`/`avg`/`min`/`max` + `groupBy`). */
+export type AggregateSpec<TDoc = Record<string, unknown>> = Core.AggregateSpec<FieldKey<TDoc>, Filter<TDoc>>;
 
 /** One aggregated result row (group fields + aggregate values). */
 export type AggregateRow = Record<string, unknown>;

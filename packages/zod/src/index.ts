@@ -70,8 +70,11 @@ export const infiniteParamsSchema = baseParamsSchema.extend({
   offset: z.number().int().nonnegative().optional(),
 });
 
-/** Cursor (keyset) params — `limit`/`cursor`/`cursorKey`/`order`/`direction`. */
-export const cursorParamsSchema = baseParamsSchema.extend({
+/**
+ * Cursor (keyset) params — `limit`/`cursor`/`cursorKey`/`order`/`direction`.
+ * No `sort`: cursor pagination is driven by `order` + `direction`, not `sort`.
+ */
+export const cursorParamsSchema = baseParamsSchema.omit({ sort: true }).extend({
   limit: z.number().int().positive().optional(),
   cursor: z.string().nullish(),
   cursorKey: z.string().optional(),
