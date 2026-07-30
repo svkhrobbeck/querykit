@@ -330,6 +330,97 @@ async function main() {
     check("cursor on timestamp key: page 2 does not crash", Array.isArray(tc2.data));
     const tcBack = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc", cursor: tc1.meta.next_cursor, direction: "backward" });
     check("cursor on timestamp key: backward does not crash", Array.isArray(tcBack.data));
+
+    /* --------------------------- projection guards -------------------------- */
+    /* Parity with drizzle-pg test/sql.ts §13-§17. `email` stands in for `password`. */
+    const keysOf = (doc: unknown) => Object.keys(doc as object).sort();
+
+    const forcedRepo = registry.repository(User, { forcedColumns: { _id: true, name: true } });
+    const forcedDoc = (await forcedRepo.findAll({ columns: { email: true } }))[0];
+    check("forcedColumns: client selection ignored", !keysOf(forcedDoc).includes("email"), keysOf(forcedDoc).join());
+    check("forcedColumns: keeps the forced fields", keysOf(forcedDoc).includes("name") && keysOf(forcedDoc).includes("_id"), keysOf(forcedDoc).join());
+    const forcedNoColumns = (await forcedRepo.findList({})).data[0];
+    check("forcedColumns: applied when the client sends nothing", !keysOf(forcedNoColumns).includes("email"), keysOf(forcedNoColumns).join());
+
+    const allowRepo = registry.repository(User, { allowedColumns: ["_id", "name"] });
+    const intersected = (await allowRepo.findAll({ columns: { name: true, email: true } }))[0];
+    check("allowedColumns: intersects the client selection", keysOf(intersected).join() === "name", keysOf(intersected).join());
+    const rejectedSel = (await allowRepo.findAll({ columns: { email: true } }))[0];
+    check(
+      "allowedColumns: a fully rejected selection yields the allowlist, NOT the full doc",
+      !keysOf(rejectedSel).includes("email") && keysOf(rejectedSel).includes("name"),
+      keysOf(rejectedSel).join(),
+    );
+    const noSelection = (await allowRepo.findAll({}))[0];
+    check("allowedColumns: applied when the client sends nothing", !keysOf(noSelection).includes("email"), keysOf(noSelection).join());
+
+    const throws = (fn: () => unknown) => {
+      try {
+        fn();
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    check(
+      "empty forcedColumns is refused",
+      throws(() => registry.repository(User, { forcedColumns: {} })),
+    );
+    check(
+      "all-false forcedColumns is refused",
+      throws(() => registry.repository(User, { forcedColumns: { _id: false } })),
+    );
+    check(
+      "empty allowedColumns is refused",
+      throws(() => registry.repository(User, { allowedColumns: [] })),
+    );
+
+    const cursorLeak = await forcedRepo.findCursor({ limit: 1, cursorKey: "email", order: "asc" });
+    check("cursorKey cannot leak a forbidden field", !keysOf(cursorLeak.data[0]).includes("email"), keysOf(cursorLeak.data[0]).join());
+    check("…while pagination still works (token issued)", typeof cursorLeak.meta.next_cursor === "string", String(cursorLeak.meta.next_cursor));
+    const cursorAllowed = await forcedRepo.findCursor({ limit: 1, cursorKey: "_id", order: "asc" });
+    check("a permitted cursorKey stays in the doc", keysOf(cursorAllowed.data[0]).includes("_id"), keysOf(cursorAllowed.data[0]).join());
+
+    const aggGuarded = await forcedRepo.aggregate({ count: true, min: "email" });
+    check("aggregate: a forbidden min is dropped", !("min_email" in (aggGuarded[0] ?? {})), Object.keys(aggGuarded[0] ?? {}).join());
+    const aggOpen = await usersRepo.aggregate({ count: true, min: "email" });
+    check("aggregate: unguarded repo is unchanged", "min_email" in (aggOpen[0] ?? {}), Object.keys(aggOpen[0] ?? {}).join());
+
+    /* --------------------------- pagination caps ---------------------------- */
+    check("perPage is capped at 200 by default", (await usersRepo.findList({ perPage: 10_000 })).meta.per_page === 200);
+    check("infinite limit is capped at 200", (await usersRepo.findInfinite({ limit: 10_000 })).meta.limit === 200);
+    check("cursor limit is capped at 200", (await usersRepo.findCursor({ limit: 10_000 })).meta.limit === 200);
+    const cappedRepo = createRegistry(mongoose.connection, { maxPerPage: 50, maxLimit: 25 }).repository(User);
+    check("registry maxPerPage is honoured", (await cappedRepo.findList({ perPage: 10_000 })).meta.per_page === 50);
+    check("registry maxLimit is honoured", (await cappedRepo.findInfinite({ limit: 10_000 })).meta.limit === 25);
+    check("a request under the cap is untouched", (await usersRepo.findList({ perPage: 15 })).meta.per_page === 15);
+    check("the default page size still wins when omitted", (await usersRepo.findList({})).meta.per_page === 20);
+
+    /* --------------------------- registry arities --------------------------- */
+    check("arity: repository(model)", typeof registry.repository(User).findAll === "function");
+    const extendedRepo = registry.repository(User, base => ({ byName: (name: string) => base.findAll({ filter: [uf.eq("name", name)] }) }));
+    check("arity: repository(model, extend)", typeof extendedRepo.byName === "function" && typeof extendedRepo.findAll === "function");
+    check("arity: repository(model, options)", typeof registry.repository(User, { allowedColumns: ["_id"] }).findAll === "function");
+    const bothRepo = registry.repository(User, { allowedColumns: ["_id", "name"] }, base => ({ first: () => base.findOne({}) }));
+    check("arity: repository(model, options, extend)", typeof bothRepo.first === "function" && typeof bothRepo.findAll === "function");
+    const bothDoc = (await bothRepo.findAll({ columns: { email: true } }))[0];
+    check("arity: options still apply when an extender is passed", !keysOf(bothDoc).includes("email"), keysOf(bothDoc).join());
+
+    const scopedGuarded = (await forcedRepo.scoped({ name: "Ali Valiyev" }).findAll({ columns: { email: true } }))[0];
+    check("scoped() preserves forcedColumns", scopedGuarded === undefined || !keysOf(scopedGuarded).includes("email"));
+
+    /* wire-shaped params need no cast — the compile-time guarantee of P1-2 */
+    const wireParams = {
+      filter: [{ key: "name", operation: "%_%" as const, value: "ali" }],
+      sort: [{ key: "createdAt", direction: "desc" as const }],
+      page: 1,
+      perPage: 20,
+    };
+    check("wire-shaped params compile without a cast", Array.isArray((await usersRepo.findList(wireParams)).data));
+    check(
+      "an unknown wire key is skipped, not a type error",
+      (await usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] })).length === (await usersRepo.count()),
+    );
   } finally {
     await mongoose.disconnect();
     await replset.stop();

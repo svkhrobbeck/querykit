@@ -5,10 +5,8 @@
  * escape-hatch bound to a native Mongo `FilterQuery`.
  *
  * The public surface mirrors `@querykitjs/drizzle-pg` so the same frontend
- * request contract works regardless of backend.
- *
- * NOTE: Stage 1 exposes only read methods (+ scoped). Writes/upsert/aggregate/
- * transaction land in stage 2.
+ * request contract works regardless of backend: same option names, same
+ * semantics, one shared source in core.
  */
 import type { Model, Types } from "mongoose";
 import type * as Core from "@querykitjs/core";
@@ -34,6 +32,14 @@ export type RawFilter<_TDoc = unknown> = Record<string, unknown>;
 /** Union of a document's field keys. */
 export type FieldKey<TDoc> = keyof TDoc & string;
 
+/**
+ * A field key that also accepts any `string`. Filter/sort keys arrive from the
+ * wire as plain strings and the adapter skips the ones it cannot resolve, so a
+ * validated payload can go straight into a repository call with no `as` cast.
+ * Autocomplete still suggests the document's real fields.
+ */
+export type LooseFieldKey<TDoc> = Core.LooseKey<FieldKey<TDoc>>;
+
 /* --------------------------------- filters -------------------------------- */
 /* DSL from `@querykitjs/core`, specialized: TKey = field key, TRaw = Mongo filter. */
 
@@ -41,19 +47,19 @@ export type FilterOperator = Core.FilterOperator;
 export type FilterScalar = Core.FilterScalar;
 export type FilterValue = Core.FilterValue;
 
-export type FieldCondition<TDoc = Record<string, unknown>> = Core.FieldCondition<FieldKey<TDoc>>;
-export type AndGroup<TDoc = Record<string, unknown>> = Core.AndGroup<FieldKey<TDoc>, RawFilter<TDoc>>;
-export type OrGroup<TDoc = Record<string, unknown>> = Core.OrGroup<FieldKey<TDoc>, RawFilter<TDoc>>;
-export type NotGroup<TDoc = Record<string, unknown>> = Core.NotGroup<FieldKey<TDoc>, RawFilter<TDoc>>;
-export type FilterNode<TDoc = Record<string, unknown>> = Core.FilterNode<FieldKey<TDoc>, RawFilter<TDoc>>;
-export type Filter<TDoc = Record<string, unknown>> = Core.Filter<FieldKey<TDoc>, RawFilter<TDoc>>;
+export type FieldCondition<TDoc = Record<string, unknown>> = Core.FieldCondition<LooseFieldKey<TDoc>>;
+export type AndGroup<TDoc = Record<string, unknown>> = Core.AndGroup<LooseFieldKey<TDoc>, RawFilter<TDoc>>;
+export type OrGroup<TDoc = Record<string, unknown>> = Core.OrGroup<LooseFieldKey<TDoc>, RawFilter<TDoc>>;
+export type NotGroup<TDoc = Record<string, unknown>> = Core.NotGroup<LooseFieldKey<TDoc>, RawFilter<TDoc>>;
+export type FilterNode<TDoc = Record<string, unknown>> = Core.FilterNode<LooseFieldKey<TDoc>, RawFilter<TDoc>>;
+export type Filter<TDoc = Record<string, unknown>> = Core.Filter<LooseFieldKey<TDoc>, RawFilter<TDoc>>;
 
 /* --------------------------------- sorting -------------------------------- */
 
 export type SortDirection = Core.SortDirection;
 
 /** One sort field by typed field key (`{ key, direction }`) — autocomplete. */
-export type SortItem<TDoc = Record<string, unknown>> = Core.SortItem<FieldKey<TDoc>>;
+export type SortItem<TDoc = Record<string, unknown>> = Core.SortItem<LooseFieldKey<TDoc>>;
 
 /**
  * Sort — **always an array** of `{ key, direction }` (multi-field). This is the
@@ -83,7 +89,7 @@ export type Scope<TDoc = Record<string, unknown>> = Core.Scope<FieldKey<TDoc>>;
 
 export interface ByIdParams<TDoc = Record<string, unknown>> extends QueryParams<TDoc> {
   /** Field to match against the id. Defaults to `"id"` (→ `_id`). */
-  idKey?: FieldKey<TDoc>;
+  idKey?: LooseFieldKey<TDoc>;
 }
 
 /* --------------------------------- writes --------------------------------- */
@@ -125,7 +131,7 @@ export interface CursorParams<TDoc = Record<string, unknown>> extends QueryParam
   limit?: number;
   cursor?: string | null;
   /** Field the cursor walks over. Defaults to `"id"` (→ `_id`). */
-  cursorKey?: FieldKey<TDoc>;
+  cursorKey?: LooseFieldKey<TDoc>;
   order?: SortDirection;
   direction?: "forward" | "backward";
 }
@@ -145,10 +151,30 @@ type DocOf<M> = M extends Model<infer T> ? T : never;
 /** Resolve a {@link RelationMap} to `{ field: <its document type> }`. */
 export type RelationDocs<TRel extends RelationMap> = { [K in keyof TRel]: DocOf<TRel[K]> };
 
-/** Options for `registry.repository(model, options)`. */
-export interface RepositoryOptions<TRel extends RelationMap = RelationMap> {
+/**
+ * Options for `registry.repository(model, options)`.
+ *
+ * Philosophy: the guard lives in the **repository**, not the route — `scope`
+ * (RBAC) already worked that way and projection joins it. Same names and same
+ * semantics as the drizzle-pg adapter's `RepositoryOptions`.
+ */
+export interface RepositoryOptions<TDoc = any, TRel extends RelationMap = RelationMap> {
   /** Declare populatable relations (field → model) so `with` types the result. */
   relations?: TRel;
+  /** Constant equality filter added to every read/write (RBAC / multi-tenancy). */
+  scope?: Scope<TDoc>;
+  /**
+   * Forced projection — the client's `columns` is **ignored entirely**. Keeps a
+   * password out of a `users` response without a `{ ...params, columns }` trick in
+   * every route. Must select at least one field, else building the repository throws.
+   */
+  forcedColumns?: ColumnSelection<TDoc>;
+  /**
+   * Allowlist — the client's `columns` is intersected with it. An empty
+   * intersection yields the allowlist itself, **never** the full document.
+   * An empty array throws (a projection selecting nothing means "everything").
+   */
+  allowedColumns?: readonly FieldKey<TDoc>[];
 }
 
 /* --------------------------- result-type inference ------------------------ */
@@ -179,7 +205,7 @@ type Params<TBase, TColumns, TWith> = Omit<TBase, "columns" | "with"> & { column
 /* ------------------------------- repository ------------------------------- */
 
 /**
- * Table-scoped repository (stage 1: reads + scoped). Read methods infer their
+ * Model-scoped repository. Read methods infer their
  * return type from the `columns` argument, mirroring `@querykitjs/drizzle-pg`.
  */
 export interface Repository<TDoc = Record<string, unknown>, TRel extends Record<string, unknown> = Record<never, never>> {
@@ -247,12 +273,19 @@ export interface Repository<TDoc = Record<string, unknown>, TRel extends Record<
   scoped(scope: Scope<TDoc>): Repository<TDoc, TRel>;
 }
 
-/** {@link createRegistry} options — pagination defaults. */
+/** {@link createRegistry} options — pagination defaults and bounds. */
 export interface RegistryOptions {
   /** `findList` default page size (core `DEFAULT_PER_PAGE` = 20). */
   defaultPerPage?: number;
   /** `findInfinite`/`findCursor` default limit (core `DEFAULT_LIMIT` = 20). */
   defaultLimit?: number;
+  /**
+   * Upper bound for `perPage` (core `DEFAULT_MAX_PER_PAGE` = 200). Applied even
+   * when validation was bypassed — defense in depth. Disable with `Infinity`.
+   */
+  maxPerPage?: number;
+  /** Upper bound for `limit` (`findInfinite`/`findCursor`, core `DEFAULT_MAX_LIMIT` = 200). */
+  maxLimit?: number;
 }
 
 /** Extends a base repository with custom, model-specific methods (drizzle-pg style). */
@@ -270,15 +303,28 @@ export interface Registry {
   ): Repository<TDoc> & TExt;
 
   /** …with typed relations so populated `with` fields are typed. */
-  repository<TDoc, TRel extends RelationMap>(model: Model<TDoc>, options: RepositoryOptions<TRel>): Repository<TDoc, RelationDocs<TRel>>;
+  repository<TDoc, TRel extends RelationMap>(model: Model<TDoc>, options: RepositoryOptions<TDoc, TRel>): Repository<TDoc, RelationDocs<TRel>>;
 
   /** …with both typed relations and custom methods. */
   repository<TDoc, TRel extends RelationMap, TExt extends Record<string, unknown>>(
     model: Model<TDoc>,
-    options: RepositoryOptions<TRel>,
+    options: RepositoryOptions<TDoc, TRel>,
     extend: RepositoryExtender<TDoc, RelationDocs<TRel>, TExt>,
   ): Repository<TDoc, RelationDocs<TRel>> & TExt;
 
   /** Runs `fn` inside a MongoDB transaction (requires a replica set). */
   transaction<T>(fn: () => Promise<T>): Promise<T>;
 }
+
+/* ---------------------- compile-time wire alignment ----------------------- */
+/* A validated (string-keyed) payload is assignable to the repository params —
+ * i.e. no `as OffsetParams<IUser>` cast in the route. The loop closes through
+ * core: `@querykitjs/zod` checks that its output matches these wire shapes, and
+ * here we check the shapes reach the repository. Mirrors the drizzle-pg adapter. */
+
+type Expect<T extends true> = T;
+type _WireOffset = Expect<Core.WireOffsetParams extends OffsetParams ? true : false>;
+type _WireInfinite = Expect<Core.WireInfiniteParams extends InfiniteParams ? true : false>;
+type _WireCursor = Expect<Core.WireCursorParams extends CursorParams ? true : false>;
+/* Loose keys keep autocomplete: a real field name is still a member of the type. */
+type _KeepsAutocomplete = Expect<"name" extends LooseFieldKey<{ name: string }> ? true : false>;

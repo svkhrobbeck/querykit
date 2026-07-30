@@ -66,30 +66,48 @@ const awaitable = <T>(value: T, extra: Record<string, unknown> = {}) => ({
   then: (resolve: (v: T) => void) => resolve(value),
 });
 
+/** Apply the recorded `columns` selection, the way drizzle would. */
+const project = (config: Recorded, source: unknown[]): unknown[] => {
+  const keys = Object.keys(config.columns ?? {}).filter(key => config.columns![key]);
+  if (keys.length === 0) return source;
+  return source.map(row => Object.fromEntries(keys.filter(key => key in (row as object)).map(key => [key, (row as Record<string, unknown>)[key]])));
+};
+
 const handle = {
   findMany: async (config: Recorded = {}) => {
     recorded.push(config);
-    return rows;
+    return project(config, rows);
   },
   findFirst: async (config: Recorded = {}) => {
     recorded.push(config);
-    return rows[0];
+    return project(config, rows)[0];
   },
 };
 
 const countRows = [{ value: 0 }];
 
+/** Last selection handed to `.select()` — how `aggregate` exposes what it reads. */
+let selected: Record<string, unknown> | undefined;
+
+/** `.select().from()` chain: `$dynamic`/`where`/`groupBy` all chain, and it awaits. */
+function selectChain() {
+  const chain = awaitable(countRows, {
+    $dynamic: () => chain,
+    where: (where: SQL) => {
+      recorded.push({ where });
+      return chain;
+    },
+    groupBy: () => chain,
+  }) as Record<string, unknown> & { then: (r: (v: unknown) => void) => void };
+  return chain;
+}
+
 const stubDb = {
   query: { users: handle, posts: handle },
-  select: () => ({
-    from: () =>
-      awaitable(countRows, {
-        where: (where: SQL) => {
-          recorded.push({ where });
-          return awaitable(countRows);
-        },
-      }),
-  }),
+  select: (selection?: Record<string, unknown>) => {
+    selected = selection;
+    return { from: () => selectChain() };
+  },
   transaction: async (fn: (tx: unknown) => unknown) => fn(stubDb),
 } as unknown as AnyDb;
 
@@ -251,7 +269,119 @@ async function main() {
   const counted = await capture(() => usersRepo.count([uf.gte("createdAt", ISO_FROM)] as never));
   check("count with a date filter does not crash", allOk(counted), firstError(counted));
 
-  /* 13. aggregate reuses composeWhere as well */
+  /* --------------------------- projection guards -------------------------- */
+  /* Recorded `columns` is what drizzle would have selected — i.e. exactly what the
+   * caller can ever see. `email` stands in for `password` here. */
+
+  const columnsOf = (results: Awaited<ReturnType<typeof capture>>) => Object.keys(results[0]!.entry.columns ?? {}).sort();
+
+  /* 13. forcedColumns ignores the client's selection outright */
+  const forcedRepo = registry.repository(users, { forcedColumns: { id: true, name: true } });
+  const forced = await capture(() => forcedRepo.findAll({ columns: { email: true } as never }));
+  check("forcedColumns: client selection ignored", JSON.stringify(columnsOf(forced)) === JSON.stringify(["id", "name"]), columnsOf(forced).join());
+  const forcedNoColumns = await capture(() => forcedRepo.findList({}));
+  check("forcedColumns: applied when the client sends nothing", JSON.stringify(columnsOf(forcedNoColumns)) === JSON.stringify(["id", "name"]));
+
+  /* 14. allowedColumns intersects — and never falls back to the full row */
+  const allowRepo = registry.repository(users, { allowedColumns: ["id", "name"] });
+  const intersected = await capture(() => allowRepo.findAll({ columns: { name: true, email: true } as never }));
+  check("allowedColumns: intersects the client selection", JSON.stringify(columnsOf(intersected)) === JSON.stringify(["name"]), columnsOf(intersected).join());
+
+  const rejected = await capture(() => allowRepo.findAll({ columns: { email: true } as never }));
+  check(
+    "allowedColumns: a fully rejected selection yields the allowlist, NOT the full row",
+    JSON.stringify(columnsOf(rejected)) === JSON.stringify(["id", "name"]),
+    columnsOf(rejected).join(),
+  );
+
+  const noSelection = await capture(() => allowRepo.findAll({}));
+  check("allowedColumns: applied when the client sends nothing", JSON.stringify(columnsOf(noSelection)) === JSON.stringify(["id", "name"]));
+
+  /* 15. an empty guard would mean "everything" — refuse at build time */
+  const throws = (fn: () => unknown) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  check(
+    "empty forcedColumns is refused",
+    throws(() => registry.repository(users, { forcedColumns: {} })),
+  );
+  check(
+    "all-false forcedColumns is refused",
+    throws(() => registry.repository(users, { forcedColumns: { id: false } })),
+  );
+  check(
+    "empty allowedColumns is refused",
+    throws(() => registry.repository(users, { allowedColumns: [] })),
+  );
+
+  /* 16. a client-chosen cursorKey must not become a way around the guard.
+   *     Two rows so `limit: 1` leaves an extra → a token really is issued. */
+  rows = [
+    { id: 1, name: "a", email: "secret@example.com" },
+    { id: 2, name: "b", email: "secret2@example.com" },
+  ];
+  const cursorLeak = await forcedRepo.findCursor({ limit: 1, cursorKey: "email" as never });
+  check("cursorKey cannot leak a forbidden column", !("email" in (cursorLeak.data[0] as object)), JSON.stringify(cursorLeak.data[0]));
+  check("…while pagination still works (token issued)", typeof cursorLeak.meta.next_cursor === "string", String(cursorLeak.meta.next_cursor));
+  const cursorAllowed = await forcedRepo.findCursor({ limit: 1, cursorKey: "id" as never });
+  check("a permitted cursorKey stays in the row", "id" in (cursorAllowed.data[0] as object), JSON.stringify(cursorAllowed.data[0]));
+  rows = [];
+
+  /* 17. aggregate honours the guard too (min(email) leaks as much as a column) */
+  await forcedRepo.aggregate({ count: true, groupBy: "email" as never, min: "email" as never });
+  const aggKeys = Object.keys(selected ?? {}).sort();
+  check("aggregate: a forbidden groupBy/min is dropped", JSON.stringify(aggKeys) === JSON.stringify(["count"]), aggKeys.join());
+  await forcedRepo.aggregate({ count: true, groupBy: "name" as never });
+  check("aggregate: a permitted groupBy survives", Object.keys(selected ?? {}).includes("name"), Object.keys(selected ?? {}).join());
+  await usersRepo.aggregate({ count: true, min: "email" });
+  check("aggregate: unguarded repo is unchanged", Object.keys(selected ?? {}).includes("min_email"), Object.keys(selected ?? {}).join());
+
+  /* --------------------------- pagination caps ---------------------------- */
+  /* 18. defense in depth: the repository clamps even if validation was bypassed */
+  check("perPage is capped at 200 by default", (await usersRepo.findList({ perPage: 10_000 })).meta.per_page === 200);
+  check("infinite limit is capped at 200", (await usersRepo.findInfinite({ limit: 10_000 })).meta.limit === 200);
+  check("cursor limit is capped at 200", (await usersRepo.findCursor({ limit: 10_000 })).meta.limit === 200);
+
+  const cappedRegistry = createRegistry(stubDb, schema, { maxPerPage: 50, maxLimit: 25 });
+  const cappedRepo = cappedRegistry.repository(users);
+  check("registry maxPerPage is honoured", (await cappedRepo.findList({ perPage: 10_000 })).meta.per_page === 50);
+  check("registry maxLimit is honoured", (await cappedRepo.findInfinite({ limit: 10_000 })).meta.limit === 25);
+  check("a request under the cap is untouched", (await usersRepo.findList({ perPage: 15 })).meta.per_page === 15);
+  check("the default page size still wins when omitted", (await usersRepo.findList({})).meta.per_page === 20);
+
+  /* --------------------------- registry arities --------------------------- */
+  /* 19. repository(table) / (table, extend) / (table, options) / (table, options, extend) */
+  check("arity: repository(table)", typeof registry.repository(users).findAll === "function");
+  const extended = registry.repository(users, base => ({ byName: (name: string) => base.findAll({ filter: [uf.eq("name", name)] }) }));
+  check("arity: repository(table, extend)", typeof extended.byName === "function" && typeof extended.findAll === "function");
+  check("arity: repository(table, options)", typeof registry.repository(users, { allowedColumns: ["id"] }).findAll === "function");
+  const both = registry.repository(users, { allowedColumns: ["id", "name"] }, base => ({ first: () => base.findOne({}) }));
+  check("arity: repository(table, options, extend)", typeof both.first === "function" && typeof both.findAll === "function");
+  const bothCols = await capture(() => both.findAll({ columns: { email: true } as never }));
+  check("arity: options still apply when an extender is passed", JSON.stringify(columnsOf(bothCols)) === JSON.stringify(["id", "name"]));
+
+  /* 20. scoped() keeps the guard */
+  const scopedGuarded = await capture(() => forcedRepo.scoped({ name: "a" }).findAll({ columns: { email: true } as never }));
+  check("scoped() preserves forcedColumns", JSON.stringify(columnsOf(scopedGuarded)) === JSON.stringify(["id", "name"]));
+
+  /* 21. wire-shaped params need no cast — the compile-time guarantee of P1-2.
+   *     `unknownKey` is a string the table does not have; it must not be a type
+   *     error, and at runtime the condition is simply skipped. */
+  const wireParams = {
+    filter: [{ key: "name", operation: "%_%" as const, value: "ali" }],
+    sort: [{ key: "createdAt", direction: "desc" as const }],
+    page: 1,
+    perPage: 20,
+  };
+  check("wire-shaped params compile without a cast", Array.isArray((await usersRepo.findList(wireParams)).data));
+  const unknownKey = await capture(() => usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] }));
+  check("an unknown wire key is skipped, not a type error", allOk(unknownKey) && firstParams(unknownKey).length === 0);
+
   void sql; // keep the drizzle sql import meaningful for future cases
 
   console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);

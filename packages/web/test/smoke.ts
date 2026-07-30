@@ -4,7 +4,7 @@
  *
  *   bun run test/smoke.ts
  */
-import { buildCursorParams, buildInfiniteParams, buildListParams, createFilters, createRegistry, defineListSchema } from "../src/index";
+import { buildCursorParams, buildInfiniteParams, buildListParams, createFilters, createQuery, createRegistry, defineListSchema } from "../src/index";
 import { mapCursorMeta, mapInfiniteMeta, mapMeta } from "../src/meta"; // internal (not public — use registry `parse*`)
 import { decodeSort, readListParams, schemaToFilter, setParam, setSort } from "../src/url";
 import type { FieldCondition, FilterNode } from "../src/types";
@@ -264,6 +264,24 @@ const s4 = schemaToFilter(sch, new URLSearchParams({ q: "ali", status: "x" }));
 check(
   "schema search → or-group tree",
   !Array.isArray(s4) && "and" in s4 && (s4 as { and: FilterNode[] }).and.some(n => typeof n === "object" && n !== null && "or" in n),
+);
+
+/* ------------------------------ pagination caps ---------------------------- */
+/* The cap comes from core, the same constant the zod factories and both backend
+ * repositories use — so the frontend never sends a request the server rejects. */
+
+check("perPage is capped at 200 by default", buildListParams({ perPage: 10_000 }).perPage === 200);
+check("infinite limit is capped at 200", buildInfiniteParams({ limit: 10_000 }).limit === 200);
+check("cursor limit is capped at 200", buildCursorParams({ limit: 10_000 }).limit === 200);
+check("a request under the cap is untouched", buildListParams({ perPage: 15 }).perPage === 15);
+check("the default page size still wins when omitted", buildListParams({}).perPage === 20);
+
+const capped = createQuery({ maxPerPage: 50, maxLimit: 25 });
+check("createQuery maxPerPage is honoured", (capped.list({ perPage: 10_000 }) as { perPage: number }).perPage === 50);
+check("createQuery maxLimit is honoured", (capped.infinite({ limit: 10_000 }) as { limit: number }).limit === 25);
+check(
+  "createQuery maxPerPage: Infinity disables the cap",
+  (createQuery({ maxPerPage: Infinity }).list({ perPage: 10_000 }) as { perPage: number }).perPage === 10_000,
 );
 
 console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);

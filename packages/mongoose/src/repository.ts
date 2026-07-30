@@ -15,8 +15,10 @@ import type {
   Insert,
   OffsetParams,
   OffsetResult,
+  ColumnSelection,
   QueryParams,
   Repository,
+  RepositoryOptions,
   Row,
   Scope,
   Sort,
@@ -34,12 +36,18 @@ export interface RepoRuntime {
   getSession: () => ClientSession | undefined;
   defaultPerPage: number;
   defaultLimit: number;
+  /** Upper bound for `perPage`, applied even when validation was bypassed. */
+  maxPerPage: number;
+  /** Upper bound for `limit` (`findInfinite`/`findCursor`). */
+  maxLimit: number;
 }
 
-/** Per-repository configuration (scope). */
-export interface RepoConfig<TDoc> {
-  scope?: Scope<TDoc>;
-}
+/**
+ * Clamp a requested page size into `[1, max]`, falling back to the default when
+ * omitted. Applied in the repository as well as in validation, so a bypassed or
+ * mis-configured schema still cannot ask for the whole collection.
+ */
+const clampPageSize = (requested: number | undefined, fallback: number, max: number): number => Math.min(max, Math.max(1, Math.trunc(requested ?? fallback)));
 
 // Mongoose's Query generics are extremely deep; we drive queries untyped
 // internally (the public Repository surface stays fully typed) and cast results.
@@ -50,7 +58,7 @@ type AnyQuery = any;
  * Build a model-scoped repository. `runtime` (session getter + defaults) comes
  * from the registry, so this file never touches the connection directly.
  */
-export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, config: RepoConfig<TDoc> = {}): Repository<TDoc> {
+export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, config: RepositoryOptions<TDoc> = {}): Repository<TDoc> {
   const m = model as AnyModel;
   const hasDeletedAt = hasPath(m, "deletedAt");
   // Mongoose auto-bumps `updatedAt` only when the schema opts into timestamps;
@@ -86,15 +94,51 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
     return { and: [filter, idCondition] };
   };
 
+  /* ------------------------- projection guards --------------------------- */
+  /* `columns` may arrive straight from the wire, so the safe selection belongs
+   * here rather than in every route — the same reasoning as `scope`. Both options
+   * are validated once, at build time, so a misconfiguration surfaces in
+   * development instead of quietly returning full documents in production.
+   * Identical semantics to the drizzle-pg adapter. */
+
+  const truthyKeys = (selection: ColumnSelection<TDoc>): string[] =>
+    Object.entries(selection)
+      .filter(([, on]) => on)
+      .map(([key]) => key);
+
+  const forcedKeys = config.forcedColumns ? truthyKeys(config.forcedColumns) : undefined;
+  if (config.forcedColumns && forcedKeys!.length === 0) {
+    throw new Error("buildRepository: forcedColumns must select at least one field (an empty selection would return the full document).");
+  }
+
+  const allowed = config.allowedColumns ? new Set<string>(config.allowedColumns as readonly string[]) : undefined;
+  if (config.allowedColumns && allowed!.size === 0) {
+    throw new Error("buildRepository: allowedColumns must list at least one field (an empty allowlist would return the full document).");
+  }
+
+  const guarded = Boolean(forcedKeys ?? allowed);
+  /** Whether a field may appear in a result at all. */
+  const permits = (key: string): boolean => (forcedKeys ? forcedKeys.includes(key) : allowed ? allowed.has(key) : true);
+
+  /** Client selection ∩ allowlist; empty intersection → the allowlist itself. */
+  const intersectAllowed = (requested: string[]): string[] => {
+    const hit = requested.filter(key => allowed!.has(key));
+    return hit.length > 0 ? hit : [...allowed!];
+  };
+
   /**
    * Column selection → Mongo projection, or undefined when empty. Adds `_id: 0`
    * unless the caller selected `id`/`_id`, so the runtime shape matches the
    * inferred `Pick<...>` type (Mongo otherwise always returns `_id`). Returns
    * undefined (full doc) when no requested column resolves.
+   *
+   * With `forcedColumns` the caller's selection is ignored outright; with
+   * `allowedColumns` it is intersected, and an empty intersection falls back to
+   * the allowlist — **never** to the full document.
    */
   const projection = (columns?: QueryParams<TDoc>["columns"]): Record<string, 0 | 1> | undefined => {
-    if (!columns) return undefined;
-    const keys = Object.keys(columns).filter(k => (columns as Record<string, boolean>)[k]);
+    const requested = columns ? truthyKeys(columns as ColumnSelection<TDoc>) : [];
+    const keys = forcedKeys ?? (allowed ? intersectAllowed(requested) : requested);
     if (keys.length === 0) return undefined;
     const proj: Record<string, 0 | 1> = {};
     let includesId = false;
@@ -208,7 +252,7 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
 
     async findList(params: OffsetParams<TDoc> = {}) {
       const page = Math.max(1, Math.trunc(params.page ?? 1));
-      const perPage = Math.max(1, Math.trunc(params.perPage ?? runtime.defaultPerPage));
+      const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
       const where = composeWhere(params.filter, params.withDeleted);
 
       const [data, total_items] = await Promise.all([
@@ -231,7 +275,7 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
     },
 
     async findInfinite(params: InfiniteParams<TDoc> = {}) {
-      const limit = Math.max(1, Math.trunc(params.limit ?? runtime.defaultLimit));
+      const limit = clampPageSize(params.limit, runtime.defaultLimit, runtime.maxLimit);
       const offset = Math.max(0, Math.trunc(params.offset ?? 0));
 
       const rows = await runFind(composeWhere(params.filter, params.withDeleted), {
@@ -251,7 +295,7 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
     },
 
     async findCursor(params: CursorParams<TDoc> = {}) {
-      const limit = Math.max(1, Math.trunc(params.limit ?? runtime.defaultLimit));
+      const limit = clampPageSize(params.limit, runtime.defaultLimit, runtime.maxLimit);
       const cursorKey = (params.cursorKey ?? "id") as string;
       const order: SortDirection = params.order ?? "asc";
       const direction = params.direction ?? "forward";
@@ -268,8 +312,12 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
       const where: Query = seek ? (Object.keys(baseWhere).length ? { $and: [baseWhere, seek] } : seek) : baseWhere;
 
       // Force-include the cursor field in the projection so next/prev tokens work.
+      // `cursorKey` is client-supplied, so under a projection guard this would be
+      // a way to read a forbidden field: keep it in the query (pagination needs
+      // it) but strip it from the documents we hand back.
       const selected = projection(params.columns);
       const proj = selected ? { ...selected, [field]: 1 } : undefined;
+      const leaksCursorField = guarded && selected !== undefined && !permits(cursorKey) && !permits(field);
 
       let q: AnyQuery = m
         .find(where, proj)
@@ -288,16 +336,23 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
       const has_next = direction === "forward" ? hasExtra : cursorValue !== undefined;
       const has_prev = direction === "forward" ? cursorValue !== undefined : hasExtra;
 
-      return {
-        data: pageRows,
-        meta: {
-          limit,
-          has_next,
-          has_prev,
-          next_cursor: has_next && last ? encodeCursor(last[field]) : null,
-          prev_cursor: has_prev && first ? encodeCursor(first[field]) : null,
-        },
-      } as CursorResult<never>;
+      const meta = {
+        limit,
+        has_next,
+        has_prev,
+        next_cursor: has_next && last ? encodeCursor(last[field]) : null,
+        prev_cursor: has_prev && first ? encodeCursor(first[field]) : null,
+      };
+
+      // Cursor values are read above, so the field can go now.
+      if (leaksCursorField) {
+        pageRows = pageRows.map(row => {
+          const { [field]: _cursor, ...rest } = row;
+          return rest;
+        });
+      }
+
+      return { data: pageRows, meta } as CursorResult<never>;
     },
 
     count(filter?: Filter<TDoc>) {
@@ -397,7 +452,11 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
     },
 
     async aggregate(spec: AggregateSpec<TDoc>) {
-      const groupKeys = toArr(spec.groupBy) as string[];
+      // An aggregate spec can also come from a request, and `min(password)` or a
+      // `groupBy` on a hidden field leaks just as much as a projection — so the
+      // same guard applies here (matching the drizzle-pg adapter).
+      const aggregable = (key: string) => (permits(key) ? resolveField(m, key) : undefined);
+      const groupKeys = (toArr(spec.groupBy) as string[]).filter(key => Boolean(aggregable(key)));
       // Aggregate `$match` doesn't auto-cast values the way `find()` does; cast
       // the filter against the schema so wire strings (dates / ObjectIds) become
       // proper BSON types — keeping aggregate filters consistent with reads.
@@ -410,12 +469,12 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
       } catch {
         /* fall back to the uncast filter */
       }
-      const groupId = groupKeys.length ? Object.fromEntries(groupKeys.map(k => [k, `$${resolveField(m, k) ?? k}`])) : null;
+      const groupId = groupKeys.length ? Object.fromEntries(groupKeys.map(k => [k, `$${aggregable(k) ?? k}`])) : null;
       const group: Record<string, unknown> = { _id: groupId };
       if (spec.count) group.count = { $sum: 1 };
       const addAgg = (op: "$sum" | "$avg" | "$min" | "$max", keys: string[], prefix: string) => {
         for (const k of keys) {
-          const field = resolveField(m, k);
+          const field = aggregable(k);
           if (field) group[`${prefix}_${k}`] = { [op]: `$${field}` };
         }
       };

@@ -7,6 +7,7 @@ import type {
   AnyDb,
   ByIdParams,
   ColumnKey,
+  ColumnSelection,
   CursorParams,
   CursorResult,
   Filter,
@@ -19,6 +20,7 @@ import type {
   OffsetResult,
   QueryParams,
   Repository,
+  RepositoryOptions,
   Row,
   Scope,
   SortDirection,
@@ -40,11 +42,10 @@ export interface RepoRuntime {
   defaultPerPage: number;
   /** Default `limit` for `findInfinite`/`findCursor` when omitted. */
   defaultLimit: number;
-}
-
-/** Per-repository configuration (scope). */
-export interface RepoConfig<TTable extends AnyPgTable> {
-  scope?: Scope<TTable>;
+  /** Upper bound for `perPage`, applied even when validation was bypassed. */
+  maxPerPage: number;
+  /** Upper bound for `limit` (`findInfinite`/`findCursor`). */
+  maxLimit: number;
 }
 
 interface RelationalHandle {
@@ -55,6 +56,13 @@ interface RelationalHandle {
 const CHUNK_SIZE = 1000;
 
 /**
+ * Clamp a requested page size into `[1, max]`, falling back to the default when
+ * omitted. Applied in the repository as well as in validation, so a bypassed or
+ * mis-configured schema still cannot ask for the whole table.
+ */
+const clampPageSize = (requested: number | undefined, fallback: number, max: number): number => Math.min(max, Math.max(1, Math.trunc(requested ?? fallback)));
+
+/**
  * Build a table-scoped repository. `runtime` (db + context) comes from the
  * registry, so this file never imports the app's database directly.
  */
@@ -62,7 +70,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
   runtime: RepoRuntime,
   schema: TSchema,
   table: TTable,
-  config: RepoConfig<TTable> = {},
+  config: RepositoryOptions<TTable> = {},
 ): Repository<TTable, TSchema> {
   const tableKey = getTableKey(schema, table);
   if (!tableKey) {
@@ -105,13 +113,51 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     return { and: [filter, idCondition] } as Filter<TTable>;
   };
 
-  // Inclusion-only: drop `false` selections so `{a:true,b:false}` includes only
-  // `a`, and an all-`false`/empty object returns the full row (matches the
-  // mongoose adapter and the `Pick<Row,K>` contract).
+  /* ------------------------- projection guards --------------------------- */
+  /* `columns` may arrive straight from the wire, so the safe selection belongs
+   * here rather than in every route — the same reasoning as `scope`. Both
+   * options are validated once, at build time, so a misconfiguration surfaces in
+   * development instead of quietly returning full rows in production. */
+
+  const truthyKeys = (selection: ColumnSelection<TTable>): string[] =>
+    Object.entries(selection)
+      .filter(([, on]) => on)
+      .map(([key]) => key);
+
+  const forcedKeys = config.forcedColumns ? truthyKeys(config.forcedColumns) : undefined;
+  if (config.forcedColumns && forcedKeys!.length === 0) {
+    throw new Error("buildRepository: forcedColumns must select at least one column (an empty selection would return the full row).");
+  }
+
+  const allowed = config.allowedColumns ? new Set<string>(config.allowedColumns as readonly string[]) : undefined;
+  if (config.allowedColumns && allowed!.size === 0) {
+    throw new Error("buildRepository: allowedColumns must list at least one column (an empty allowlist would return the full row).");
+  }
+
+  const guarded = Boolean(forcedKeys ?? allowed);
+  /** Whether a column may appear in a result at all. */
+  const permits = (key: string): boolean => (forcedKeys ? forcedKeys.includes(key) : allowed ? allowed.has(key) : true);
+
+  const toSelection = (keys: string[]) => Object.fromEntries(keys.map(key => [key, true]));
+
+  /**
+   * Inclusion-only: drop `false` selections so `{a:true,b:false}` includes only
+   * `a`, and an all-`false`/empty object returns the full row (matches the
+   * mongoose adapter and the `Pick<Row,K>` contract).
+   *
+   * With `forcedColumns` the caller's selection is ignored outright. With
+   * `allowedColumns` it is intersected, and an empty intersection falls back to
+   * the allowlist — **never** to the full row, which is what makes a request for
+   * a forbidden column safe instead of catastrophic.
+   */
   const pickColumns = (columns?: QueryParams<TTable>["columns"]) => {
-    if (!columns) return undefined;
-    const picked = Object.fromEntries(Object.entries(columns).filter(([, v]) => v));
-    return Object.keys(picked).length > 0 ? picked : undefined;
+    if (forcedKeys) return toSelection(forcedKeys);
+
+    const requested = columns ? truthyKeys(columns as ColumnSelection<TTable>) : [];
+    if (!allowed) return requested.length > 0 ? toSelection(requested) : undefined;
+
+    const intersection = requested.filter(key => allowed.has(key));
+    return toSelection(intersection.length > 0 ? intersection : [...allowed]);
   };
 
   /** Apply scope defaults to insert values (scope wins). */
@@ -193,7 +239,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
 
     async findList(params: OffsetParams<TTable> = {}) {
       const page = Math.max(1, Math.trunc(params.page ?? 1));
-      const perPage = Math.max(1, Math.trunc(params.perPage ?? runtime.defaultPerPage));
+      const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
       const where = composeWhere(params.filter, params.withDeleted);
 
       const [data, total_items] = await Promise.all([
@@ -223,7 +269,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     },
 
     async findInfinite(params: InfiniteParams<TTable> = {}) {
-      const limit = Math.max(1, Math.trunc(params.limit ?? runtime.defaultLimit));
+      const limit = clampPageSize(params.limit, runtime.defaultLimit, runtime.maxLimit);
       const offset = Math.max(0, Math.trunc(params.offset ?? 0));
 
       const rows = await handle().findMany({
@@ -250,7 +296,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     },
 
     async findCursor(params: CursorParams<TTable> = {}) {
-      const limit = Math.max(1, Math.trunc(params.limit ?? runtime.defaultLimit));
+      const limit = clampPageSize(params.limit, runtime.defaultLimit, runtime.maxLimit);
       const cursorKey = (params.cursorKey ?? "id") as string;
       const order: SortDirection = params.order ?? "asc";
       const direction = params.direction ?? "forward";
@@ -271,9 +317,13 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       const where = seek && baseWhere ? and(baseWhere, seek) : (seek ?? baseWhere);
 
       // Force-include the cursor column when a columns selection is given —
-      // otherwise its value is missing and next/prev cursors break.
+      // otherwise its value is missing and next/prev cursors break. `cursorKey`
+      // is client-supplied, so under a projection guard this would be a way to
+      // read a forbidden column: keep it in the query (pagination needs it) but
+      // strip it from the rows we hand back.
       const selected = pickColumns(params.columns);
       const columns = selected ? { ...selected, [cursorKey]: true } : undefined;
+      const leaksCursorColumn = guarded && selected !== undefined && !permits(cursorKey);
 
       const rows = await handle().findMany({
         where,
@@ -293,16 +343,23 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       const has_next = direction === "forward" ? hasExtra : cursorValue !== undefined;
       const has_prev = direction === "forward" ? cursorValue !== undefined : hasExtra;
 
-      return {
-        data: page,
-        meta: {
-          limit,
-          has_next,
-          has_prev,
-          next_cursor: has_next && last ? encodeCursor(last[cursorKey]) : null,
-          prev_cursor: has_prev && first ? encodeCursor(first[cursorKey]) : null,
-        },
-      } as CursorResult<never>;
+      const meta = {
+        limit,
+        has_next,
+        has_prev,
+        next_cursor: has_next && last ? encodeCursor(last[cursorKey]) : null,
+        prev_cursor: has_prev && first ? encodeCursor(first[cursorKey]) : null,
+      };
+
+      // Cursor values are read above, so the column can go now.
+      if (leaksCursorColumn) {
+        page = page.map(row => {
+          const { [cursorKey]: _cursor, ...rest } = row as Record<string, unknown>;
+          return rest;
+        });
+      }
+
+      return { data: page, meta } as CursorResult<never>;
     },
 
     count(filter?: Filter<TTable>) {
@@ -314,28 +371,32 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     },
 
     async aggregate(spec: AggregateSpec<TTable>): Promise<AggregateRow[]> {
-      const groupKeys = toArray(spec.groupBy);
+      // An aggregate spec can also come from a request, and `min(password)` or a
+      // `groupBy` on a hidden column leaks just as much as a projection — so the
+      // same guard applies here.
+      const aggregable = (key: string) => (permits(key) ? resolveColumn(table, key) : undefined);
+      const groupKeys = toArray(spec.groupBy).filter(key => Boolean(aggregable(key)));
       const selection: Record<string, SQL | AnyPgColumn> = {};
 
       for (const key of groupKeys) {
-        const column = resolveColumn(table, key);
+        const column = aggregable(key);
         if (column) selection[key] = column;
       }
       if (spec.count) selection.count = sql<number>`count(*)`.mapWith(Number);
       for (const key of toArray(spec.sum)) {
-        const c = resolveColumn(table, key);
+        const c = aggregable(key);
         if (c) selection[`sum_${key}`] = sql<number>`sum(${c})`.mapWith(Number);
       }
       for (const key of toArray(spec.avg)) {
-        const c = resolveColumn(table, key);
+        const c = aggregable(key);
         if (c) selection[`avg_${key}`] = sql<number>`avg(${c})`.mapWith(Number);
       }
       for (const key of toArray(spec.min)) {
-        const c = resolveColumn(table, key);
+        const c = aggregable(key);
         if (c) selection[`min_${key}`] = sql`min(${c})`;
       }
       for (const key of toArray(spec.max)) {
-        const c = resolveColumn(table, key);
+        const c = aggregable(key);
         if (c) selection[`max_${key}`] = sql`max(${c})`;
       }
 
@@ -345,7 +406,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
         .$dynamic();
       const where = composeWhere(spec.filter, spec.withDeleted);
       if (where) query = query.where(where);
-      const groupColumns = groupKeys.map(key => resolveColumn(table, key)).filter((c): c is AnyPgColumn => Boolean(c));
+      const groupColumns = groupKeys.map(key => aggregable(key)).filter((c): c is AnyPgColumn => Boolean(c));
       if (groupColumns.length) query = query.groupBy(...groupColumns);
 
       return (await query) as AggregateRow[];

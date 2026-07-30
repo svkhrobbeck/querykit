@@ -1,7 +1,7 @@
 import type { AnyPgTable } from "drizzle-orm/pg-core";
-import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykitjs/core";
+import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_PER_PAGE } from "@querykitjs/core";
 
-import type { AnyDb, Registry, RegistryOptions, Repository, RepositoryExtender } from "./types";
+import type { AnyDb, Registry, RegistryOptions, Repository, RepositoryExtender, RepositoryOptions } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
 import { createContextStore } from "./internal/context";
 
@@ -40,6 +40,8 @@ export function createRegistry<TSchema extends Record<string, unknown>>(db: AnyD
     getExecutor: () => ctx.get()?.executor ?? db,
     defaultPerPage: options.defaultPerPage ?? DEFAULT_PER_PAGE,
     defaultLimit: options.defaultLimit ?? DEFAULT_LIMIT,
+    maxPerPage: options.maxPerPage ?? DEFAULT_MAX_PER_PAGE,
+    maxLimit: options.maxLimit ?? DEFAULT_MAX_LIMIT,
   };
 
   function repository<TTable extends AnyPgTable>(table: TTable): Repository<TTable, TSchema>;
@@ -47,8 +49,22 @@ export function createRegistry<TSchema extends Record<string, unknown>>(db: AnyD
     table: TTable,
     extend: RepositoryExtender<TTable, TSchema, TExt>,
   ): Repository<TTable, TSchema> & TExt;
-  function repository<TTable extends AnyPgTable, TExt extends Record<string, unknown>>(table: TTable, extend?: RepositoryExtender<TTable, TSchema, TExt>) {
-    const base = buildRepository(runtime, schema, table);
+  function repository<TTable extends AnyPgTable>(table: TTable, options: RepositoryOptions<TTable>): Repository<TTable, TSchema>;
+  function repository<TTable extends AnyPgTable, TExt extends Record<string, unknown>>(
+    table: TTable,
+    options: RepositoryOptions<TTable>,
+    extend: RepositoryExtender<TTable, TSchema, TExt>,
+  ): Repository<TTable, TSchema> & TExt;
+  function repository<TTable extends AnyPgTable, TExt extends Record<string, unknown>>(
+    table: TTable,
+    arg2?: RepositoryOptions<TTable> | RepositoryExtender<TTable, TSchema, TExt>,
+    arg3?: RepositoryExtender<TTable, TSchema, TExt>,
+  ) {
+    // 2nd arg is either the options object or the extender fn (same dispatch as
+    // the mongoose adapter, so both registries read identically).
+    const repoOptions = typeof arg2 === "function" ? undefined : arg2;
+    const extend = typeof arg2 === "function" ? arg2 : arg3;
+    const base = buildRepository(runtime, schema, table, repoOptions);
     return extend ? { ...base, ...extend(base) } : base;
   }
 

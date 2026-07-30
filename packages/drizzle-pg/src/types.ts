@@ -72,6 +72,14 @@ export type TableNameOf<TSchema extends Record<string, unknown>, TTable extends 
 /** Union of a table's column keys (property names). */
 export type ColumnKey<TTable extends AnyPgTable> = keyof Row<TTable> & string;
 
+/**
+ * A column key that also accepts any `string`. Filter/sort keys arrive from the
+ * wire as plain strings and the adapter skips the ones it cannot resolve, so a
+ * validated payload can go straight into a repository call with no `as` cast.
+ * Autocomplete still suggests the table's real columns.
+ */
+export type LooseColumnKey<TTable extends AnyPgTable> = Core.LooseKey<ColumnKey<TTable>>;
+
 /* -------------------------------- filters --------------------------------- */
 /* DSL `@querykitjs/core`dan; jadval ustuni (`ColumnKey`) va raw `SQL` bilan ixtisos. */
 
@@ -80,28 +88,28 @@ export type FilterScalar = Core.FilterScalar;
 export type FilterValue = Core.FilterValue;
 
 /** A single field comparison (`operation` defaults to `"="`). */
-export type FieldCondition<TTable extends AnyPgTable = AnyPgTable> = Core.FieldCondition<ColumnKey<TTable>>;
-export type AndGroup<TTable extends AnyPgTable = AnyPgTable> = Core.AndGroup<ColumnKey<TTable>, SQL>;
-export type OrGroup<TTable extends AnyPgTable = AnyPgTable> = Core.OrGroup<ColumnKey<TTable>, SQL>;
-export type NotGroup<TTable extends AnyPgTable = AnyPgTable> = Core.NotGroup<ColumnKey<TTable>, SQL>;
+export type FieldCondition<TTable extends AnyPgTable = AnyPgTable> = Core.FieldCondition<LooseColumnKey<TTable>>;
+export type AndGroup<TTable extends AnyPgTable = AnyPgTable> = Core.AndGroup<LooseColumnKey<TTable>, SQL>;
+export type OrGroup<TTable extends AnyPgTable = AnyPgTable> = Core.OrGroup<LooseColumnKey<TTable>, SQL>;
+export type NotGroup<TTable extends AnyPgTable = AnyPgTable> = Core.NotGroup<LooseColumnKey<TTable>, SQL>;
 
 /**
  * Any node in a filter tree: a field comparison, a logical group, or a raw
  * Drizzle `SQL` fragment (escape hatch for expressions the DSL can't express).
  */
-export type FilterNode<TTable extends AnyPgTable = AnyPgTable> = Core.FilterNode<ColumnKey<TTable>, SQL>;
+export type FilterNode<TTable extends AnyPgTable = AnyPgTable> = Core.FilterNode<LooseColumnKey<TTable>, SQL>;
 
 /**
  * Public filter input. Either a filter tree/node, or a flat array of
  * conditions (treated as implicit AND — backward compatible with db-service).
  */
-export type Filter<TTable extends AnyPgTable = AnyPgTable> = Core.Filter<ColumnKey<TTable>, SQL>;
+export type Filter<TTable extends AnyPgTable = AnyPgTable> = Core.Filter<LooseColumnKey<TTable>, SQL>;
 
 /* --------------------------------- sorting -------------------------------- */
 
 export type SortDirection = Core.SortDirection;
 
-export type SortItem<TTable extends AnyPgTable = AnyPgTable> = Core.SortItem<ColumnKey<TTable>>;
+export type SortItem<TTable extends AnyPgTable = AnyPgTable> = Core.SortItem<LooseColumnKey<TTable>>;
 
 /** Sort is **always an array** of `{ key, direction }` items (multi-field). */
 export type Sort<TTable extends AnyPgTable = AnyPgTable> = SortItem<TTable>[];
@@ -127,7 +135,7 @@ export type Scope<TTable extends AnyPgTable> = Core.Scope<ColumnKey<TTable>>;
 
 export interface ByIdParams<TTable extends AnyPgTable> extends QueryParams<TTable> {
   /** Column to match against the id. Defaults to `"id"`. */
-  idKey?: ColumnKey<TTable>;
+  idKey?: LooseColumnKey<TTable>;
 }
 
 /** Options for {@link Repository.upsert} / {@link Repository.upsertMany}. */
@@ -175,7 +183,7 @@ export interface CursorParams<TTable extends AnyPgTable> extends QueryParams<TTa
   /** Opaque cursor token from a previous result's meta. */
   cursor?: string | null;
   /** Column the cursor walks over. Must be unique & sortable. Defaults to `"id"`. */
-  cursorKey?: ColumnKey<TTable>;
+  cursorKey?: LooseColumnKey<TTable>;
   /** Stable order of the dataset. Defaults to `"asc"`. */
   order?: SortDirection;
   /** Navigation relative to the cursor. Defaults to `"forward"`. */
@@ -418,12 +426,44 @@ export type RepositoryExtender<TTable extends AnyPgTable, TSchema extends Record
   base: Repository<TTable, TSchema>,
 ) => TExt;
 
-/** {@link createRegistry} sozlamalari — pagination default'lari. */
+/** {@link createRegistry} sozlamalari — pagination default'lari va chegaralari. */
 export interface RegistryOptions {
   /** `findList` uchun default sahifa o'lchami (core `DEFAULT_PER_PAGE` = 20). */
   defaultPerPage?: number;
   /** `findInfinite`/`findCursor` uchun default `limit` (core `DEFAULT_LIMIT` = 20). */
   defaultLimit?: number;
+  /**
+   * `findList` uchun **maksimal** `perPage` (core `DEFAULT_MAX_PER_PAGE` = 200).
+   * Validatsiya (`@querykitjs/zod` factory'lari) chetlab o'tilsa ham repository
+   * o'zi clamp qiladi — defense in depth. Cheklovni o'chirish: `Infinity`.
+   */
+  maxPerPage?: number;
+  /** `findInfinite`/`findCursor` uchun maksimal `limit` (core `DEFAULT_MAX_LIMIT` = 200). */
+  maxLimit?: number;
+}
+
+/**
+ * Per-repository sozlamalari — `registry.repository(table, options)`ga beriladi.
+ * Falsafa: himoya **repository'da**, route'da emas — `scope` (RBAC) allaqachon
+ * shu yo'lda, projection ham shu yerga tushadi. Mongoose adapteridagi
+ * `RepositoryOptions` bilan bir xil nom va bir xil semantika.
+ */
+export interface RepositoryOptions<TTable extends AnyPgTable> {
+  /** Har bir o'qish/yozishga qo'shiladigan doimiy tenglik filtri (RBAC / multi-tenancy). */
+  scope?: Scope<TTable>;
+  /**
+   * Majburiy projection — client `columns` **butunlay e'tiborsiz** qoldiriladi.
+   * `users` kabi jadvallarda parol chiqib ketishining oldini oladi; route'da
+   * `{ ...params, columns: SAFE_COLUMNS }` spread-trick'i kerak bo'lmaydi.
+   * Kamida bitta ustun tanlanishi shart (aks holda repository yaratilishida xato).
+   */
+  forcedColumns?: ColumnSelection<TTable>;
+  /**
+   * Ruxsat etilgan ustunlar — client `columns` shu ro'yxat bilan kesiladi.
+   * Kesishma bo'sh bo'lsa natija **to'liq qator emas**, ro'yxatning o'zi bo'ladi.
+   * Bo'sh massiv berilishi xato (hech narsa tanlanmagan projection = to'liq qator).
+   */
+  allowedColumns?: readonly ColumnKey<TTable>[];
 }
 
 /** DB registry: bir marta yaratiladi, jadval repositorylarini chiqaradi. */
@@ -450,6 +490,24 @@ export interface Registry<TSchema extends Record<string, unknown>> {
   ): Repository<TTable, TSchema> & TExt;
 
   /**
+   * …with per-repository options (`scope`, `forcedColumns`, `allowedColumns`).
+   *
+   * @example
+   * ```ts
+   * export const usersRepository = registry.repository(users, {
+   *   forcedColumns: { id: true, fullName: true }, // parol hech qachon chiqmaydi
+   * });
+   * ```
+   */
+  repository<TTable extends AnyPgTable>(table: TTable, options: RepositoryOptions<TTable>): Repository<TTable, TSchema>;
+  /** …with both options and custom methods. */
+  repository<TTable extends AnyPgTable, TExt extends Record<string, unknown>>(
+    table: TTable,
+    options: RepositoryOptions<TTable>,
+    extend: RepositoryExtender<TTable, TSchema, TExt>,
+  ): Repository<TTable, TSchema> & TExt;
+
+  /**
    * `fn` ni DB **tranzaksiyasi** ichida bajaradi. Ichida ishlatilgan
    * repositorylar avtomatik ravishda tranzaksiya ulanishini ishlatadi (ambient
    * kontekst orqali). Ichma-ich chaqirilsa **savepoint** yaratiladi. `fn` xato
@@ -465,3 +523,17 @@ export interface Registry<TSchema extends Record<string, unknown>> {
    */
   transaction<T>(fn: () => Promise<T>): Promise<T>;
 }
+
+/* ---------------------- compile-time wire alignment ----------------------- */
+/* Validatsiyalangan (string-keyed) payload repository params'ga assignable —
+ * ya'ni route'da `as OffsetParams<typeof table>` cast'i kerak emas. Halqa core
+ * orqali yopiladi: `@querykitjs/zod` chiqishi shu wire shakllariga mos ekanini
+ * o'sha paketda tekshiradi, bu yerda esa ularning repo'ga tushishi tekshiriladi.
+ * `test/` typecheck qilinmaydi (`include: ["src"]`), shuning uchun `src` ichida. */
+
+type Expect<T extends true> = T;
+type _WireOffset = Expect<Core.WireOffsetParams extends OffsetParams<AnyPgTable> ? true : false>;
+type _WireInfinite = Expect<Core.WireInfiniteParams extends InfiniteParams<AnyPgTable> ? true : false>;
+type _WireCursor = Expect<Core.WireCursorParams extends CursorParams<AnyPgTable> ? true : false>;
+/* Loose kalitlar autocomplete'ni yo'qotmaydi: haqiqiy ustun nomi hali ham tip a'zosi. */
+type _KeepsAutocomplete = Expect<"id" extends LooseColumnKey<AnyPgTable> ? true : false>;

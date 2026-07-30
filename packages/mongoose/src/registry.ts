@@ -1,5 +1,5 @@
 import type { Connection, Model } from "mongoose";
-import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykitjs/core";
+import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_PER_PAGE } from "@querykitjs/core";
 
 import type { RelationDocs, RelationMap, Registry, RegistryOptions, Repository, RepositoryExtender, RepositoryOptions } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
@@ -26,6 +26,8 @@ export function createRegistry(connection: Connection, options: RegistryOptions 
     getSession: () => ctx.get()?.session,
     defaultPerPage: options.defaultPerPage ?? DEFAULT_PER_PAGE,
     defaultLimit: options.defaultLimit ?? DEFAULT_LIMIT,
+    maxPerPage: options.maxPerPage ?? DEFAULT_MAX_PER_PAGE,
+    maxLimit: options.maxLimit ?? DEFAULT_MAX_LIMIT,
   };
 
   function repository<TDoc>(model: Model<TDoc>): Repository<TDoc>;
@@ -33,22 +35,25 @@ export function createRegistry(connection: Connection, options: RegistryOptions 
     model: Model<TDoc>,
     extend: RepositoryExtender<TDoc, Record<never, never>, TExt>,
   ): Repository<TDoc> & TExt;
-  function repository<TDoc, TRel extends RelationMap>(model: Model<TDoc>, options: RepositoryOptions<TRel>): Repository<TDoc, RelationDocs<TRel>>;
+  function repository<TDoc, TRel extends RelationMap>(model: Model<TDoc>, options: RepositoryOptions<TDoc, TRel>): Repository<TDoc, RelationDocs<TRel>>;
   function repository<TDoc, TRel extends RelationMap, TExt extends Record<string, unknown>>(
     model: Model<TDoc>,
-    options: RepositoryOptions<TRel>,
+    options: RepositoryOptions<TDoc, TRel>,
     extend: RepositoryExtender<TDoc, RelationDocs<TRel>, TExt>,
   ): Repository<TDoc, RelationDocs<TRel>> & TExt;
   function repository<TDoc, TRel extends RelationMap, TExt extends Record<string, unknown>>(
     model: Model<TDoc>,
-    arg2?: RepositoryOptions<TRel> | RepositoryExtender<TDoc, RelationDocs<TRel>, TExt>,
+    arg2?: RepositoryOptions<TDoc, TRel> | RepositoryExtender<TDoc, RelationDocs<TRel>, TExt>,
     arg3?: RepositoryExtender<TDoc, RelationDocs<TRel>, TExt>,
   ) {
-    // 2nd arg is either the relations options object or the extender fn.
-    // `relations` is type-only (drives `with` inference); runtime populate is
-    // opt-in per call, so nothing to wire from it here.
+    // 2nd arg is either the options object or the extender fn (same dispatch as
+    // the drizzle-pg adapter, so both registries read identically).
+    // `relations` is type-only (it drives `with` inference); `scope` and the
+    // projection guards are runtime and must reach buildRepository — before this
+    // they were silently dropped, so `forcedColumns` had no effect.
+    const repoOptions = typeof arg2 === "function" ? undefined : arg2;
     const extend = typeof arg2 === "function" ? arg2 : arg3;
-    const base = buildRepository(runtime, model) as unknown as Repository<TDoc, RelationDocs<TRel>>;
+    const base = buildRepository(runtime, model, repoOptions) as unknown as Repository<TDoc, RelationDocs<TRel>>;
     return extend ? { ...base, ...extend(base) } : base;
   }
 
