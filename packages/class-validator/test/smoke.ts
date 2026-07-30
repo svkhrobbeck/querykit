@@ -4,8 +4,9 @@
  *
  * `bun run --filter @querykitjs/class-validator test:smoke`
  *
- * NOTE: the script runs from this directory against ./tsconfig.json — bun drops
- * `experimentalDecorators` when a tsconfig uses `extends`. See ./tsconfig.json.
+ * NOTE: the script runs from ./.bun so bun picks up ./.bun/tsconfig.json — bun
+ * only reads the root of an `extends` chain, so it would otherwise drop
+ * `experimentalDecorators`. See ./.bun/tsconfig.json for the full reasoning.
  */
 import "reflect-metadata";
 import { existsSync } from "node:fs";

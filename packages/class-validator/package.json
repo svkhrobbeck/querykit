@@ -42,7 +42,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test:smoke": "cd test && bun smoke.ts"
+    "test:smoke": "cd test/.bun && bun ../smoke.ts"
   },
   "dependencies": {
     "@querykitjs/core": "workspace:*"
