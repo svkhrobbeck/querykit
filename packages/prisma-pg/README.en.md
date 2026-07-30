@@ -31,7 +31,7 @@ const { data, meta } = await usersRepository.findList({
 - **Soft delete** — automatic when the model has `deletedAt`; `softDelete`/`restore`/`withDeleted`.
 - **Upsert / bulk** — `upsert`, `upsertMany`.
 - **Framework-agnostic** — it knows nothing about HTTP: Express, Hono, NestJS, background jobs, all the same.
-- **Cross-adapter parity** — the same surface and the same results as `@querykitjs/drizzle-pg` and `@querykitjs/mongoose` ([PARITY.md](./PARITY.md)).
+- **Cross-adapter parity** — the same surface and the same results as `@querykitjs/drizzle-pg` and `@querykitjs/mongoose`.
 
 ## Install
 
@@ -161,7 +161,7 @@ await usersRepository.findAll({
 
 `contains`/`startsWith`/`endsWith` are case-**insensitive** (`mode: "insensitive"`), `like` is case-**sensitive**, `ilike` is insensitive — exactly as in the drizzle-pg adapter.
 
-> **LIKE patterns.** Prisma has no raw SQL `LIKE` inside `where`, so the pattern is translated — **exactly**, so any pattern returns the same rows as on drizzle-pg: `%ali%` → `contains`, `ali%` → `startsWith`, `%ali` → `endsWith`, no wildcard → `equals`. Interior `%` and `_` are handled with two identities — `LIKE 'A%S'` ≡ `LIKE 'A%S%' AND LIKE '%S'`, and for a pattern with no `%`, `LIKE 'P'` ≡ `LIKE 'P%' AND NOT LIKE 'P_%'` (which pins the length). Only a **malformed** pattern (a dangling trailing `\`) is dropped and reported. Details: [PARITY.md](./PARITY.md) §5.1.
+> **LIKE patterns.** Prisma has no raw SQL `LIKE` inside `where`, so the pattern is translated — **exactly**, so any pattern returns the same rows as on drizzle-pg: `%ali%` → `contains`, `ali%` → `startsWith`, `%ali` → `endsWith`, no wildcard → `equals`. Interior `%` and `_` are handled with two identities — `LIKE 'A%S'` ≡ `LIKE 'A%S%' AND LIKE '%S'`, and for a pattern with no `%`, `LIKE 'P'` ≡ `LIKE 'P%' AND NOT LIKE 'P_%'` (which pins the length). Only a **malformed** pattern (a dangling trailing `\`) is dropped and reported.
 
 ### Raw `where` escape hatch
 
@@ -324,7 +324,7 @@ await ordersRepository.aggregate({ sum: "amount", avg: "amount", groupBy: "regio
 - Filter/sort keys are **Prisma field names** (`createdAt`), not DB columns (`created_at`) — Prisma's own `where` does not accept a `@map`ped name either.
 - Text operators only apply to `String` fields; on any other type the condition is dropped and reported.
 
-Full list and the three-adapter comparison: [PARITY.md](./PARITY.md).
+These are pinned by `test/contract.ts`, which asserts all three adapters agree on the same payload.
 
 ## API reference
 

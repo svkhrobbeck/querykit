@@ -12,7 +12,7 @@
  * actual shape Prisma returns.
  *
  * The mirror of this file is `packages/drizzle-pg/test/smoke.ts` — the checks are
- * deliberately the same, because the two adapters must agree (see PARITY.md).
+ * deliberately the same, because the two adapters must agree.
  */
 import { PrismaClient } from "./prisma/generated/index.js";
 
@@ -86,7 +86,7 @@ async function main() {
     const pre = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "Ali%" }] });
     check("like 'Ali%' anchors at the start (no widening)", pre.length === 1 && pre[0]!.name === "Ali Valiyev");
 
-    /* ------------- exact LIKE patterns (PARITY §5.1) ------------------------ */
+    /* ------------- exact LIKE patterns ------------------------ */
     /* These are the patterns Prisma has no direct filter for; they are compiled
      * into an exact AND/NOT construction that pushes the raw pattern through
      * `startsWith`/`endsWith`. That works because Prisma does **not** escape
@@ -128,7 +128,7 @@ async function main() {
     const wireNumber = await usersRepo.findAll({ filter: [{ key: "age", operation: ">=", value: "26" }] });
     check("wire string on an Int field works (no PrismaClientValidationError)", wireNumber.length === 1, `${wireNumber.length}`);
 
-    /* --------------------- NULL semantics (PARITY.md §4) -------------------- */
+    /* --------------------- NULL semantics -------------------- */
     /* Postgres three-valued logic: every negation must exclude the NULL-age row. */
     const neq = await usersRepo.findAll({ filter: [{ key: "age", operation: "!=", value: 25 }] });
     check("!= excludes NULL rows", neq.length === 1 && neq[0]!.name === "Ali Valiyev", ids(neq));

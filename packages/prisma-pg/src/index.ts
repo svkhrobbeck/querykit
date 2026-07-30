@@ -10,8 +10,8 @@
  *
  * Its filter DSL, pagination meta and cursor tokens are the same as
  * `@querykitjs/drizzle-pg` and `@querykitjs/mongoose`, so a `@querykitjs/web`
- * frontend keeps working if the backend swaps ORMs. See `PARITY.md` for the
- * audit, including the few documented divergences.
+ * frontend keeps working if the backend swaps ORMs. `test/contract.ts` holds
+ * that guarantee: it drives all three adapters from the real web builders.
  *
  * @example
  * ```ts

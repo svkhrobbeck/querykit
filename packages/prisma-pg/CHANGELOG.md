@@ -37,6 +37,6 @@ with `@querykitjs/drizzle-pg` and `@querykitjs/mongoose`.
 - Framework-agnostic: no HTTP, Nest or DI imports — Express, Hono, NestJS and
   background jobs all use the same repository.
 
-See `PARITY.md` for the cross-adapter audit, including the documented
-divergences (LIKE patterns Prisma cannot express, field-name resolution, and the
-wider wire-value coercion that keeps results identical to drizzle-pg).
+Cross-adapter behaviour is enforced by `test/contract.ts` (37 checks), which
+drives prisma-pg, drizzle-pg and mongoose from the real `@querykitjs/web`
+builders and asserts they agree.

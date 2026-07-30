@@ -31,7 +31,7 @@ const { data, meta } = await usersRepository.findList({
 - **Soft-delete** — `deletedAt` maydoni bo'lsa avtomatik; `softDelete`/`restore`/`withDeleted`.
 - **Upsert / bulk** — `upsert`, `upsertMany`.
 - **Framework-agnostik** — HTTP'ni bilmaydi: Express, Hono, NestJS, fon vazifalari — hammasiga tushadi.
-- **Cross-adapter parity** — `@querykitjs/drizzle-pg` va `@querykitjs/mongoose` bilan bir xil yuza va bir xil natija ([PARITY.md](./PARITY.md)).
+- **Cross-adapter parity** — `@querykitjs/drizzle-pg` va `@querykitjs/mongoose` bilan bir xil yuza va bir xil natija.
 
 ## O'rnatish
 
@@ -161,7 +161,7 @@ await usersRepository.findAll({
 
 `contains`/`startsWith`/`endsWith` — **case-insensitive** (`mode: "insensitive"`), `like` — case-sensitive, `ilike` — insensitive. Bu drizzle-pg adapteri bilan aynan bir xil.
 
-> **LIKE pattern'lari.** Prisma `where` ichida xom SQL `LIKE` yo'q, shuning uchun pattern tarjima qilinadi — lekin **aniq**, ya'ni har qanday pattern drizzle-pg bilan bir xil qatorlarni qaytaradi: `%ali%` → `contains`, `ali%` → `startsWith`, `%ali` → `endsWith`, wildcard'siz → `equals`. Ichki `%` va `_` uchun ikkita ayniyat ishlatiladi — `LIKE 'A%S'` ≡ `LIKE 'A%S%' AND LIKE '%S'`, va `%`siz pattern uchun `LIKE 'P'` ≡ `LIKE 'P%' AND NOT LIKE 'P_%'` (uzunlikni qadaydi). Faqat **buzuq** pattern (oxirida osilib qolgan `\`) tashlanadi va reportlanadi. Batafsil: [PARITY.md](./PARITY.md) §5.1.
+> **LIKE pattern'lari.** Prisma `where` ichida xom SQL `LIKE` yo'q, shuning uchun pattern tarjima qilinadi — lekin **aniq**, ya'ni har qanday pattern drizzle-pg bilan bir xil qatorlarni qaytaradi: `%ali%` → `contains`, `ali%` → `startsWith`, `%ali` → `endsWith`, wildcard'siz → `equals`. Ichki `%` va `_` uchun ikkita ayniyat ishlatiladi — `LIKE 'A%S'` ≡ `LIKE 'A%S%' AND LIKE '%S'`, va `%`siz pattern uchun `LIKE 'P'` ≡ `LIKE 'P%' AND NOT LIKE 'P_%'` (uzunlikni qadaydi). Faqat **buzuq** pattern (oxirida osilib qolgan `\`) tashlanadi va reportlanadi.
 
 ### Xom `where` escape-hatch
 
@@ -324,7 +324,7 @@ await ordersRepository.aggregate({ sum: "amount", avg: "amount", groupBy: "regio
 - Filter/sort kalitlari — **Prisma maydon nomi** (`createdAt`), DB ustun nomi (`created_at`) emas. Prisma `where`ning o'zi ham `@map`langan nomni qabul qilmaydi.
 - Matn operatorlari faqat `String` maydonlarda; boshqa tipda shart tashlanadi va reportlanadi.
 
-To'liq ro'yxat va uchala adapter solishtiruvi: [PARITY.md](./PARITY.md).
+Bu farqlar `test/contract.ts` bilan qadalgan — uchala adapter bir xil payloaddan bir xil natija berishi shu yerda tekshiriladi.
 
 ## API ma'lumotnoma
 

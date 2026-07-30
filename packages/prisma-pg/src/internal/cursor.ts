@@ -4,7 +4,7 @@
  *
  * ⚠️ Byte-for-byte identical to `@querykitjs/drizzle-pg` and `@querykitjs/mongoose`
  * — a token issued by one adapter must be readable by another, so this file is
- * deliberately kept unchanged across the three backends (see PARITY.md).
+ * deliberately kept unchanged across the three backends (see test/contract.ts).
  */
 
 interface CursorPayload {

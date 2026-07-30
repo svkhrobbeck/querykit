@@ -23,7 +23,7 @@ import type { Diagnostics } from "../src/internal/diagnostics";
 import type { Filter, FilterOperator } from "../src/types";
 import { createRegistry } from "../src/index";
 
-/* Cross-adapter cursor tokens must be interchangeable (PARITY.md). */
+/* Cross-adapter cursor tokens must be interchangeable. */
 import { encodeCursor as drizzleEncode } from "../../drizzle-pg/src/internal/cursor";
 import { encodeCursor as mongooseEncode } from "../../mongoose/src/internal/cursor";
 
