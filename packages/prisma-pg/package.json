@@ -44,6 +44,7 @@
     "typecheck": "tsc --noEmit",
     "test:generate": "prisma generate --schema test/prisma/schema.prisma",
     "test:query": "bun run test/query.ts",
+    "test:types": "tsc --noEmit -p test/tsconfig.json",
     "test:smoke": "bun run test/smoke.ts"
   },
   "dependencies": {

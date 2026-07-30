@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@querykitjs/core": ["../../core/src/index.ts"]
+    },
+    "noUnusedLocals": false
+  },
+  "include": ["types.ts", "../src"],
+  "exclude": ["node_modules"]
+}

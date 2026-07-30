@@ -50,11 +50,83 @@ non-2-tuple `between`/`notBetween` drop the condition (and report it through
 
 ## 2. Repository surface
 
-_Filled in during phase 3._
+Every method name, argument order, default and return shape below was compared
+against `packages/drizzle-pg/src/repository.ts` and
+`packages/mongoose/src/repository.ts`.
+
+| Method                       | Signature                    | Defaults                                                           | Returns                        | Same? |
+| ---------------------------- | ---------------------------- | ------------------------------------------------------------------ | ------------------------------ | :---: |
+| `findAll`                    | `(params?)`                  | —                                                                  | `Row[]`                        |  ✅   |
+| `findOne`                    | `(params?)`                  | —                                                                  | `Row \| undefined`             |  ✅   |
+| `findById`                   | `(id, params?)`              | `idKey: "id"`                                                      | `Row \| undefined`             |  ✅   |
+| `findList`                   | `(params?)`                  | `page: 1`, `perPage: defaultPerPage`                               | `{ data, meta: OffsetMeta }`   |  ✅   |
+| `findInfinite`               | `(params?)`                  | `limit: defaultLimit`, `offset: 0`                                 | `{ data, meta: InfiniteMeta }` |  ✅   |
+| `findCursor`                 | `(params?)`                  | `limit`, `cursorKey: "id"`, `order: "asc"`, `direction: "forward"` | `{ data, meta: CursorMeta }`   |  ✅   |
+| `count` / `exists`           | `(filter?)`                  | —                                                                  | `number` / `boolean`           |  ✅   |
+| `create` / `createMany`      | `(values)`                   | —                                                                  | `Row` / `Row[]`                |  ✅   |
+| `upsert` / `upsertMany`      | `(values, { target, set? })` | `set` = values minus target                                        | `Row` / `Row[]`                |  ✅   |
+| `updateById`                 | `(id, patch, idKey?)`        | `idKey: "id"`                                                      | `Row \| undefined`             |  ✅   |
+| `updateWhere`                | `(filter, patch)`            | —                                                                  | `Row[]`                        |  ✅   |
+| `deleteById` / `deleteWhere` | `(id, idKey?)` / `(filter)`  | `idKey: "id"`                                                      | `Row \| undefined` / `Row[]`   |  ✅   |
+| `softDelete` / `restore`     | `(id, idKey?)`               | `idKey: "id"`                                                      | `Row \| undefined`             |  ✅   |
+| `aggregate`                  | `(spec)`                     | —                                                                  | `AggregateRow[]`               |  ✅   |
+| `scoped`                     | `(scope)`                    | —                                                                  | a new `Repository`             |  ✅   |
+
+Registry surface — `createRegistry(client, options?)` with `defaultPerPage`,
+`defaultLimit`, `maxPerPage`, `maxLimit`, `strict`, `onSkippedCondition`; the
+same four `repository()` overloads (key/handle, `+options`, `+extender`,
+`+both`); `transaction(fn)` with ambient (AsyncLocalStorage) propagation. The
+per-repository options `scope`, `forcedColumns`, `allowedColumns` behave
+identically, including "an empty intersection falls back to the allowlist, never
+to the full row" and the build-time throw on an empty guard or unresolvable
+scope key.
+
+**Behavioural details verified identical** (all covered by `test/query.ts`):
+`clampPageSize` = `min(max, max(1, trunc(requested ?? fallback)))` · unknown
+filter/sort key skipped and reported · unknown `cursorKey` always fatal
+(`QueryKitError`) · cursor key forced into the projection but stripped from
+guarded rows · `updatedAt` bumped on every update path · soft-delete guard ANDed
+into reads and lifted by `withDeleted` · scope defaulted into inserts (scope
+wins) · `aggregate` honours the projection guard.
+
+Two internal implementations differ while the observable contract does not, both
+because Prisma returns counts where the other ORMs return rows:
+
+| Method        | drizzle-pg               | mongoose                             | prisma-pg                                       |
+| ------------- | ------------------------ | ------------------------------------ | ----------------------------------------------- |
+| `createMany`  | one `INSERT … RETURNING` | `insertMany`                         | `createManyAndReturn`, else sequential `create` |
+| `updateById`  | `UPDATE … RETURNING`     | `findOneAndUpdate`                   | `findFirst` (id only) → `update` by that id     |
+| `updateWhere` | `UPDATE … RETURNING`     | collect ids → `updateMany` → re-read | collect ids → `updateMany` → re-read            |
+| `upsertMany`  | chunked `ON CONFLICT`    | chunked `bulkWrite`                  | sequential `upsert` (Prisma has no bulk upsert) |
+
+⚠️ `updateById`/`deleteById` on prisma-pg require a **single-field `@id`**
+(Prisma's `update`/`delete` only accept a unique `where`, and querykit's
+predicate also carries scope + soft-delete). A model with a composite `@@id`
+throws a clear error naming `updateWhere`/`deleteWhere` as the alternative.
 
 ## 3. Pagination meta formulas
 
-_Filled in during phase 3._
+Identical arithmetic in all three adapters — re-derived from the source, and
+pinned by `test/query.ts` §9–10.
+
+| Field                         | Formula                                                            |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `total_items`                 | `count(where)`                                                     |
+| `total_pages`                 | `ceil(total_items / perPage)`                                      |
+| `current_page`                | `max(1, trunc(page ?? 1))`                                         |
+| `per_page`                    | `clampPageSize(perPage, defaultPerPage, maxPerPage)`               |
+| `has_next` / `has_prev`       | `page < total_pages` / `page > 1`                                  |
+| `limit` / `offset`            | `clampPageSize(limit, …)` / `max(0, trunc(offset ?? 0))`           |
+| `count` (infinite)            | rows returned after trimming the probe row                         |
+| `has_more`                    | `rows.length > limit` (query takes `limit + 1`)                    |
+| `next_offset`                 | `has_more ? offset + limit : null`                                 |
+| `has_next` (cursor)           | forward: `hasExtra` · backward: `cursor !== undefined`             |
+| `has_prev` (cursor)           | forward: `cursor !== undefined` · backward: `hasExtra`             |
+| `next_cursor` / `prev_cursor` | `encodeCursor` of the last / first row's cursor field, else `null` |
+
+Keyset direction: `ascInQuery = direction === "forward" ? order === "asc" : order === "desc"`,
+seek with `gt`/`lt` accordingly, and a backward page is reversed before it is
+returned — the same three lines in all three adapters.
 
 ## 4. NULL semantics
 
