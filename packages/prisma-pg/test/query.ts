@@ -161,15 +161,144 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
   }
   check(`${cases.length} representable patterns translate exactly`, ok === cases.length, `${ok}/${cases.length}`);
 
-  check("interior % is not representable", parseLikePattern("a%b") === undefined);
-  check("_ wildcard is not representable", parseLikePattern("a_b") === undefined);
-  check("_ anywhere is not representable", parseLikePattern("%ali_") === undefined);
-  check("escaped % inside a substring match is not representable", parseLikePattern("%50\\%%") === undefined);
-  check("dangling escape is not representable", parseLikePattern("ali\\") === undefined);
+  // Patterns with no direct Prisma filter still translate — exactly.
+  check("interior % has no simple shape", parseLikePattern("a%b") === undefined);
+  check("_ wildcard has no simple shape", parseLikePattern("a_b") === undefined);
+  check("escaped % inside a substring has no simple shape", parseLikePattern("%50\\%%") === undefined);
+  check("dangling escape is rejected outright", parseLikePattern("ali\\") === undefined);
+
+  // `LIKE 'a%b'` ≡ `LIKE 'a%b%' AND LIKE '%b'` — the tail anchor pins the end,
+  // so nothing over-matches (the reason a plain `contains` would be wrong).
+  check(
+    "interior % → exact AND construction",
+    eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }]), { AND: [{ name: { startsWith: "a%b" } }, { name: { endsWith: "b" } }] }),
+    show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }])),
+  );
+  // `LIKE 'a_b'` ≡ `LIKE 'a_b%' AND NOT LIKE 'a_b_%'` — pins the length exactly.
+  check(
+    "_ wildcard → exact length-pinned construction",
+    eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }]), {
+      AND: [{ name: { startsWith: "a_b" } }, { NOT: { name: { startsWith: "a_b_" } } }],
+    }),
+    show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }])),
+  );
+  check(
+    "a pattern already ending in % needs a single filter",
+    eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b%" }]), { name: { startsWith: "a%b" } }),
+    show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b%" }])),
+  );
+  // A literal `%` is re-escaped so LIKE reads it as a character, not a wildcard.
+  check(
+    "escaped literal % inside a substring is preserved",
+    eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "%50\\%%" }]), { name: { startsWith: "%50\\%" } }),
+    show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "%50\\%%" }])),
+  );
+  check(
+    "ilike keeps mode:insensitive through the exact construction",
+    eq(buildWhere(userMeta, [{ key: "name", operation: "ilike", value: "a%b" }]), {
+      AND: [{ name: { startsWith: "a%b", mode: "insensitive" } }, { name: { endsWith: "b", mode: "insensitive" } }],
+    }),
+  );
+  check(
+    "notLike negates the whole construction",
+    eq(buildWhere(userMeta, [{ key: "name", operation: "notLike", value: "a%b" }]), {
+      NOT: { AND: [{ name: { startsWith: "a%b" } }, { name: { endsWith: "b" } }] },
+    }),
+    show(buildWhere(userMeta, [{ key: "name", operation: "notLike", value: "a%b" }])),
+  );
 
   const { diag, seen } = spy();
-  const dropped = buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }], diag);
-  check("unrepresentable pattern is dropped AND reported", dropped === undefined && seen[0] === "filter:name:invalid-value", show(seen));
+  const dropped = buildWhere(userMeta, [{ key: "name", operation: "like", value: "ali\\" }], diag);
+  check("a malformed pattern is still dropped AND reported", dropped === undefined && seen[0] === "filter:name:invalid-value", show(seen));
+
+  /* --- exhaustive proof that the translation is exact, not approximate --- */
+  /* The construction is only worth anything if it selects *exactly* the rows SQL
+   * LIKE would. This brute-forces patterns × strings against a reference LIKE
+   * evaluator, interpreting the generated plan the way Postgres will:
+   * startsWith X → LIKE 'X%', endsWith X → LIKE '%X', contains X → LIKE '%X%'. */
+
+  /** Reference SQL LIKE (with `\` escapes) as a regex. */
+  const likeMatches = (pattern: string, subject: string): boolean => {
+    let re = "";
+    for (let i = 0; i < pattern.length; i++) {
+      const ch = pattern[i]!;
+      if (ch === "\\") {
+        const next = pattern[++i];
+        if (next === undefined) return false;
+        re += next.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      } else if (ch === "%") re += "[\\s\\S]*";
+      else if (ch === "_") re += "[\\s\\S]";
+      else re += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    return new RegExp(`^${re}$`).test(subject);
+  };
+
+  /** Evaluate a generated Prisma `where` node the way Postgres would. */
+  const planMatches = (node: Record<string, any>, subject: string): boolean => {
+    if (Array.isArray(node.AND)) return node.AND.every((n: Record<string, any>) => planMatches(n, subject));
+    if (node.NOT) return !planMatches(node.NOT as Record<string, any>, subject);
+    const frag = node.name as Record<string, any> | undefined;
+    if (!frag) throw new Error(`unexpected node ${JSON.stringify(node)}`);
+    const evalFrag = (f: Record<string, any>): boolean => {
+      if ("not" in f) return !evalFrag(f.not as Record<string, any>);
+      if ("equals" in f) return subject === f.equals;
+      if ("startsWith" in f) return likeMatches(`${f.startsWith}%`, subject);
+      if ("endsWith" in f) return likeMatches(`%${f.endsWith}`, subject);
+      if ("contains" in f) return likeMatches(`%${f.contains}%`, subject);
+      throw new Error(`unexpected fragment ${JSON.stringify(f)}`);
+    };
+    return evalFrag(frag);
+  };
+
+  const patterns = [
+    "ali",
+    "ali%",
+    "%ali",
+    "%ali%",
+    "%",
+    "a%b",
+    "a_b",
+    "a%b%c",
+    "%a%b",
+    "a%b%",
+    "_ali",
+    "ali_",
+    "a__b",
+    "%a_b%",
+    "ab%ba",
+    "\\%50",
+    "%50\\%%",
+    "a\\_b",
+    "",
+  ];
+  const subjects = ["", "a", "ab", "aba", "abab", "ali", "Ali", "aXb", "aXbXc", "a_b", "a%b", "%50", "50%", "vali ali", "abba", "aXbba", "ali_", "_ali", "aab"];
+
+  let mismatches: string[] = [];
+  for (const pattern of patterns) {
+    const node = buildWhere(userMeta, [{ key: "name", operation: "like", value: pattern }]);
+    for (const subject of subjects) {
+      const expected = likeMatches(pattern, subject);
+      const actual = node === undefined ? true : planMatches(node as Record<string, any>, subject);
+      if (expected !== actual) mismatches.push(`like(${show(pattern)}, ${show(subject)}) expected=${expected} got=${actual}`);
+    }
+  }
+  check(
+    `LIKE translation is exact over ${patterns.length}×${subjects.length} pattern/string pairs`,
+    mismatches.length === 0,
+    mismatches.slice(0, 4).join(" · "),
+  );
+
+  // The same proof for notLike, which must also exclude NULLs (SQL NOT LIKE).
+  mismatches = [];
+  for (const pattern of patterns) {
+    const node = buildWhere(userMeta, [{ key: "name", operation: "notLike", value: pattern }]);
+    for (const subject of subjects) {
+      const expected = !likeMatches(pattern, subject);
+      const actual = node === undefined ? true : planMatches(node as Record<string, any>, subject);
+      if (expected !== actual) mismatches.push(`notLike(${show(pattern)}, ${show(subject)}) expected=${expected} got=${actual}`);
+    }
+  }
+  check("notLike is the exact complement", mismatches.length === 0, mismatches.slice(0, 4).join(" · "));
 }
 
 console.log("\n=== 4. where tree ===");

@@ -2,7 +2,7 @@ import type { FieldCondition, Filter, FilterNode } from "../types";
 import { coerceCondition, INVALID_VALUE, isTextOperator } from "./coerce";
 import { reportSkip, type Diagnostics } from "./diagnostics";
 import { isStringField, resolveField, type ModelMeta } from "./fields";
-import { operators } from "./operators";
+import { isWhereFragment, operators } from "./operators";
 
 /** A Prisma `where` object (`Prisma.<Model>WhereInput` at the type level). */
 export type Where = Record<string, unknown>;
@@ -56,11 +56,14 @@ function buildCondition(meta: ModelMeta, condition: FieldCondition, diag?: Diagn
   const fragment = build(value, { isString });
   if (fragment === undefined) {
     // The operator rejected the value shape (a non-array `in`, a non-2-tuple
-    // `between`, a LIKE pattern with no Prisma equivalent) — same class of
-    // problem as an uncastable value.
+    // `between`, a malformed LIKE pattern) — same class of problem as an
+    // uncastable value.
     reportSkip(diag, { site: "filter", key: condition.key, operation: operator, reason: "invalid-value" });
     return undefined;
   }
+  // An exact LIKE translation can need two predicates on one field, and Prisma
+  // has no field-level `AND` — such builders emit the whole `where` node.
+  if (isWhereFragment(fragment)) return fragment.buildFor(field);
   return { [field]: fragment };
 }
 

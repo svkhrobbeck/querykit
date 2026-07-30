@@ -6,13 +6,25 @@ import type { FilterOperator, FilterValue } from "../types";
  */
 export type Fragment = Record<string, unknown> | undefined;
 
+/**
+ * Some conditions cannot be expressed as a single field fragment — an exact
+ * `LIKE` translation may need two predicates on the same field, and Prisma has
+ * no field-level `AND`. Such a builder returns this instead, and `where.ts`
+ * expands it into a full `where` node once the field name is known.
+ */
+export interface WhereFragment {
+  buildFor(field: string): Record<string, unknown>;
+}
+
+export const isWhereFragment = (value: unknown): value is WhereFragment => typeof (value as WhereFragment | undefined)?.buildFor === "function";
+
 /** Per-condition facts the builders need (see `where.ts`). */
 export interface OperatorContext {
   /** Whether the target field is a `String` — `mode: "insensitive"` is only valid there. */
   isString: boolean;
 }
 
-type Builder = (value: FilterValue | undefined, ctx: OperatorContext) => Fragment;
+type Builder = (value: FilterValue | undefined, ctx: OperatorContext) => Fragment | WhereFragment;
 
 const text = (value: FilterValue | undefined): string => String(value ?? "");
 
@@ -37,67 +49,136 @@ const insensitive = (fragment: Record<string, unknown>, ctx: OperatorContext): R
  * "%"     → endsWith  ""        (i.e. every non-NULL row, exactly like SQL)
  * ```
  *
- * A pattern that Postgres can express and Prisma cannot — a `_` wildcard, an
- * interior `%`, or an escaped literal `%`/`_` inside a substring match — returns
- * `undefined`. The caller then drops the condition **and reports it**, because
- * silently degrading it to `contains` would *widen* the result set (`"ali%"`
- * would start matching `"vali ali"`), which is exactly the kind of divergence
- * that makes a cross-adapter contract untrustworthy.
+ * Patterns Prisma has no direct filter for — an interior `%`, a `_` wildcard, or
+ * an escaped literal `%`/`_` inside a substring match — are still translated
+ * **exactly**, via {@link rawLikePlan}, so every SQL `LIKE` pattern drizzle-pg
+ * accepts returns the same rows here.
  */
 export interface LikeShape {
   op: "equals" | "contains" | "startsWith" | "endsWith";
   value: string;
 }
 
-export function parseLikePattern(pattern: string): LikeShape | undefined {
-  /** Tokens: `{ w: true }` = wildcard `%`, else a literal character. */
-  const tokens: Array<{ w: boolean; c: string }> = [];
+/** One character of a LIKE pattern: a wildcard, or a literal (possibly escaped). */
+interface LikeToken {
+  kind: "any" | "one" | "lit";
+  char: string;
+}
 
+/** Split a SQL LIKE pattern into tokens, resolving `\` escapes. */
+function tokenizeLike(pattern: string): LikeToken[] | undefined {
+  const tokens: LikeToken[] = [];
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i]!;
     if (ch === "\\") {
       const next = pattern[i + 1];
-      if (next === undefined) return undefined; // dangling escape — not representable
-      tokens.push({ w: false, c: next });
+      if (next === undefined) return undefined; // dangling escape — not a valid pattern
+      tokens.push({ kind: "lit", char: next });
       i++;
       continue;
     }
-    if (ch === "_") return undefined; // single-character wildcard: no Prisma equivalent
-    tokens.push({ w: ch === "%", c: ch });
+    if (ch === "%") tokens.push({ kind: "any", char: "%" });
+    else if (ch === "_") tokens.push({ kind: "one", char: "_" });
+    else tokens.push({ kind: "lit", char: ch });
   }
+  return tokens;
+}
+
+/** Render tokens back to a SQL LIKE pattern, re-escaping literal `%`, `_` and `\`. */
+const renderPattern = (tokens: LikeToken[]): string =>
+  tokens.map(t => (t.kind === "lit" && (t.char === "%" || t.char === "_" || t.char === "\\") ? `\\${t.char}` : t.char)).join("");
+
+/**
+ * The simple shape of a pattern whose wildcards are only leading/trailing `%`
+ * and whose literal part contains no `%`/`_` — i.e. the forms that map onto a
+ * plain `equals`/`contains`/`startsWith`/`endsWith`. Returns `undefined` when
+ * the pattern needs the exact construction in {@link rawLikePlan}.
+ *
+ * This path is preferred because it never relies on how Prisma treats wildcard
+ * characters inside a filter value.
+ */
+export function parseLikePattern(pattern: string): LikeShape | undefined {
+  const tokens = tokenizeLike(pattern);
+  if (!tokens) return undefined;
 
   let start = 0;
   let end = tokens.length;
   let leading = false;
   let trailing = false;
-  while (start < end && tokens[start]!.w) {
+  while (start < end && tokens[start]!.kind === "any") {
     leading = true;
     start++;
   }
-  while (end > start && tokens[end - 1]!.w) {
+  while (end > start && tokens[end - 1]!.kind === "any") {
     trailing = true;
     end--;
   }
 
   const core = tokens.slice(start, end);
-  if (core.some(t => t.w)) return undefined; // interior `%`
+  if (core.some(t => t.kind !== "lit")) return undefined; // interior wildcard
 
-  const value = core.map(t => t.c).join("");
+  const value = core.map(t => t.char).join("");
   const op = leading && trailing ? "contains" : leading ? "endsWith" : trailing ? "startsWith" : "equals";
 
-  // An escaped literal `%`/`_` survives into the search string, and Prisma does
-  // not escape those before handing them to LIKE — so a substring match would
-  // treat them as wildcards again. `equals` is unaffected (no LIKE involved).
+  // A literal `%`/`_` would be re-read as a wildcard by LIKE, so anything but a
+  // pure `equals` has to go through the exact construction instead.
   if (op !== "equals" && /[%_]/.test(value)) return undefined;
 
   return { op, value };
 }
 
-const likeFragment = (value: FilterValue | undefined, ctx: OperatorContext, caseInsensitive: boolean): Fragment => {
-  const shape = parseLikePattern(text(value));
-  if (!shape) return undefined;
-  const fragment: Record<string, unknown> = { [shape.op]: shape.value };
-  return caseInsensitive ? insensitive(fragment, ctx) : fragment;
+/**
+ * Exact translation for every remaining pattern.
+ *
+ * Prisma renders `startsWith: X` as `LIKE 'X%'`, `endsWith: X` as `LIKE '%X'`
+ * and `contains: X` as `LIKE '%X%'`, and it does **not** escape `%`/`_` inside
+ * the value — so a raw pattern can be pushed through. Two identities then make
+ * an arbitrary pattern expressible:
+ *
+ * - `LIKE 'A%S'` ≡ `LIKE 'A%S%' AND LIKE '%S'` — where `S` is the (fixed-length)
+ *   tail after the last `%`. Anchoring the tail pins the final `S` to the end of
+ *   the string, so nothing over-matches.
+ * - `LIKE 'P'` with no `%` at all ≡ `LIKE 'P%' AND NOT LIKE 'P_%'` — the first
+ *   fixes the prefix and a minimum length, the second forbids any extra
+ *   character, which together pin the length exactly.
+ *
+ * A pattern that already ends in `%` needs neither: `startsWith` alone is exact.
+ */
+export function rawLikePlan(pattern: string, ctx: OperatorContext, caseInsensitive: boolean): WhereFragment | undefined {
+  const tokens = tokenizeLike(pattern);
+  if (!tokens) return undefined;
+
+  const mode = (fragment: Record<string, unknown>) => (caseInsensitive ? insensitive(fragment, ctx) : fragment);
+  const raw = renderPattern(tokens);
+
+  return {
+    buildFor(field: string) {
+      // `LIKE 'X%'` — the trailing wildcard is already there, so one filter does it.
+      if (tokens[tokens.length - 1]?.kind === "any") {
+        return { [field]: mode({ startsWith: raw.replace(/%$/, "") }) };
+      }
+
+      const lastAny = tokens.map(t => t.kind).lastIndexOf("any");
+      if (lastAny >= 0) {
+        // …%S  →  LIKE 'pattern%'  AND  LIKE '%S'
+        const tail = renderPattern(tokens.slice(lastAny + 1));
+        return { AND: [{ [field]: mode({ startsWith: raw }) }, { [field]: mode({ endsWith: tail }) }] };
+      }
+
+      // No `%` at all: pin the length with `NOT LIKE 'pattern_%'`.
+      return { AND: [{ [field]: mode({ startsWith: raw }) }, { NOT: { [field]: mode({ startsWith: `${raw}_` }) } }] };
+    },
+  };
+}
+
+const likeFragment = (value: FilterValue | undefined, ctx: OperatorContext, caseInsensitive: boolean): Fragment | WhereFragment => {
+  const pattern = text(value);
+  const shape = parseLikePattern(pattern);
+  if (shape) {
+    const fragment: Record<string, unknown> = { [shape.op]: shape.value };
+    return caseInsensitive ? insensitive(fragment, ctx) : fragment;
+  }
+  return rawLikePlan(pattern, ctx, caseInsensitive);
 };
 
 /* ------------------------------- operators -------------------------------- */
@@ -139,7 +220,12 @@ export const operators: Record<FilterOperator, Builder> = {
   ilike: (v, ctx) => likeFragment(v, ctx, true),
   notLike: (v, ctx) => {
     const inner = likeFragment(v, ctx, false);
-    return inner ? { not: inner } : undefined;
+    if (!inner) return undefined;
+    // Negation lives at the `where` level when the positive form needed more
+    // than one predicate. SQL `NOT (…)` drops NULL rows either way, matching
+    // drizzle-pg's `NOT LIKE`.
+    if (isWhereFragment(inner)) return { buildFor: (field: string) => ({ NOT: inner.buildFor(field) }) };
+    return { not: inner };
   },
 
   in: v => (Array.isArray(v) ? { in: v } : undefined),

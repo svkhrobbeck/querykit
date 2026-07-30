@@ -20,26 +20,26 @@
 `v` = the caller's value. Postgres adapters (drizzle-pg, prisma-pg) are compared
 on the **SQL** they produce; mongoose on the Mongo predicate.
 
-| Operator           | drizzle-pg (SQL)          | mongoose (Mongo)                     | prisma-pg (Prisma `where`)                | Same? |
-| ------------------ | ------------------------- | ------------------------------------ | ----------------------------------------- | :---: |
-| `=`, `eq`          | `c = v`                   | `{$eq: v}`                           | `{equals: v}`                             |  ✅   |
-| `!=`, `ne`         | `c <> v`                  | `{$nin: [v, null]}`                  | `{not: v}`                                |  ✅   |
-| `>`, `gt`          | `c > v`                   | `{$gt: v}`                           | `{gt: v}`                                 |  ✅   |
-| `>=`, `gte`        | `c >= v`                  | `{$gte: v}`                          | `{gte: v}`                                |  ✅   |
-| `<`, `lt`          | `c < v`                   | `{$lt: v}`                           | `{lt: v}`                                 |  ✅   |
-| `<=`, `lte`        | `c <= v`                  | `{$lte: v}`                          | `{lte: v}`                                |  ✅   |
-| `contains`, `%_%`  | `c ILIKE '%v%'`           | `{$regex: esc(v), $options:"i"}`     | `{contains: v, mode:"insensitive"}`       |  ✅   |
-| `startsWith`, `%_` | `c ILIKE 'v%'`            | `{$regex: "^"+esc(v), $options:"i"}` | `{startsWith: v, mode:"insensitive"}`     |  ✅   |
-| `endsWith`, `_%`   | `c ILIKE '%v'`            | `{$regex: esc(v)+"$", $options:"i"}` | `{endsWith: v, mode:"insensitive"}`       |  ✅   |
-| `like`             | `c LIKE v` (raw pattern)  | `$regex` from the LIKE pattern       | pattern **translated** (see §5.1)         |  ⚠️   |
-| `ilike`            | `c ILIKE v` (raw pattern) | `$regex` + `i`                       | pattern translated + `mode:"insensitive"` |  ⚠️   |
-| `notLike`          | `c NOT LIKE v`            | `{$not: regex, $ne: null}`           | `{not: <translated>}`                     |  ⚠️   |
-| `in`               | `c IN (…)`                | `{$in: v}`                           | `{in: v}`                                 |  ✅   |
-| `notIn`            | `c NOT IN (…)`            | `{$nin: [...v, null]}`               | `{notIn: v}`                              |  ✅   |
-| `between`          | `c BETWEEN a AND b`       | `{$gte: a, $lte: b}`                 | `{gte: a, lte: b}`                        |  ✅   |
-| `notBetween`       | `c NOT BETWEEN a AND b`   | `{$not: {…}, $ne: null}`             | `{not: {gte: a, lte: b}}`                 |  ✅   |
-| `isNull`           | `c IS NULL`               | `{$eq: null}`                        | `{equals: null}`                          |  ✅   |
-| `isNotNull`        | `c IS NOT NULL`           | `{$ne: null}`                        | `{not: null}`                             |  ✅   |
+| Operator           | drizzle-pg (SQL)          | mongoose (Mongo)                     | prisma-pg (Prisma `where`)               | Same? |
+| ------------------ | ------------------------- | ------------------------------------ | ---------------------------------------- | :---: |
+| `=`, `eq`          | `c = v`                   | `{$eq: v}`                           | `{equals: v}`                            |  ✅   |
+| `!=`, `ne`         | `c <> v`                  | `{$nin: [v, null]}`                  | `{not: v}`                               |  ✅   |
+| `>`, `gt`          | `c > v`                   | `{$gt: v}`                           | `{gt: v}`                                |  ✅   |
+| `>=`, `gte`        | `c >= v`                  | `{$gte: v}`                          | `{gte: v}`                               |  ✅   |
+| `<`, `lt`          | `c < v`                   | `{$lt: v}`                           | `{lt: v}`                                |  ✅   |
+| `<=`, `lte`        | `c <= v`                  | `{$lte: v}`                          | `{lte: v}`                               |  ✅   |
+| `contains`, `%_%`  | `c ILIKE '%v%'`           | `{$regex: esc(v), $options:"i"}`     | `{contains: v, mode:"insensitive"}`      |  ✅   |
+| `startsWith`, `%_` | `c ILIKE 'v%'`            | `{$regex: "^"+esc(v), $options:"i"}` | `{startsWith: v, mode:"insensitive"}`    |  ✅   |
+| `endsWith`, `_%`   | `c ILIKE '%v'`            | `{$regex: esc(v)+"$", $options:"i"}` | `{endsWith: v, mode:"insensitive"}`      |  ✅   |
+| `like`             | `c LIKE v` (raw pattern)  | `$regex` from the LIKE pattern       | exact translation (see §5.1)             |  ✅   |
+| `ilike`            | `c ILIKE v` (raw pattern) | `$regex` + `i`                       | exact translation + `mode:"insensitive"` |  ✅   |
+| `notLike`          | `c NOT LIKE v`            | `{$not: regex, $ne: null}`           | negation of the exact translation        |  ✅   |
+| `in`               | `c IN (…)`                | `{$in: v}`                           | `{in: v}`                                |  ✅   |
+| `notIn`            | `c NOT IN (…)`            | `{$nin: [...v, null]}`               | `{notIn: v}`                             |  ✅   |
+| `between`          | `c BETWEEN a AND b`       | `{$gte: a, $lte: b}`                 | `{gte: a, lte: b}`                       |  ✅   |
+| `notBetween`       | `c NOT BETWEEN a AND b`   | `{$not: {…}, $ne: null}`             | `{not: {gte: a, lte: b}}`                |  ✅   |
+| `isNull`           | `c IS NULL`               | `{$eq: null}`                        | `{equals: null}`                         |  ✅   |
+| `isNotNull`        | `c IS NOT NULL`           | `{$ne: null}`                        | `{not: null}`                            |  ✅   |
 
 **Case sensitivity** — identical across all three: `contains`/`startsWith`/`endsWith`
 are case-**insensitive**; `like` is case-**sensitive**; `ilike` is case-insensitive.
@@ -143,31 +143,49 @@ _Confirmed against a real database in phase 4._
 
 ## 5. Known divergences
 
-### 5.1 `like` / `ilike` / `notLike` with wildcards Prisma cannot express
+### 5.1 `like` / `ilike` / `notLike` — RESOLVED, no divergence
 
 Prisma's `where` has no raw SQL `LIKE`, only `equals`/`contains`/`startsWith`/
-`endsWith`. prisma-pg therefore **translates** the pattern:
+`endsWith`. Every pattern is nevertheless translated **exactly**, so prisma-pg
+returns the same rows as drizzle-pg for any pattern:
 
-| Pattern                                   | prisma-pg                           | Same rows as drizzle-pg? |
-| ----------------------------------------- | ----------------------------------- | :----------------------: |
-| `%ali%`                                   | `contains: "ali"`                   |            ✅            |
-| `ali%`                                    | `startsWith: "ali"`                 |            ✅            |
-| `%ali`                                    | `endsWith: "ali"`                   |            ✅            |
-| `ali`                                     | `equals: "ali"`                     |            ✅            |
-| `%`                                       | `endsWith: ""` (every non-NULL row) |            ✅            |
-| `a%b` (interior `%`)                      | **dropped + reported**              |            ❌            |
-| `a_b` (any `_`)                           | **dropped + reported**              |            ❌            |
-| `%50\%%` (escaped `%` inside a substring) | **dropped + reported**              |            ❌            |
+| Pattern                        | prisma-pg                                        | Same rows as drizzle-pg? |
+| ------------------------------ | ------------------------------------------------ | :----------------------: |
+| `%ali%`                        | `contains: "ali"`                                |            ✅            |
+| `ali%`                         | `startsWith: "ali"`                              |            ✅            |
+| `%ali`                         | `endsWith: "ali"`                                |            ✅            |
+| `ali`                          | `equals: "ali"`                                  |            ✅            |
+| `%`                            | `endsWith: ""` (every non-NULL row)              |            ✅            |
+| `a%b` (interior `%`)           | `AND[ startsWith "a%b", endsWith "b" ]`          |            ✅            |
+| `a%b%` (interior + trailing)   | `startsWith: "a%b"`                              |            ✅            |
+| `a_b` (any `_`)                | `AND[ startsWith "a_b", NOT startsWith "a_b_" ]` |            ✅            |
+| `%50\%%` (escaped literal `%`) | `startsWith: "%50\%"`                            |            ✅            |
 
-The last three are dropped rather than approximated **on purpose**. Degrading
-`ali%` to `contains: "ali"` would make it match `"vali ali"` — the filter would
-return _more_ rows than on the other backends, which is the worst possible
-failure mode for a cross-adapter contract. A drop is loud (`onSkippedCondition`,
-or a `QueryKitError` in `strict` mode) and never widens a result set.
+Two identities make an arbitrary pattern expressible:
 
-mongoose translates the full LIKE grammar into a regex, so it _can_ serve `a%b`
-and `a_b`. Applications that need those patterns on Postgres should use the raw
-`where` escape hatch.
+- **`LIKE 'A%S'` ≡ `LIKE 'A%S%' AND LIKE '%S'`.** The first fixes the prefix and
+  requires `S` to occur after it; the second pins `S` to the very end. Together
+  they also imply the minimum length, so nothing over-matches. (A plain
+  `contains` would have been wrong here — `ali%` would start matching
+  `"vali ali"`.)
+- **`LIKE 'P'` with no `%` at all ≡ `LIKE 'P%' AND NOT LIKE 'P_%'`.** The first
+  fixes the prefix and a minimum length, the second forbids one more character —
+  together they pin the length exactly, which is what `_` needs.
+
+A pattern that already ends in `%` needs neither: `startsWith` alone is exact.
+
+**Runtime assumption.** The construction pushes a raw pattern through
+`startsWith`/`endsWith`, which works because Prisma does **not** escape `%`/`_`
+inside a filter value. That is the one behavioural assumption in the adapter, so
+it is pinned from both sides: `test/query.ts` proves the algebra against a
+reference SQL-LIKE evaluator over 19 patterns × 19 subjects (for `like` and
+`notLike` alike), and `test/smoke.ts` asserts real Postgres row counts for
+interior `%`, `_`, escaped `%` and escaped `_`. If a future Prisma release starts
+escaping, the smoke test fails loudly instead of the filter quietly returning
+the wrong rows.
+
+Only a **malformed** pattern (a dangling trailing `\`) is still dropped and
+reported; Postgres would raise an error on it instead.
 
 ### 5.2 Field-name resolution
 
@@ -195,10 +213,60 @@ only cast their ORM won't do). A value that cannot be represented — `"18.5"` o
 an `Int`, `"maybe"` on a `Boolean` — is dropped and reported rather than sent on
 to crash the request. Net effect: **same rows as drizzle-pg**, never a 500.
 
-### 5.4 Text operators on non-text fields
+### 5.5 Text operators on non-text fields
 
 drizzle-pg can `ILIKE` a timestamp (Postgres renders it as text). Prisma rejects
 `contains`/`mode` on a non-`String` field, and Mongo rejects `$regex` on a Date,
 so **prisma-pg and mongoose both drop** the condition and report
 `invalid-value`. Exact parity is not reachable here; a non-crashing, observable
 skip is the agreed behaviour on both.
+
+## 6. Contract audit (machine-checked)
+
+§1–§5 are a read-and-compare exercise, which can rot. `test/contract.ts`
+(`bun run test:contract`, no database) turns the three questions that actually
+matter into assertions, driving **all three adapters' compilers** from the real
+`@querykitjs/web` builders. 34 checks, all green.
+
+**A — does it accept input the same way?**
+
+- All **27 operators** are accepted by prisma-pg, drizzle-pg and mongoose alike:
+  none of the three drops a condition the others keep.
+- Case sensitivity is asserted on the **rendered** form, not on the table:
+  `contains` → Prisma `mode: "insensitive"` · drizzle `… ilike $1` · mongoose
+  `$options: "i"`; `like` → Prisma `contains` without mode · drizzle `… like $1`
+  · mongoose no `$options`.
+- An anchored `like "Ali%"` becomes `startsWith: "Ali"` here and the parameter
+  `'Ali%'` on drizzle-pg — the same rows, which is the point of §5.1.
+- A wire string on a numeric field (`value: "26"`) is accepted by all three.
+
+**B — is it used the same way?**
+
+- The runtime exports of the three `index.ts` files are **identical**:
+  `buildRepository`, `createFilters`, `createRegistry`, `f`.
+- The repository exposes **exactly** the shared 20-method set — no extras, none
+  missing.
+- `createRegistry(…) → repository(…) → findList(params)` reads the same on all
+  three; only the model handle differs (`db + schema` / `Model` / `"modelKey"`),
+  which is each ORM's own idiom.
+
+**C — does what `@querykitjs/web` sends arrive intact?**
+
+Payloads are built with the real `buildListParams` / `buildInfiniteParams` /
+`buildCursorParams` / `createQuery`, pushed through
+`JSON.parse(JSON.stringify(…))` (the wire), and passed to the repository **with
+no cast**:
+
+- `filter: []`, `columns: {}`, `with: {}` — the values web sends when the user
+  selected nothing — mean _no_ `where`, _full_ row and _no_ `include`. (An empty
+  `select` would have made every response a list of empty objects; this is the
+  single most valuable check in the file.)
+- `cursor: null` is "no cursor"; a condition with `value` omitted (`isNull`) is
+  accepted; web's default `sort` resolves on all three adapters.
+- Every `*Meta` this adapter returns carries exactly the snake_case fields
+  web's mappers read — verified by scanning `packages/web/src/meta.ts`.
+- A cursor token issued here survives the wire and comes back through web's
+  cursor builder as the correct keyset predicate.
+- Every field of web's `PrismaInclude` (`select`, `include`, `where`, `orderBy`,
+  `take`, `skip`) passes through untouched, including inside the composed
+  `select`.

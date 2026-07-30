@@ -45,6 +45,7 @@
     "test:generate": "prisma generate --schema test/prisma/schema.prisma",
     "test:query": "bun run test/query.ts",
     "test:types": "tsc --noEmit -p test/tsconfig.json",
+    "test:contract": "bun --preload ../mongoose/test/_bun-v8-shim.ts test/contract.ts",
     "test:smoke": "bun run test/smoke.ts"
   },
   "dependencies": {
