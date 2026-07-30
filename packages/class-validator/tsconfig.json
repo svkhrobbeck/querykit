@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // class-validator / class-transformer rely on legacy (stage-2) decorators.
+    "experimentalDecorators": true,
+    // `emitDecoratorMetadata` is deliberately OFF: esbuild (tsup) cannot emit it,
+    // and this package never reads `design:type` — every `@Type(() => …)` is
+    // explicit and `@ValidateNested` is unused (recursion lives in `validateFilter`).
+    // Consumers keep it on in their own tsconfig; nothing here depends on it.
+    "emitDecoratorMetadata": false,
+    // With `target: ES2022` this would default to `true`, which turns a bare
+    // `filter?: Filter` declaration into a constructor-time `defineProperty` —
+    // the classic decorator/class-property footgun. Nest apps run with `false`.
+    "useDefineForClassFields": false,
+    "paths": {
+      "@querykitjs/core": ["../core/src/index.ts"]
+    }
+  },
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist"]
+}

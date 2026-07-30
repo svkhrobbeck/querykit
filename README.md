@@ -9,15 +9,16 @@ result types inferred automatically.
 
 ## Packages
 
-| Package                                           | Status       | Description                                               |
-| ------------------------------------------------- | ------------ | --------------------------------------------------------- |
-| [`@querykitjs/core`](./packages/core)             | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared) |
-| [`@querykitjs/drizzle-pg`](./packages/drizzle-pg) | ✅ available | Drizzle ORM + PostgreSQL (backend repository)             |
-| [`@querykitjs/mongoose`](./packages/mongoose)     | ✅ available | Mongoose + MongoDB (backend repository)                   |
-| [`@querykitjs/web`](./packages/web)               | ✅ available | Frontend query-building (filters, pagination, URL sync)   |
-| [`@querykitjs/zod`](./packages/zod)               | ✅ available | Zod schemas validating the request contract (backend)     |
-| `@querykitjs/drizzle-sqlite`                      | 🚧 planned   | Drizzle ORM + SQLite                                      |
-| `@querykitjs/prisma-pg`                           | 🚧 planned   | Prisma + PostgreSQL                                       |
+| Package                                                     | Status       | Description                                                    |
+| ----------------------------------------------------------- | ------------ | -------------------------------------------------------------- |
+| [`@querykitjs/core`](./packages/core)                       | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared)      |
+| [`@querykitjs/drizzle-pg`](./packages/drizzle-pg)           | ✅ available | Drizzle ORM + PostgreSQL (backend repository)                  |
+| [`@querykitjs/mongoose`](./packages/mongoose)               | ✅ available | Mongoose + MongoDB (backend repository)                        |
+| [`@querykitjs/web`](./packages/web)                         | ✅ available | Frontend query-building (filters, pagination, URL sync)        |
+| [`@querykitjs/zod`](./packages/zod)                         | ✅ available | Zod schemas validating the request contract (backend)          |
+| [`@querykitjs/class-validator`](./packages/class-validator) | ✅ available | class-validator decorators + DTOs for the same contract (Nest) |
+| `@querykitjs/drizzle-sqlite`                                | 🚧 planned   | Drizzle ORM + SQLite                                           |
+| `@querykitjs/prisma-pg`                                     | 🚧 planned   | Prisma + PostgreSQL                                            |
 
 Shared logic is moved into `@querykitjs/core` gradually as it emerges. The two
 backend adapters expose **the same surface** — same option names, same semantics —
@@ -29,11 +30,15 @@ The request contract comes from the client, so the pieces that protect a respons
 live in the library rather than in every route:
 
 - **Pagination is capped** — `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (200) in
-  core, enforced by the zod factories, both repositories, and the frontend
-  builders. Uncapped pagination is a DoS surface.
+  core, enforced by the zod factories, the class-validator DTOs, both
+  repositories, and the frontend builders. Uncapped pagination is a DoS surface.
 - **Projection is server-owned** — `forcedColumns` / `allowedColumns` on a
   repository, so a client cannot ask for a password column. `columns` / `with` /
-  `withDeleted` are absent from the zod factories unless explicitly allowed.
+  `withDeleted` are absent from the validation factories unless explicitly allowed.
+- **Filter keys can be allow-listed** — `allowedKeys` in
+  `@querykitjs/class-validator` rejects a filter on an unknown field instead of
+  dropping it silently, and `maxDepth` bounds how deep an `and`/`or`/`not` tree
+  may nest.
 - **Dates arrive as strings** and are cast from the column/path type, so a wire
   filter on a timestamp works without app-side helpers.
 - **Dropped conditions are visible** — `onSkippedCondition` to watch them,
@@ -57,11 +62,12 @@ bun run changeset     # record a change for release
 Tests are runnable scripts, not a framework. The ones that need no service:
 
 ```bash
-bun run --filter @querykitjs/core       test:smoke
-bun run --filter @querykitjs/zod        test:smoke
-bun run --filter @querykitjs/web        test:smoke
-bun run --filter @querykitjs/drizzle-pg test:sql    # SQL/params via PgDialect, no DB
-bun run --filter @querykitjs/mongoose   test:smoke  # spins up mongodb-memory-server
+bun run --filter @querykitjs/core            test:smoke
+bun run --filter @querykitjs/zod             test:smoke
+bun run --filter @querykitjs/class-validator test:smoke
+bun run --filter @querykitjs/web             test:smoke
+bun run --filter @querykitjs/drizzle-pg      test:sql    # SQL/params via PgDialect, no DB
+bun run --filter @querykitjs/mongoose        test:smoke  # spins up mongodb-memory-server
 ```
 
 `@querykitjs/drizzle-pg`'s `test:smoke` needs a reachable Postgres:

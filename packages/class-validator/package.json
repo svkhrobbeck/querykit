@@ -1,0 +1,76 @@
+{
+  "name": "@querykitjs/class-validator",
+  "version": "0.1.0",
+  "description": "class-validator decorators and DTOs that validate the querykit request contract (filters, sort, pagination) — types stay in sync with @querykitjs/core.",
+  "type": "module",
+  "author": {
+    "name": "Suhrobbek Soatov",
+    "url": "https://soatov.uz",
+    "email": "svkhrobbeck@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svkhrobbeck/querykit.git",
+    "directory": "packages/class-validator"
+  },
+  "homepage": "https://github.com/svkhrobbeck/querykit/tree/main/packages/class-validator#readme",
+  "bugs": {
+    "url": "https://github.com/svkhrobbeck/querykit/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "cd test/.bun && bun ../smoke.ts"
+  },
+  "dependencies": {
+    "@querykitjs/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "class-transformer": ">=0.5",
+    "class-validator": ">=0.14",
+    "reflect-metadata": ">=0.1.13"
+  },
+  "peerDependenciesMeta": {
+    "reflect-metadata": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "reflect-metadata": "^0.2.2"
+  },
+  "keywords": [
+    "querykit",
+    "class-validator",
+    "class-transformer",
+    "nestjs",
+    "validation",
+    "dto",
+    "filter",
+    "pagination",
+    "typescript"
+  ]
+}
