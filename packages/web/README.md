@@ -450,6 +450,21 @@ const q = createQuery({ defaultPerPage: 20, pruneEmpty: true });
 const params = q.list({ filter, page });
 ```
 
+### Paginatsiya chegaralari
+
+`perPage`/`limit` **clamp qilinadi** — default `@querykitjs/core`ning
+`DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (200). Bu aynan zod factory'lari va
+ikkala backend repository'si ishlatadigan konstanta, ya'ni front server rad
+etadigan so'rovni umuman yubormaydi.
+
+```ts
+createQuery({ maxPerPage: 50, maxLimit: 25 });
+createRegistry({ adapter: "drizzle-pg", defaults: { maxPerPage: 50, maxLimit: 25 } });
+
+// cheklovni o'chirish (⚠️ cap'siz paginatsiya DoS yuzasi):
+createQuery({ maxPerPage: Infinity });
+```
+
 ## So'rovni o'zingiz yuborasiz
 
 Kutubxona faqat **so'rovgacha** ishlaydi. Transport yo'q:

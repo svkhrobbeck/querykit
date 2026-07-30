@@ -1,4 +1,4 @@
-import { DEFAULT_LIMIT, DEFAULT_PER_PAGE } from "@querykitjs/core";
+import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_PER_PAGE } from "@querykitjs/core";
 
 import type {
   CursorParams,
@@ -31,6 +31,14 @@ export interface QueryConfig {
   cursorField?: string;
   defaultPerPage?: number;
   defaultLimit?: number;
+  /**
+   * `perPage` yuqori chegarasi (core `DEFAULT_MAX_PER_PAGE` = 200) — backend
+   * repositorylari va `@querykitjs/zod` factory'lari bilan **bir xil manba**,
+   * shuning uchun front rad etiladigan so'rovni umuman yubormaydi.
+   */
+  maxPerPage?: number;
+  /** `limit` yuqori chegarasi (core `DEFAULT_MAX_LIMIT` = 200). */
+  maxLimit?: number;
   defaultSort?: Sort;
   /** Bo'sh qiymatli filterlarni tashlash (default `true`). */
   pruneEmpty?: boolean;
@@ -49,6 +57,8 @@ const DEFAULTS: Required<QueryConfig> = {
   cursorField: "cursor",
   defaultPerPage: DEFAULT_PER_PAGE,
   defaultLimit: DEFAULT_LIMIT,
+  maxPerPage: DEFAULT_MAX_PER_PAGE,
+  maxLimit: DEFAULT_MAX_LIMIT,
   defaultSort: [{ key: "createdAt", direction: "desc" }],
   pruneEmpty: true,
 };
@@ -125,8 +135,9 @@ function buildBase(input: Params, cfg: Required<QueryConfig>): Record<string, un
   return base;
 }
 
-function clampInt(value: number | undefined, fallback: number): number {
-  return value === undefined || value < 1 || Number.isNaN(value) ? fallback : Math.trunc(value);
+function clampInt(value: number | undefined, fallback: number, max = Infinity): number {
+  const resolved = value === undefined || value < 1 || Number.isNaN(value) ? fallback : Math.trunc(value);
+  return Math.min(max, resolved);
 }
 
 function build(input: Params, cfg: Required<QueryConfig>): Record<string, unknown> {
@@ -137,14 +148,14 @@ function buildList(input: ListParams, cfg: Required<QueryConfig>): Record<string
   return {
     ...build(input, cfg),
     [cfg.pageField]: clampInt(input.page, 1), // page >= 1 (kasr/0/manfiy → 1)
-    [cfg.perPageField]: clampInt(input.perPage, cfg.defaultPerPage),
+    [cfg.perPageField]: clampInt(input.perPage, cfg.defaultPerPage, cfg.maxPerPage),
   };
 }
 
 function buildInfinite(input: InfiniteParams, cfg: Required<QueryConfig>): Record<string, unknown> {
   return {
     ...build(input, cfg),
-    [cfg.limitField]: clampInt(input.limit, cfg.defaultLimit),
+    [cfg.limitField]: clampInt(input.limit, cfg.defaultLimit, cfg.maxLimit),
     [cfg.offsetField]: input.offset && input.offset > 0 ? Math.trunc(input.offset) : 0,
   };
 }
@@ -152,7 +163,7 @@ function buildInfinite(input: InfiniteParams, cfg: Required<QueryConfig>): Recor
 function buildCursor(input: CursorParams, cfg: Required<QueryConfig>): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     ...buildBase(input, cfg),
-    [cfg.limitField]: clampInt(input.limit, cfg.defaultLimit),
+    [cfg.limitField]: clampInt(input.limit, cfg.defaultLimit, cfg.maxLimit),
     [cfg.cursorField]: input.cursor ?? null,
     order: input.order ?? "asc",
     direction: input.direction ?? "forward",

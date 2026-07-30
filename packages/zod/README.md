@@ -42,7 +42,58 @@ Infinite/cursor uchun `infiniteParamsSchema` / `cursorParamsSchema`.
 - **`with`** (relations), **`columns`**, **`withDeleted`**.
 - Eski `type` maydoni **e'tiborsiz** qoldiriladi (rad etilmaydi) — migratsiya oson.
 
-## Schema'lar
+## Factory'lar (tavsiya etiladi)
+
+Konstanta schema'lar cheklovsiz: `perPage` yuqori chegarasi yo'q va
+`columns`/`with`/`withDeleted` clientdan qabul qilinadi. Factory'lar **xavfsiz
+default** bilan keladi:
+
+```ts
+import { makeOffsetParamsSchema, makeInfiniteParamsSchema, makeCursorParamsSchema } from "@querykitjs/zod";
+
+const listSchema = makeOffsetParamsSchema(); // perPage ≤ 200; columns/with/withDeleted YO'Q
+type ListParams = z.infer<typeof listSchema>;
+
+// cheklovni o'zgartirish
+const bigList = makeOffsetParamsSchema({ maxPerPage: 500 });
+
+// server-owned maydonni ATAYLAB ochish (tip darajasida ham paydo bo'ladi)
+const adminList = makeOffsetParamsSchema({ allow: ["withDeleted"] });
+```
+
+| Opsiya       | Default                           | Ma'nosi                                           |
+| ------------ | --------------------------------- | ------------------------------------------------- |
+| `maxPerPage` | core `DEFAULT_MAX_PER_PAGE` (200) | `perPage` yuqori chegarasi                        |
+| `maxLimit`   | core `DEFAULT_MAX_LIMIT` (200)    | `limit` yuqori chegarasi (infinite/cursor)        |
+| `allow`      | `[]`                              | `"columns"` / `"with"` / `"withDeleted"`ni ochish |
+
+**Nega default'da yopiq:**
+
+- `columns` — client `{ password: true }` so'rashi mumkin;
+- `with` — client istalgan relation'ni tortib olishi mumkin (data exposure);
+- `withDeleted` — client soft-delete himoyasini o'chira oladi.
+
+Ochish kerak bo'lsa, `allow` bilan birga **repository darajasidagi ikkinchi
+qatlam**ni ham qo'ying: `forcedColumns` / `allowedColumns`
+([drizzle-pg](../drizzle-pg/README.md) · [mongoose](../mongoose/README.md)).
+
+`maxPerPage: Infinity` cheklovni butunlay o'chiradi — ⚠️ cap'siz paginatsiya DoS
+yuzasi, chunki bitta so'rov butun jadvalni so'rashi mumkin. Backend
+repositorylari ham shu core konstantasidan clamp qiladi, ya'ni validatsiya
+chetlab o'tilsa ham himoya qoladi.
+
+Chiqish tiplari: `MadeOffsetParams<TAllow>` / `MadeInfiniteParams` /
+`MadeCursorParams` (va schema tiplari `OffsetParamsSchema<TAllow>`, …).
+
+> `ReturnType<typeof makeOffsetParamsSchema>` **ishlatilmasin** — `const` tip
+> parametrli generic funksiyada TypeScript uni `any` qilib yuboradi. `z.infer<typeof listSchema>`
+> yoki `MadeOffsetParams<...>` ishlating.
+
+## Schema'lar (konstantalar — legacy parity)
+
+⚠️ Quyidagi konstantalarda **cap yo'q** va `columns`/`with`/`withDeleted`
+**ochiq**. Ular mavjud loyihalar buzilmasligi uchun o'zgarishsiz qoldirilgan;
+yangi kod yuqoridagi factory'lardan foydalansin.
 
 | Schema                              | Vazifasi                                           |
 | ----------------------------------- | -------------------------------------------------- |

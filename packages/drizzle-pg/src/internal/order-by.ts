@@ -3,6 +3,7 @@ import type { AnyPgTable } from "drizzle-orm/pg-core";
 
 import type { Sort, SortDirection } from "../types";
 import { resolveColumn } from "./columns";
+import { reportSkip, type Diagnostics } from "./diagnostics";
 
 interface NormalizedSort {
   key: string;
@@ -15,12 +16,15 @@ interface NormalizedSort {
  * pagination is stable (matches the mongoose adapter). `resolveColumn` matches
  * by JS property or DB column name, so `createdAt` also finds a `created_at` column.
  */
-export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: Sort<TTable>): SQL[] {
+export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: Sort<TTable>, diag?: Diagnostics): SQL[] {
   const orderBy: SQL[] = [];
 
   for (const { key, direction } of normalize(sort as Sort | undefined)) {
     const column = resolveColumn(table, key);
     if (column) orderBy.push(direction === "desc" ? desc(column) : asc(column));
+    // An unknown sort key falls back to the default order, so the list looks
+    // "unsorted" to the caller with nothing in the log to explain it.
+    else reportSkip(diag, { site: "sort", key, reason: "unknown-key" });
   }
 
   if (orderBy.length > 0) return orderBy;

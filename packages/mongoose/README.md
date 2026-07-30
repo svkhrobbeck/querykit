@@ -83,7 +83,21 @@ export const registry = createRegistry(mongoose.connection);
 // export const registry = createRegistry(mongoose.connection, { defaultPerPage: 20, defaultLimit: 20 });
 ```
 
-`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) berilmasa `@querykitjs/core`ning **20**siga tushadi. `connection` tashqaridan beriladi (tranzaksiya to'g'ri session'ni ulashsin uchun).
+`connection` tashqaridan beriladi (tranzaksiya to'g'ri session'ni ulashsin uchun).
+
+**`createRegistry` opsiyalari** — drizzle-pg adapteri bilan **aynan bir xil**:
+
+| Opsiya               | Default                           | Ma'nosi                                                   |
+| -------------------- | --------------------------------- | --------------------------------------------------------- |
+| `defaultPerPage`     | core `DEFAULT_PER_PAGE` (20)      | `findList` sahifa o'lchami                                |
+| `defaultLimit`       | core `DEFAULT_LIMIT` (20)         | `findInfinite`/`findCursor` `limit`i                      |
+| `maxPerPage`         | core `DEFAULT_MAX_PER_PAGE` (200) | `perPage` yuqori chegarasi (`Infinity` — o'chirish)       |
+| `maxLimit`           | core `DEFAULT_MAX_LIMIT` (200)    | `limit` yuqori chegarasi                                  |
+| `strict`             | `false`                           | noma'lum kalit → `QueryKitError` (400), jimgina skip emas |
+| `onSkippedCondition` | —                                 | tashlab yuborilgan har bir shart uchun callback           |
+
+`maxPerPage`/`maxLimit` — **ikkinchi himoya qatlami**: validatsiya
+(`@querykitjs/zod` factory'lari) chetlab o'tilsa ham repository o'zi clamp qiladi.
 
 ### 2. Har model uchun repository
 
@@ -96,6 +110,82 @@ export const usersRepository = registry.repository(User, base => ({
   findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
 }));
 ```
+
+`repository()` to'rt shaklda chaqiriladi (drizzle-pg adapteri bilan bir xil):
+
+```ts
+registry.repository(User);                            // sof
+registry.repository(User, base => ({ … }));           // + custom metodlar
+registry.repository(User, options);                   // + per-repo opsiyalar
+registry.repository(User, options, base => ({ … }));  // ikkisi ham
+```
+
+### 3. Projection himoyasi (`RepositoryOptions`)
+
+`columns` clientdan kelishi mumkin, shuning uchun xavfsiz tanlov **repository'da**
+belgilanadi — `scope` (RBAC) allaqachon shu yo'lda:
+
+```ts
+export const usersRepository = registry.repository(User, {
+  forcedColumns: { _id: true, fullName: true, email: true }, // parol hech qachon chiqmaydi
+});
+
+// yoki yumshoqroq: client faqat shu ro'yxatdan tanlaydi
+export const postsRepository = registry.repository(Post, {
+  allowedColumns: ["_id", "title", "createdAt"],
+});
+```
+
+| Opsiya           | Xulqi                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `forcedColumns`  | client `columns`i **butunlay e'tiborsiz**                                             |
+| `allowedColumns` | client tanlovi allowlist bilan **kesiladi**; kesishma bo'sh bo'lsa → allowlist        |
+| `scope`          | har bir o'qish/yozishga doimiy tenglik filtri (`scoped()` bilan ham berilishi mumkin) |
+| `relations`      | populate qilinadigan relation'lar (faqat tip — `with` inference uchun)                |
+
+Muhim nozikliklar:
+
+- Kesishma bo'sh bo'lganda natija **to'liq hujjat emas** — allowlistning o'zi.
+- `aggregate` ham shu guard ostida: `min("password")` yoki
+  `groupBy: "password"` projection bilan bir xil miqdorda ma'lumot chiqaradi.
+- `cursorKey` clientdan keladi va cursor maydoni paginatsiya uchun majburan
+  tanlanadi — guard bor bo'lsa u maydon so'rovda qoladi, lekin qaytariladigan
+  hujjatlardan **olib tashlanadi**.
+- `forcedColumns: {}` yoki `allowedColumns: []` — repository yaratilishida **xato**.
+- ⚠️ Guard **faqat o'qish** metodlariga ta'sir qiladi (`findAll`/`findOne`/
+  `findById`/`findList`/`findInfinite`/`findCursor` + `aggregate`). Yozish
+  metodlari (`create`, `upsert`, `updateById`, `softDelete`, …) tip kontrakti
+  bo'yicha **to'liq hujjatni** qaytaradi. Yozish natijasini clientga
+  qaytarishdan oldin `findById` bilan qayta o'qing yoki o'zingiz map qiling.
+
+### 4. Noto'g'ri shartlar: kuzatish yoki rad etish
+
+Noma'lum filter/sort kaliti default'da **jimgina tashlab yuboriladi**. Muammosi:
+filter natijani _cheklash_ uchun ishlatiladi, shuning uchun typo qilingan kalit
+yo'qolsa endpoint kutilganidan **ko'proq** data qaytaradi.
+
+```ts
+// 1-qadam: kuzatish (xulq o'zgarmaydi)
+createRegistry(mongoose.connection, {
+  onSkippedCondition: info => logger.warn({ querykit: info }, "shart tashlab yuborildi"),
+});
+
+// 2-qadam: log tozalanganda — qattiq rejim
+createRegistry(mongoose.connection, { strict: true });
+```
+
+```ts
+import { QueryKitError } from "@querykitjs/core";
+
+try {
+  return await usersRepository.findList(params);
+} catch (err) {
+  if (err instanceof QueryKitError) return c.json({ error: err.message, info: err.info }, 400);
+  throw err;
+}
+```
+
+`scope` va `cursorKey` kaliti **har doim** fatal (`strict`dan qat'i nazar).
 
 ## MongoDB-ga xos jihatlar
 
@@ -185,6 +275,36 @@ const mine = roadmapsRepository.scoped({ supervisorId: user.id });
 await mine.findList({ page: 1 }); // { supervisorId: user.id, ... }
 await mine.create({ ... });        // supervisorId majburan user.id
 ```
+
+Scope'ni `registry.repository(Model, { scope })` bilan ham berish mumkin.
+Noma'lum scope kaliti — repository yaratilishida **xato** (jimgina tashlansa
+RBAC filtri yo'qolib ketardi).
+
+## Wire (JSON) qiymatlari va DbService'dan migratsiya
+
+Backend so'rov body'sini JSON'da oladi, ya'ni sana har doim **string** bo'lib
+keladi. Adapter uni schema path tipiga qarab avtomatik cast qiladi:
+
+```json
+{ "key": "createdAt", "operation": "<=", "value": "2026-07-28T12:00:00.000Z" }
+```
+
+- `Date` path'lari → ISO string avtomatik `Date`ga aylanadi. Qamrov **ataylab**
+  drizzle-pg bilan bir xil: u ham faqat JS orqali map qilinadigan tiplarni
+  hukm qiladi, qolganini bazaga qoldiradi.
+- `in`/`notIn` massivlari, `between`/`notBetween` tuple'lari va cursor token ham
+  qamraladi (`cursorKey: "createdAt"` ishlaydi).
+- ⚠️ **Hujjatlashtirilgan farq:** Mongo `Date` path'da `$regex` qila olmaydi
+  (`Can't use $options with Date`), shuning uchun date maydonidagi text-pattern
+  operatori (`contains`/`ilike`/…) **tashlab yuboriladi**. drizzle-pg esa buni
+  bajaradi (Postgres timestamp'ni text sifatida render qiladi). Ikkalasi ham
+  crash qilmaydi; farq `onSkippedCondition`da ko'rinadi.
+- Parse bo'lmaydigan qiymat (`"not-a-date"`) shartni bekor qiladi (`strict`da —
+  400). `in` ro'yxatidagi **bitta** yaroqsiz element butun shartni bekor qiladi.
+
+**DbService migratsiyasi:** eski wire'dagi `type: "date"` maydoni endi keraksiz —
+`@querykitjs/zod` uni strip qiladi (xato bermaydi), coercion esa server tomonda
+path tipidan avtomatik.
 
 ## Soft-delete
 

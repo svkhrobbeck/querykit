@@ -1,4 +1,4 @@
 export { createRegistry } from "./registry";
-export { buildRepository, type RepoRuntime, type RepoConfig } from "./repository";
+export { buildRepository, type RepoRuntime } from "./repository";
 export { createFilters, f } from "./filters";
 export * from "./types";

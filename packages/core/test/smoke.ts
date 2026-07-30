@@ -4,7 +4,7 @@
  *
  *   bun run test/smoke.ts
  */
-import { createFilters, f } from "../src/index";
+import { createFilters, f, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, FILTER_OPERATORS, QueryKitError, TEXT_FILTER_OPERATORS } from "../src/index";
 import type { FieldCondition } from "../src/types";
 
 let passed = 0;
@@ -29,6 +29,41 @@ check(
   uf.like("name", "a%").operation === "like" && uf.ilike("name", "a").operation === "ilike" && uf.notLike("name", "a").operation === "notLike",
 );
 check("between → [min,max]", eq(uf.between("age", 18, 65).value, [18, 65]));
+check("notBetween → [min,max]", uf.notBetween("age", 18, 65).operation === "notBetween" && eq(uf.notBetween("age", 18, 65).value, [18, 65]));
+check(
+  "har bir FILTER_OPERATORS uchun builder bor (alias bundan mustasno)",
+  (() => {
+    const emitted = new Set<string>();
+    for (const cond of [
+      uf.eq("age", 1),
+      uf.ne("age", 1),
+      uf.gt("age", 1),
+      uf.gte("age", 1),
+      uf.lt("age", 1),
+      uf.lte("age", 1),
+      uf.contains("name", "a"),
+      uf.startsWith("name", "a"),
+      uf.endsWith("name", "a"),
+      uf.like("name", "a"),
+      uf.ilike("name", "a"),
+      uf.notLike("name", "a"),
+      uf.in("age", [1]),
+      uf.notIn("age", [1]),
+      uf.between("age", 1, 2),
+      uf.notBetween("age", 1, 2),
+      uf.isNull("age"),
+      uf.isNotNull("age"),
+    ]) {
+      emitted.add(cond.operation!);
+    }
+    // Aliaslar builderdan chiqmaydi — ular faqat wire'da qabul qilinadi:
+    // `eq`/`gt`/… nomlari tokenlarning (`=`/`>`) aliasi, `contains`/`startsWith`/
+    // `endsWith` esa `%_%`/`%_`/`_%` tokenlarining aliasi.
+    const aliases = new Set(["eq", "ne", "gt", "gte", "lt", "lte", "contains", "startsWith", "endsWith"]);
+    const missing = FILTER_OPERATORS.filter(op => !aliases.has(op) && !emitted.has(op));
+    return missing.length === 0;
+  })(),
+);
 check(
   "range → two conditions",
   eq(uf.range("createdAt", "x", "y"), [
@@ -47,6 +82,33 @@ check("not group", "not" in notNode);
 
 /* untyped f */
 check("untyped f works", (f.eq("k", 1) as FieldCondition).operation === "=");
+
+/* cap defaults — yagona manba (zod factory + ikkala backend + web shundan oladi) */
+check("cap defaults", DEFAULT_MAX_PER_PAGE === 200 && DEFAULT_MAX_LIMIT === 200);
+
+/* text operatorlar ro'yxati — adapterlar date coercion'da shularni chetlab o'tadi */
+check(
+  "TEXT_FILTER_OPERATORS ⊂ FILTER_OPERATORS",
+  TEXT_FILTER_OPERATORS.length === 9 && TEXT_FILTER_OPERATORS.every(op => (FILTER_OPERATORS as readonly string[]).includes(op)),
+);
+check(
+  "TEXT_FILTER_OPERATORS token va nom aliaslarini ham qamraydi",
+  ["like", "ilike", "notLike", "contains", "startsWith", "endsWith", "%_%", "%_", "_%"].every(op => (TEXT_FILTER_OPERATORS as readonly string[]).includes(op)),
+);
+check(
+  "solishtirish operatorlari text emas (cast qilinadi)",
+  !["=", ">=", "<=", "between", "in", "isNull"].some(op => (TEXT_FILTER_OPERATORS as readonly string[]).includes(op)),
+);
+
+/* QueryKitError — strict rejim xatosi (ikkala backend uchun bitta klass) */
+const qkErr = new QueryKitError({ source: "users", site: "filter", key: "nope", operation: "=", reason: "unknown-key" });
+check("QueryKitError instanceof Error + name", qkErr instanceof Error && qkErr instanceof QueryKitError && qkErr.name === "QueryKitError");
+check("QueryKitError code + info", qkErr.code === "QUERYKIT_INVALID_CONDITION" && qkErr.info.key === "nope" && qkErr.info.site === "filter");
+check(
+  "QueryKitError xabari kalit/joy/manbani ko'rsatadi",
+  qkErr.message.includes("unknown-key") && qkErr.message.includes("nope") && qkErr.message.includes("filter") && qkErr.message.includes("users"),
+  qkErr.message,
+);
 
 console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
