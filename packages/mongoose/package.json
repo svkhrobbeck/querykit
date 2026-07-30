@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/mongoose",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Advanced filtering + flexible pagination repository layer for Mongoose (MongoDB).",
   "type": "module",
   "author": {

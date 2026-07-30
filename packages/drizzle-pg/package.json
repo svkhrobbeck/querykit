@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/drizzle-pg",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Advanced filtering + flexible pagination repository layer for Drizzle ORM (PostgreSQL).",
   "type": "module",
   "author": {

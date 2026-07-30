@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/core",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "ORM-agnostic query DSL shared by querykit packages — filters, operators & wire types.",
   "type": "module",
   "author": {
