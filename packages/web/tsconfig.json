@@ -4,7 +4,6 @@
     "lib": ["ES2022", "DOM"],
     "types": ["node", "react"],
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "@querykitjs/core": ["../core/src/index.ts"]
     }
