@@ -7,7 +7,7 @@
  * Backend (Hono, Express, …) so'rov body'sini shu bilan validatsiya qiladi.
  */
 import { z } from "zod";
-import { FILTER_OPERATORS } from "@querykitjs/core";
+import { DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, FILTER_OPERATORS } from "@querykitjs/core";
 import type { FieldCondition, Filter, FilterNode, FilterOperator, FilterValue, WireCursorParams, WireInfiniteParams, WireOffsetParams } from "@querykitjs/core";
 
 /* --------------------------------- filter --------------------------------- */
@@ -82,6 +82,104 @@ export const cursorParamsSchema = baseParamsSchema.omit({ sort: true }).extend({
   direction: z.enum(["forward", "backward"]).optional(),
 });
 
+/* ------------------------------- factories -------------------------------- */
+/* Sozlanadigan schema quruvchilar — **xavfsiz default** bilan. Yuqoridagi
+ * konstantalar legacy-parity uchun o'z holida qoladi (cap yo'q, uch maydon ochiq);
+ * yangi kod shu factory'lardan foydalanadi. */
+
+/** Server'ga tegishli, default'da clientdan **qabul qilinmaydigan** maydonlar. */
+export type ServerOwnedField = "columns" | "with" | "withDeleted";
+
+const serverOwnedShape = {
+  /** Client `{ password: true }` so'ramasin — projection server ishi. */
+  columns: z.record(z.string(), z.boolean()).optional(),
+  /** Client istalgan relation'ni tortmasin — data exposure. */
+  with: z.record(z.string(), z.unknown()).optional(),
+  /** Client soft-delete himoyasini o'chirmasin. */
+  withDeleted: z.boolean().optional(),
+};
+
+type ServerOwnedShape = typeof serverOwnedShape;
+
+/** Factory'lar uchun opsiyalar. */
+export interface ParamsSchemaOptions<TAllow extends readonly ServerOwnedField[] = []> {
+  /**
+   * `perPage` yuqori chegarasi. Default — core `DEFAULT_MAX_PER_PAGE` (200).
+   * Cap'ni butunlay o'chirish: `Infinity` (⚠️ DoS yuzasi).
+   */
+  maxPerPage?: number;
+  /** `limit` yuqori chegarasi. Default — core `DEFAULT_MAX_LIMIT` (200). */
+  maxLimit?: number;
+  /**
+   * Server-owned maydonlarni **ataylab** ochish. Default — bo'sh: `columns`,
+   * `with` va `withDeleted` schema'ga umuman kirmaydi va client yuborsa
+   * jimgina strip qilinadi. Repository darajasidagi ikkinchi himoya qatlami —
+   * `forcedColumns`/`allowedColumns` (backend adapterlarida).
+   */
+  allow?: TAllow;
+}
+
+const pickServerOwned = <TAllow extends readonly ServerOwnedField[]>(allow?: TAllow) => {
+  const picked: Record<string, z.ZodTypeAny> = {};
+  for (const key of allow ?? []) picked[key] = serverOwnedShape[key];
+  return picked as Pick<ServerOwnedShape, TAllow[number]>;
+};
+
+/* Uch factory bir xil `filter`/`sort` maydonlarini ulashadi — takrorlanmasin. */
+const filterField = filterSchema.optional();
+const sortField = sortSchema.optional();
+
+const positive = (max: number) => z.number().int().positive().max(max).optional();
+
+/**
+ * Offset (sahifali) params schema — `perPage` cap'i bilan va server-owned
+ * maydonlarsiz.
+ *
+ * @example
+ * ```ts
+ * const listSchema = makeOffsetParamsSchema({ maxPerPage: 100 });
+ * type ListParams = z.infer<typeof listSchema>;
+ * // `withDeleted`ni ataylab ochish:
+ * const adminSchema = makeOffsetParamsSchema({ allow: ["withDeleted"] });
+ * ```
+ */
+export function makeOffsetParamsSchema<const TAllow extends readonly ServerOwnedField[] = []>(options: ParamsSchemaOptions<TAllow> = {}) {
+  return z.object({
+    filter: filterField,
+    sort: sortField,
+    ...pickServerOwned(options.allow),
+    page: z.number().int().positive().optional(),
+    perPage: positive(options.maxPerPage ?? DEFAULT_MAX_PER_PAGE),
+  });
+}
+
+/** Infinite-scroll params schema — `limit` cap'i bilan. Qarang: {@link makeOffsetParamsSchema}. */
+export function makeInfiniteParamsSchema<const TAllow extends readonly ServerOwnedField[] = []>(options: ParamsSchemaOptions<TAllow> = {}) {
+  return z.object({
+    filter: filterField,
+    sort: sortField,
+    ...pickServerOwned(options.allow),
+    limit: positive(options.maxLimit ?? DEFAULT_MAX_LIMIT),
+    offset: z.number().int().nonnegative().optional(),
+  });
+}
+
+/**
+ * Cursor (keyset) params schema — `limit` cap'i bilan. `sort` yo'q: tartib
+ * `order` + `direction` bilan boshqariladi.
+ */
+export function makeCursorParamsSchema<const TAllow extends readonly ServerOwnedField[] = []>(options: ParamsSchemaOptions<TAllow> = {}) {
+  return z.object({
+    filter: filterField,
+    ...pickServerOwned(options.allow),
+    limit: positive(options.maxLimit ?? DEFAULT_MAX_LIMIT),
+    cursor: z.string().nullish(),
+    cursorKey: z.string().optional(),
+    order: directionSchema.optional(),
+    direction: z.enum(["forward", "backward"]).optional(),
+  });
+}
+
 /* ------------------------------ inferred types ---------------------------- */
 
 export type FilterInput = z.infer<typeof filterSchema>;
@@ -90,6 +188,19 @@ export type BaseParams = z.infer<typeof baseParamsSchema>;
 export type OffsetParams = z.infer<typeof offsetParamsSchema>;
 export type InfiniteParams = z.infer<typeof infiniteParamsSchema>;
 export type CursorParams = z.infer<typeof cursorParamsSchema>;
+
+/* Factory chiqishlari. `ReturnType<typeof makeOffsetParamsSchema>` ishlatib
+ * bo'lmaydi — `const` tip parametrli generic funksiyada u `any` beradi; shuning
+ * uchun instantiatsiya aniq yoziladi. */
+
+export type OffsetParamsSchema<TAllow extends readonly ServerOwnedField[] = []> = ReturnType<typeof makeOffsetParamsSchema<TAllow>>;
+export type InfiniteParamsSchema<TAllow extends readonly ServerOwnedField[] = []> = ReturnType<typeof makeInfiniteParamsSchema<TAllow>>;
+export type CursorParamsSchema<TAllow extends readonly ServerOwnedField[] = []> = ReturnType<typeof makeCursorParamsSchema<TAllow>>;
+
+/** `makeOffsetParamsSchema(...)` chiqishining tipi. */
+export type MadeOffsetParams<TAllow extends readonly ServerOwnedField[] = []> = z.infer<OffsetParamsSchema<TAllow>>;
+export type MadeInfiniteParams<TAllow extends readonly ServerOwnedField[] = []> = z.infer<InfiniteParamsSchema<TAllow>>;
+export type MadeCursorParams<TAllow extends readonly ServerOwnedField[] = []> = z.infer<CursorParamsSchema<TAllow>>;
 
 /* ---------------------- compile-time core alignment ----------------------- */
 /* Schema chiqishi core tiplariga assignable ekanini typecheck darajasida qat'iy tekshiradi. */
@@ -106,3 +217,18 @@ type _Filter = Expect<FilterInput extends Filter ? true : false>;
 type _WireOffset = Expect<OffsetParams extends WireOffsetParams ? true : false>;
 type _WireInfinite = Expect<InfiniteParams extends WireInfiniteParams ? true : false>;
 type _WireCursor = Expect<CursorParams extends WireCursorParams ? true : false>;
+
+/* Factory chiqishi ham xuddi shu wire shakllariga mos — `allow` bilan ham, usiz ham. */
+type _FactoryOffset = Expect<MadeOffsetParams extends WireOffsetParams ? true : false>;
+type _FactoryInfinite = Expect<MadeInfiniteParams extends WireInfiniteParams ? true : false>;
+type _FactoryCursor = Expect<MadeCursorParams extends WireCursorParams ? true : false>;
+type _FactoryOffsetAllowAll = Expect<MadeOffsetParams<["columns", "with", "withDeleted"]> extends WireOffsetParams ? true : false>;
+
+/* `allow` bergan schema'da server-owned maydonlar tip darajasida ham paydo bo'ladi
+ * (ya'ni `allow` faqat runtime hodisa emas — TS ham biladi)… */
+type _AllowTyped = Expect<MadeOffsetParams<["withDeleted"]> extends { withDeleted?: boolean } ? true : false>;
+/* …va bermagan schema'da yo'q — bu P1-4 ning tip darajasidagi kafolati. */
+type _DefaultDropsWithDeleted = Expect<"withDeleted" extends keyof MadeOffsetParams ? false : true>;
+type _DefaultDropsColumns = Expect<"columns" extends keyof MadeOffsetParams ? false : true>;
+type _DefaultDropsWith = Expect<"with" extends keyof MadeOffsetParams ? false : true>;
+type _AllowColumnsTyped = Expect<"columns" extends keyof MadeOffsetParams<["columns"]> ? true : false>;
