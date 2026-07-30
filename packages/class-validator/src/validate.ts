@@ -33,11 +33,19 @@ export interface QueryFilterOptions {
    * Default `false`, ya'ni `@querykitjs/zod` bilan bir xil qat'iylik.
    */
   strictValue?: boolean;
+  /**
+   * `path`ning ildizi. Default `"filter"`. Dekorator buni DTO property nomiga
+   * qo'yadi, ya'ni `where` deb nomlangan maydon xatosi `filter.operation` emas,
+   * `where.operation` deb chiqadi.
+   */
+  rootPath?: string;
 }
 
 export interface QuerySortOptions {
   /** Berilsa — faqat shu kalitlar bo'yicha saralashga ruxsat. */
   allowedKeys?: readonly string[];
+  /** `path`ning ildizi. Default `"sort"`. Qarang: {@link QueryFilterOptions.rootPath}. */
+  rootPath?: string;
 }
 
 /** Bitta validatsiya xatosi. */
@@ -210,6 +218,7 @@ function walkNode(node: unknown, depth: number, path: string, ctx: FilterContext
 export function validateFilter(value: unknown, options: QueryFilterOptions = {}): ValidationIssue[] {
   if (value === undefined) return [];
 
+  const root = options.rootPath ?? "filter";
   const ctx: FilterContext = {
     issues: [],
     allowedKeys: options.allowedKeys ? new Set(options.allowedKeys) : undefined,
@@ -221,11 +230,11 @@ export function validateFilter(value: unknown, options: QueryFilterOptions = {})
   if (Array.isArray(value)) {
     /* Flat massiv = implicit AND. Core uni `FieldCondition[]` deb tiplaydi —
      * ya'ni elementlari faqat shart, nested guruh emas (zod'da ham shunday). */
-    value.forEach((item, index) => checkCondition(item, `filter[${index}]`, ctx));
+    value.forEach((item, index) => checkCondition(item, `${root}[${index}]`, ctx));
     return ctx.issues;
   }
 
-  walkNode(value, 1, "filter", ctx);
+  walkNode(value, 1, root, ctx);
   return ctx.issues;
 }
 
@@ -234,13 +243,15 @@ export function validateFilter(value: unknown, options: QueryFilterOptions = {})
  */
 export function validateSort(value: unknown, options: QuerySortOptions = {}): ValidationIssue[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value)) return [issue("querykit.sort.not_array", "sort")];
+
+  const root = options.rootPath ?? "sort";
+  if (!Array.isArray(value)) return [issue("querykit.sort.not_array", root)];
 
   const allowedKeys = options.allowedKeys ? new Set(options.allowedKeys) : undefined;
   const issues: ValidationIssue[] = [];
 
   value.forEach((item, index) => {
-    const path = `sort[${index}]`;
+    const path = `${root}[${index}]`;
 
     if (!isRecord(item)) {
       issues.push(issue("querykit.sort.invalid_item", path));

@@ -1,0 +1,28 @@
+{
+  // Bu fayl FAQAT `test:smoke` uchun: bun tsconfig'ni `$cwd`dan oladi, shuning
+  // uchun skript `cd test && bun smoke.ts` ko'rinishida ishlaydi.
+  //
+  // NEGA ALOHIDA VA NEGA `extends` YO'Q: bun (1.3.14) tsconfig'da `extends`
+  // bo'lsa `experimentalDecorators` bayrog'ini o'qimay qo'yadi va legacy
+  // dekoratorlar o'rniga standart (ES) dekoratorlarni qo'llaydi — natijada
+  // class-validator dekoratoriga `target` sifatida `undefined` keladi.
+  // Paketning asosiy `tsconfig.json`i (`extends: ../../tsconfig.base.json`)
+  // tsc va tsup (esbuild) uchun to'g'ri ishlaydi — dist'da legacy
+  // `__decorateClass` chiqadi. Muammo faqat bun runtime'ida.
+  // ⚠️ Bu yerga `extends` qo'shmang: smoke test darhol yorilib qoladi.
+  //
+  // Typecheck bu faylga tayanmaydi: `tsc --noEmit` paket ildizidagi
+  // tsconfig bilan `src` va `test`ni birga tekshiradi.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@querykitjs/core": ["../../core/src/index.ts"]
+    }
+  }
+}

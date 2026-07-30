@@ -42,14 +42,20 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test:smoke": "bun run test/smoke.ts"
+    "test:smoke": "cd test && bun smoke.ts"
   },
   "dependencies": {
     "@querykitjs/core": "workspace:*"
   },
   "peerDependencies": {
     "class-transformer": ">=0.5",
-    "class-validator": ">=0.14"
+    "class-validator": ">=0.14",
+    "reflect-metadata": ">=0.1.13"
+  },
+  "peerDependenciesMeta": {
+    "reflect-metadata": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "class-transformer": "^0.5.1",
