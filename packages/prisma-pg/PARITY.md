@@ -81,6 +81,14 @@ identically, including "an empty intersection falls back to the allowlist, never
 to the full row" and the build-time throw on an empty guard or unresolvable
 scope key.
 
+**The model handle** reads the same in all three. drizzle-pg takes a table
+object and mongoose takes a `Model`; prisma-pg accepts the delegate object
+(`registry.repository(prisma.user)`) as well as its name
+(`registry.repository("user")`). `test/contract.ts` asserts the two forms
+produce identical queries, and that a handle-built repository still runs on the
+transaction client — the handle is resolved to a model key on every call rather
+than captured, so it can never quietly write outside a transaction.
+
 **Behavioural details verified identical** (all covered by `test/query.ts`):
 `clampPageSize` = `min(max, max(1, trunc(requested ?? fallback)))` · unknown
 filter/sort key skipped and reported · unknown `cursorKey` always fatal
@@ -99,10 +107,11 @@ because Prisma returns counts where the other ORMs return rows:
 | `updateWhere` | `UPDATE … RETURNING`     | collect ids → `updateMany` → re-read | collect ids → `updateMany` → re-read            |
 | `upsertMany`  | chunked `ON CONFLICT`    | chunked `bulkWrite`                  | sequential `upsert` (Prisma has no bulk upsert) |
 
-⚠️ `updateById`/`deleteById` on prisma-pg require a **single-field `@id`**
-(Prisma's `update`/`delete` only accept a unique `where`, and querykit's
-predicate also carries scope + soft-delete). A model with a composite `@@id`
-throws a clear error naming `updateWhere`/`deleteWhere` as the alternative.
+Composite `@@id` models are supported too: the row is located by the querykit
+predicate and then written through Prisma's compound key (`{ a_b: { a, b } }`),
+and bulk re-reads use `OR` over the key tuples instead of an `IN` list. An
+`idKey` that does not resolve is **fatal** (`QueryKitError`), never skipped —
+otherwise `updateById` would be left with no predicate and hit an arbitrary row.
 
 ## 3. Pagination meta formulas
 
@@ -187,17 +196,17 @@ the wrong rows.
 Only a **malformed** pattern (a dangling trailing `\`) is still dropped and
 reported; Postgres would raise an error on it instead.
 
-### 5.2 Field-name resolution
+### 5.2 Field-name resolution — RESOLVED, no divergence
 
 drizzle-pg's `resolveColumn` accepts either the JS property (`createdAt`) or the
-DB column (`created_at`). prisma-pg accepts **only the Prisma field name**
-(`createdAt`), because that is all Prisma's `where` itself accepts — a `@map`ped
-column name is not addressable. mongoose likewise accepts only schema paths
-(plus the `id` → `_id` alias).
+DB column (`created_at`). prisma-pg now does the same: `readModelMeta` records
+each field's `@map`ped column from the runtime datamodel and `resolveField`
+falls back to that alias, so `created_at` resolves to `createdAt` and the query
+is issued with the Prisma field name (which is all Prisma's `where` accepts).
 
-Practical impact: none for clients that send the field names querykit documents;
-a client sending snake_case keys to drizzle-pg would silently get them skipped by
-prisma-pg. Both report the drop via `onSkippedCondition`.
+A real field name always wins over an alias, so a `@map` can never shadow
+another field. mongoose accepts schema paths plus the `id` → `_id` alias; there
+is no separate column name in MongoDB, so the question does not arise there.
 
 ### 5.3 Wire-value coercion is wider here (and that _restores_ parity)
 

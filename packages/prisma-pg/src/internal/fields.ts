@@ -3,11 +3,14 @@
  * mongoose's `fields.ts`.
  *
  * Prisma's `where` is keyed by **model field name** (camelCase), never by the DB
- * column, so resolution is simpler than drizzle's (which also matches
- * `created_at`). What is *not* simpler is getting the field list without
- * importing the generated client: this package must typecheck with no generated
- * client present, so the metadata is read off the client **instance** at runtime
- * through a fallback chain.
+ * column — but a client may well send `created_at`, which drizzle-pg accepts. So
+ * each field's `@map`ped column is recorded as an alias and `resolveField`
+ * translates it back, keeping the two Postgres adapters interchangeable.
+ *
+ * Getting the field list without importing the generated client is the other
+ * half of the job: this package must typecheck with no generated client present,
+ * so metadata is read off the client **instance** at runtime, through a fallback
+ * chain.
  */
 
 /** One model field, normalized across every metadata source. */
@@ -20,6 +23,8 @@ export interface FieldMeta {
   /** `@updatedAt` — Prisma bumps these itself, so the adapter must not. */
   isUpdatedAt: boolean;
   isList: boolean;
+  /** The `@map`ped database column, when it differs from the field name. */
+  dbName?: string;
 }
 
 /** Everything the repository needs to know about one model. */
@@ -27,8 +32,14 @@ export interface ModelMeta {
   /** Prisma model name (`"User"`) — used as the diagnostics `source`. */
   name: string;
   fields: Map<string, FieldMeta>;
+  /** `@map`ped DB column → Prisma field name, so `created_at` also resolves. */
+  byDbName: Map<string, string>;
   /** The `@id` field name; undefined for a composite `@@id`. */
   idField: string | undefined;
+  /** Fields that uniquely address a row — one `@id`, or every `@@id` field. */
+  primaryKey: string[];
+  /** Prisma's name for a composite key (`@@id(name:)`), else the joined fields. */
+  primaryKeyName: string | undefined;
   hasDeletedAt: boolean;
   /** Present only when the field exists **and** is not `@updatedAt`-managed. */
   stampUpdatedAt: string | undefined;
@@ -70,6 +81,7 @@ interface RuntimeField {
   isId?: unknown;
   isUpdatedAt?: unknown;
   isList?: unknown;
+  dbName?: unknown;
 }
 
 const KINDS = new Set(["scalar", "enum", "object", "unsupported"]);
@@ -81,8 +93,12 @@ const normalizeKind = (kind: unknown): FieldMeta["kind"] => (typeof kind === "st
  * source that carries `isId` / `isUpdatedAt`, which soft-delete, id aliasing and
  * the `updatedAt` bump all depend on.
  */
-function fromRuntimeDataModel(client: Record<string, unknown>, delegateKey: string): { name: string; fields: FieldMeta[] } | undefined {
-  const rdm = client._runtimeDataModel as { models?: Record<string, { fields?: RuntimeField[] }> } | undefined;
+function fromRuntimeDataModel(
+  client: Record<string, unknown>,
+  delegateKey: string,
+): { name: string; fields: FieldMeta[]; primaryKey?: { name?: unknown; fields?: unknown } | null } | undefined {
+  const rdm = client._runtimeDataModel as
+    { models?: Record<string, { fields?: RuntimeField[]; primaryKey?: { name?: unknown; fields?: unknown } | null }> } | undefined;
   const models = rdm?.models;
   if (!models || typeof models !== "object") return undefined;
 
@@ -102,9 +118,10 @@ function fromRuntimeDataModel(client: Record<string, unknown>, delegateKey: stri
       isId: field.isId === true,
       isUpdatedAt: field.isUpdatedAt === true,
       isList: field.isList === true,
+      ...(typeof field.dbName === "string" && field.dbName ? { dbName: field.dbName } : {}),
     });
   }
-  return fields.length ? { name: modelName, fields } : undefined;
+  return fields.length ? { name: modelName, fields, primaryKey: models[modelName]?.primaryKey ?? null } : undefined;
 }
 
 /**
@@ -170,14 +187,34 @@ export function readModelMeta(client: Record<string, unknown>, delegateKey: stri
   }
 
   const fields = new Map<string, FieldMeta>();
-  for (const field of source.fields) fields.set(field.name, field);
+  const byDbName = new Map<string, string>();
+  for (const field of source.fields) {
+    fields.set(field.name, field);
+    // A `@map`ped column is registered as an alias, so a client sending
+    // `created_at` resolves exactly as it does on the drizzle-pg adapter. A real
+    // field name always wins (registered below), so an alias can never shadow one.
+    if (field.dbName && field.dbName !== field.name) byDbName.set(field.dbName, field.name);
+  }
+  for (const name of fields.keys()) byDbName.delete(name);
 
   const idField = fields.get("id")?.name ?? [...fields.values()].find(f => f.isId)?.name;
   const updatedAt = fields.get("updatedAt");
 
+  // A composite `@@id` addresses a row through Prisma's compound key, so those
+  // models get the same by-id write methods as single-`@id` ones.
+  const compositeRaw = (source as { primaryKey?: { name?: unknown; fields?: unknown } | null }).primaryKey;
+  const compositeFields = Array.isArray(compositeRaw?.fields) ? (compositeRaw.fields as unknown[]).filter((f): f is string => typeof f === "string") : [];
+  const primaryKey = idField ? [idField] : compositeFields.filter(f => fields.has(f));
+  const primaryKeyName = idField
+    ? undefined
+    : (typeof compositeRaw?.name === "string" && compositeRaw.name ? compositeRaw.name : primaryKey.join("_")) || undefined;
+
   return {
     name: source.name,
     fields,
+    byDbName,
+    primaryKey,
+    primaryKeyName,
     idField,
     hasDeletedAt: fields.has("deletedAt"),
     // Prisma maintains `@updatedAt` itself; stamping it again would be redundant
@@ -195,7 +232,10 @@ export function readModelMeta(client: Record<string, unknown>, delegateKey: stri
  */
 export function resolveField(meta: ModelMeta, key: string): string | undefined {
   if (key === "id") return meta.fields.has("id") ? "id" : meta.idField;
-  return meta.fields.has(key) ? key : undefined;
+  if (meta.fields.has(key)) return key;
+  // Fall back to the `@map`ped database column (`created_at` → `createdAt`), so
+  // a payload written against the drizzle-pg adapter resolves here too.
+  return meta.byDbName.get(key);
 }
 
 /** Field metadata by resolved name. */

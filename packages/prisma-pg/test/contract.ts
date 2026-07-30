@@ -148,7 +148,11 @@ console.log("\n=== A1/A3. every operator is accepted by all three compilers ==="
     if (p !== undefined && d !== undefined && m !== undefined) accepted++;
     else rejected.push(`${op}(p=${p !== undefined} d=${d !== undefined} m=${m !== undefined})`);
   }
-  check(`all ${cases.length} operators are accepted by prisma-pg, drizzle-pg and mongoose`, rejected.length === 0, rejected.join(" "));
+  check(
+    `all ${cases.length} operators are accepted by prisma-pg, drizzle-pg and mongoose`,
+    rejected.length === 0,
+    `${accepted}/${cases.length} ${rejected.join(" ")}`.trim(),
+  );
 
   // Case sensitivity is the one place a silent drift would be invisible: assert
   // the *rendered* form per adapter rather than trusting the table.
@@ -280,6 +284,49 @@ console.log("\n=== B1/B4. exports and repository surface ===");
     typeof registry.repository === "function" && typeof registry.transaction === "function" && typeof repo.findList === "function",
   );
   check("registry exposes the client handle (drizzle exposes `schema`, mongoose the connection)", "client" in registry);
+
+  // B5 — the model handle. drizzle takes a table object, mongoose a Model; this
+  // adapter accepts the delegate object too, so the call site reads the same.
+  const byHandle = spyClient();
+  const handleRepo = createRegistry(byHandle.client as never).repository(byHandle.client.user as never);
+  await handleRepo.findAll({ filter: [{ key: "name", value: "ali" }] } as never);
+  const byKey = spyClient();
+  await createRegistry(byKey.client as never)
+    .repository("user" as never)
+    .findAll({ filter: [{ key: "name", value: "ali" }] } as never);
+  check(
+    "repository(prisma.user) and repository('user') are equivalent",
+    eq(lastArgs(byHandle.calls, "findMany"), lastArgs(byKey.calls, "findMany")),
+    show(lastArgs(byHandle.calls, "findMany")),
+  );
+
+  // …and a handle-built repository must still follow the transaction client — it
+  // resolves by key on every call rather than capturing the delegate object.
+  const outer = spyClient();
+  const inner = spyClient();
+  outer.client.$transaction = (fn: (t: unknown) => Promise<unknown>) => fn(inner.client);
+  const txRegistry = createRegistry(outer.client as never);
+  const txRepo = txRegistry.repository(outer.client.user as never);
+  await txRegistry.transaction(async () => {
+    await txRepo.findAll({} as never);
+  });
+  check(
+    "a handle-built repository still runs on the transaction client",
+    inner.calls.length === 1 && outer.calls.length === 0,
+    `base=${outer.calls.length} tx=${inner.calls.length}`,
+  );
+
+  let handleErr = "";
+  try {
+    createRegistry(spyClient().client as never).repository(spyClient().client.user as never);
+  } catch (err) {
+    handleErr = (err as Error).message;
+  }
+  check(
+    "a delegate from a different client is rejected with a clear error",
+    handleErr.includes("does not belong to this Prisma client"),
+    handleErr.slice(0, 50),
+  );
 }
 
 /* ================= C. @querykitjs/web → prisma-pg, end to end ============== */

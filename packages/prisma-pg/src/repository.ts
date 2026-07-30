@@ -97,19 +97,39 @@ export function buildRepository<TDelegate>(runtime: RepoRuntime, modelKey: strin
   };
 
   /**
-   * Several write paths need to address a single row by its primary key
-   * (Prisma's `update`/`delete` only accept a unique `where`, while querykit's
-   * filters are arbitrary predicates). A composite `@@id` has no single key, so
-   * fail loudly rather than silently mis-targeting a row.
+   * Several write paths need to address a row by its primary key: Prisma's
+   * `update`/`delete` accept only a unique `where`, while querykit's filters are
+   * arbitrary predicates (they also carry the scope and soft-delete guards). So
+   * the row is located first, then written by key. Works for a single `@id` and
+   * for a composite `@@id` alike.
    */
-  const requireIdField = (method: string): string => {
-    if (!meta.idField) {
+  const requirePrimaryKey = (method: string): string[] => {
+    if (meta.primaryKey.length === 0) {
       throw new Error(
-        `${method}: model "${meta.name}" has no single-field @id, so a row cannot be addressed by id. ` +
+        `${method}: model "${meta.name}" has no primary key, so a row cannot be addressed individually. ` +
           `Use updateWhere/deleteWhere with an explicit filter instead.`,
       );
     }
-    return meta.idField;
+    return meta.primaryKey;
+  };
+
+  /** `select` that fetches just the key fields. */
+  const keySelect = (key: string[]): Record<string, true> => Object.fromEntries(key.map(field => [field, true]));
+
+  /**
+   * Prisma's unique `where` for one row. A composite `@@id` is addressed through
+   * its compound key (`{ a_b: { a, b } }`), the name Prisma generates from the
+   * field list unless `@@id(name:)` says otherwise.
+   */
+  const uniqueWhere = (key: string[], row: Record<string, unknown>): Record<string, unknown> => {
+    if (key.length === 1) return { [key[0]!]: row[key[0]!] };
+    return { [meta.primaryKeyName ?? key.join("_")]: Object.fromEntries(key.map(field => [field, row[field]])) };
+  };
+
+  /** A `where` matching exactly the given rows by key (used for bulk re-reads). */
+  const keyedIn = (key: string[], rows: Record<string, unknown>[]): Where => {
+    if (key.length === 1) return { [key[0]!]: { in: rows.map(row => row[key[0]!]) } };
+    return { OR: rows.map(row => Object.fromEntries(key.map(field => [field, row[field]]))) };
   };
 
   // Precomputed base filter from the scope (equality on each field).
@@ -131,8 +151,18 @@ export function buildRepository<TDelegate>(runtime: RepoRuntime, modelKey: strin
   const composeWhere = (userFilter?: Filter<TDelegate>, withDeleted?: boolean): Where | undefined =>
     andWhere([buildWhere(meta, userFilter as Filter, diag), scopeWhere, meta.hasDeletedAt && !withDeleted ? { deletedAt: null } : undefined]);
 
-  /** Merge an id predicate into a filter as AND. */
+  /**
+   * Merge an id predicate into a filter as AND.
+   *
+   * An unresolvable `idKey` is **fatal**, never skipped: the normal "drop the
+   * condition" path would leave `updateById`/`deleteById` with no predicate at
+   * all and let them hit an arbitrary row. Same reasoning (and same error) as an
+   * unknown `cursorKey`.
+   */
   const withId = (filter: Filter<TDelegate> | undefined, idKey: string, id: Id): Filter<TDelegate> => {
+    if (!resolveField(meta, idKey)) {
+      throw new QueryKitError({ source: meta.name, site: "filter", key: idKey, reason: "unknown-key" });
+    }
     const idCondition = { key: idKey, operation: "=" as const, value: id };
     if (!filter) return [idCondition] as Filter<TDelegate>;
     if (Array.isArray(filter)) return [...filter, idCondition] as Filter<TDelegate>;
@@ -183,9 +213,6 @@ export function buildRepository<TDelegate>(runtime: RepoRuntime, modelKey: strin
   };
 
   const countWhere = (where?: Where): Promise<number> => delegate().count({ where });
-
-  /** `where` for Prisma's unique-only `update`/`delete`, from an already-found row. */
-  const uniqueById = (idField: string, row: Record<string, unknown>): Record<string, unknown> => ({ [idField]: row[idField] });
 
   /**
    * The conflict `where` for `upsert`. Prisma addresses a compound unique
@@ -436,33 +463,33 @@ export function buildRepository<TDelegate>(runtime: RepoRuntime, modelKey: strin
     },
 
     async updateWhere(filter: Filter<TDelegate>, patch: Partial<Insert<TDelegate>>) {
-      const idField = requireIdField("updateWhere");
+      const key = requirePrimaryKey("updateWhere");
       const where = composeWhere(filter);
       const d = delegate();
-      // Prisma's `updateMany` returns a count, so the affected ids are collected
+      // Prisma's `updateMany` returns a count, so the affected keys are collected
       // first and re-read afterwards (the same shape the mongoose adapter uses).
-      const found = await d.findMany({ where, select: { [idField]: true } });
+      const found = await d.findMany({ where, select: keySelect(key) });
       if (found.length === 0) return [];
-      const ids = found.map(row => row[idField]);
-      await d.updateMany({ where: { [idField]: { in: ids } }, data: forUpdate(patch as object) });
-      return (await d.findMany({ where: { [idField]: { in: ids } } })) as Row<TDelegate>[];
+      const keyed = keyedIn(key, found);
+      await d.updateMany({ where: keyed, data: forUpdate(patch as object) });
+      return (await d.findMany({ where: keyed })) as Row<TDelegate>[];
     },
 
     async deleteById(id: Id, idKey: string = "id") {
-      const idField = requireIdField("deleteById");
+      const key = requirePrimaryKey("deleteById");
       const d = delegate();
       const target = await d.findFirst({ where: composeWhere(withId(undefined, idKey, id)) });
       if (!target) return undefined;
-      return (await d.delete({ where: uniqueById(idField, target) })) as Row<TDelegate>;
+      return (await d.delete({ where: uniqueWhere(key, target) })) as Row<TDelegate>;
     },
 
     async deleteWhere(filter: Filter<TDelegate>) {
-      const idField = requireIdField("deleteWhere");
+      const key = requirePrimaryKey("deleteWhere");
       const d = delegate();
       const where = composeWhere(filter);
       const rows = await d.findMany({ where });
       if (rows.length === 0) return [];
-      await d.deleteMany({ where: { [idField]: { in: rows.map(row => row[idField]) } } });
+      await d.deleteMany({ where: keyedIn(key, rows) });
       return rows as Row<TDelegate>[];
     },
 
@@ -550,11 +577,11 @@ export function buildRepository<TDelegate>(runtime: RepoRuntime, modelKey: strin
    * its primary key.
    */
   async function updateOne(where: Where | undefined, data: Record<string, unknown>, method: string): Promise<Row<TDelegate> | undefined> {
-    const idField = requireIdField(method);
+    const key = requirePrimaryKey(method);
     const d = delegate();
-    const target = await d.findFirst({ where, select: { [idField]: true } });
+    const target = await d.findFirst({ where, select: keySelect(key) });
     if (!target) return undefined;
-    return (await d.update({ where: uniqueById(idField, target), data })) as Row<TDelegate>;
+    return (await d.update({ where: uniqueWhere(key, target), data })) as Row<TDelegate>;
   }
 
   return repository as unknown as Repository<TDelegate>;

@@ -59,14 +59,14 @@ export const registry = createRegistry(prisma);
 
 ### 2. Repository (per model)
 
-A model is taken by its **delegate key** — Prisma's own camelCase naming: `User` → `"user"`, `LegalEntity` → `"legalEntity"`.
+A model is taken by its **handle**, the way drizzle-pg takes a table object and mongoose takes a `Model`. Its name (the delegate key, camelCase) works too: `User` → `"user"`, `LegalEntity` → `"legalEntity"`.
 
 ```ts
 // db/users.repository.ts
-import { registry } from "./registry";
+import { prisma, registry } from "./registry";
 
-export const usersRepository = registry.repository("user");
-//                                               ^ autocompleted from your PrismaClient
+export const usersRepository = registry.repository(prisma.user);
+// …or by name: registry.repository("user") — the two are equivalent
 
 // with custom methods:
 export const postsRepository = registry.repository("post", base => ({

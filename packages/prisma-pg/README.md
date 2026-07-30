@@ -59,14 +59,14 @@ export const registry = createRegistry(prisma);
 
 ### 2. Repository (model bo'yicha)
 
-Model **delegate kaliti** bilan olinadi — Prisma'ning o'z nomlash uslubi (camelCase): `User` → `"user"`, `LegalEntity` → `"legalEntity"`.
+Model **handle** bilan olinadi — `drizzle-pg` jadval obyektini, `mongoose` esa `Model`ni qabul qilgani kabi. Nom (delegate kaliti, camelCase) ham qabul qilinadi: `User` → `"user"`, `LegalEntity` → `"legalEntity"`.
 
 ```ts
 // db/users.repository.ts
-import { registry } from "./registry";
+import { prisma, registry } from "./registry";
 
-export const usersRepository = registry.repository("user");
-//                                               ^ PrismaClient kalitlaridan autocomplete
+export const usersRepository = registry.repository(prisma.user);
+// …yoki nomi bilan: registry.repository("user") — ikkalasi bir xil
 
 // custom metodlar bilan:
 export const postsRepository = registry.repository("post", base => ({

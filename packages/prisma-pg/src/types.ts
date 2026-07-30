@@ -410,10 +410,14 @@ export interface Registry<TClient extends AnyClient = AnyClient> {
   readonly client: TClient;
 
   /**
-   * Repository for a model, by its Prisma delegate key (camelCase).
+   * Repository for a model — addressed either by the model handle
+   * (`prisma.user`, like the drizzle-pg and mongoose registries take a table or
+   * a Model) or by its Prisma delegate key (`"user"`, camelCase).
    *
    * @example
    * ```ts
+   * export const usersRepository = registry.repository(prisma.user);
+   * // …or, equivalently:
    * export const usersRepository = registry.repository("user");
    * ```
    */
@@ -434,6 +438,19 @@ export interface Registry<TClient extends AnyClient = AnyClient> {
     options: RepositoryOptions<DelegateOf<TClient, TKey>>,
     extend: RepositoryExtender<DelegateOf<TClient, TKey>, TExt>,
   ): Repository<DelegateOf<TClient, TKey>> & TExt;
+
+  /* …and the same four, addressed by the model handle itself (`prisma.user`). */
+  repository<TDelegate extends AnyDelegate>(model: TDelegate): Repository<TDelegate>;
+  repository<TDelegate extends AnyDelegate, TExt extends Record<string, unknown>>(
+    model: TDelegate,
+    extend: RepositoryExtender<TDelegate, TExt>,
+  ): Repository<TDelegate> & TExt;
+  repository<TDelegate extends AnyDelegate>(model: TDelegate, options: RepositoryOptions<TDelegate>): Repository<TDelegate>;
+  repository<TDelegate extends AnyDelegate, TExt extends Record<string, unknown>>(
+    model: TDelegate,
+    options: RepositoryOptions<TDelegate>,
+    extend: RepositoryExtender<TDelegate, TExt>,
+  ): Repository<TDelegate> & TExt;
 
   /**
    * Runs `fn` inside a Prisma interactive transaction. Repositories used inside

@@ -84,7 +84,12 @@ console.log("\n=== 1. model metadata ===");
   check("updatedAt stamped when not @updatedAt", postMeta.stampUpdatedAt === "updatedAt");
   check("resolveField: known field", resolveField(userMeta, "email") === "email");
   check("resolveField: unknown field → undefined", resolveField(userMeta, "nope") === undefined);
-  check("resolveField: DB column name is NOT accepted (Prisma takes field names)", resolveField(userMeta, "created_at") === undefined);
+  // A @mapped DB column resolves to its Prisma field, matching drizzle-pg's
+  // `resolveColumn` (which accepts either form). The query still uses the field.
+  check("resolveField: @mapped DB column resolves to the field", resolveField(postMeta, "author_id") === "authorId");
+  check("resolveField: @mapped column on a filter", eq(buildWhere(postMeta, [{ key: "created_at", operation: "isNull" }]), { createdAt: { equals: null } }));
+  check("resolveField: @mapped column on the other model too", resolveField(userMeta, "created_at") === "createdAt");
+  check("resolveField: a name that is neither field nor column stays unknown", resolveField(postMeta, "nope_at") === undefined);
   check("isDateField / isStringField", isDateField(userMeta, "createdAt") && isStringField(userMeta, "name") && !isStringField(userMeta, "age"));
 
   // D7: "id" maps to the model's @id field even when it is named differently.
@@ -771,6 +776,18 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
     softErr = (err as Error).message;
   }
   check("softDelete on a model without deletedAt throws", softErr.includes("no deletedAt"));
+
+  // An unresolvable idKey must never degrade into "no predicate" — that would
+  // let updateById/deleteById hit an arbitrary row.
+  const idGuard = spyOf([{ id: 1 }], { findFirst: { id: 1 } });
+  const idRepo = createRegistry(idGuard.client as never).repository("user" as never);
+  let idErr = "";
+  try {
+    await idRepo.updateById(1, {} as never, "nope" as never);
+  } catch (err) {
+    idErr = (err as { code?: string }).code ?? "";
+  }
+  check("an unknown idKey is fatal, not skipped", idErr === "QUERYKIT_INVALID_CONDITION" && !idGuard.calls.some(c => c.method === "update"), idErr);
 
   const miss = spyOf([], { findFirst: null });
   check(
