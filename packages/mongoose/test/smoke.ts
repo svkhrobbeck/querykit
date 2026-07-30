@@ -295,6 +295,41 @@ async function main() {
       await usersRepo.create({ name: "TxCommit", email: "txc@x.com", age: 1 });
     });
     check("transaction commit", (await usersRepo.count()) === before + 1);
+
+    // wire (ISO string) date filters — parity with the drizzle adapter's P0-1
+    // cases (test/smoke.ts §13/§14 there, test/sql.ts for the SQL-level ones).
+    // Mongoose casts filter values itself, so these lock the behaviour in place
+    // rather than relying on mongoose internals.
+    const total = await usersRepo.count();
+    const pastIso = new Date(Date.now() - 3_600_000).toISOString();
+    const futureIso = new Date(Date.now() + 3_600_000).toISOString();
+
+    check("timestamp filter: >= ISO string", (await usersRepo.findAll({ filter: [uf.gte("createdAt", pastIso)] })).length === total);
+    check("timestamp filter: <= ISO string", (await usersRepo.findAll({ filter: [uf.lte("createdAt", futureIso)] })).length === total);
+    check("timestamp filter: between ISO tuple", (await usersRepo.findAll({ filter: [uf.between("createdAt", pastIso, futureIso)] })).length === total);
+    check("timestamp filter: >= future ISO excludes all", (await usersRepo.findAll({ filter: [uf.gte("createdAt", futureIso)] })).length === 0);
+    check("timestamp filter: notBetween ISO tuple", (await usersRepo.findAll({ filter: [uf.notBetween("createdAt", pastIso, futureIso)] })).length === 0);
+    check("timestamp filter: in ISO array does not crash", Array.isArray(await usersRepo.findAll({ filter: [uf.in("createdAt", [pastIso, futureIso])] })));
+    check("timestamp filter: Date object still works", (await usersRepo.findAll({ filter: [uf.lte("createdAt", new Date(futureIso))] })).length === total);
+    check(
+      "timestamp filter: uncastable value is skipped, not crashed",
+      (await usersRepo.findAll({ filter: [uf.gte("createdAt", "not-a-date")] })).length === total,
+    );
+    // Mongo cannot regex a Date path, so a text pattern on a date is skipped
+    // rather than crashing. Drizzle *can* match it (Postgres renders the
+    // timestamp as text), so this is a documented divergence, not parity.
+    check(
+      "timestamp filter: text pattern on a date path is skipped, not crashed",
+      (await usersRepo.findAll({ filter: [uf.contains("createdAt", "20")] })).length === total,
+    );
+
+    // cursor pagination over a timestamp path — parity with drizzle §14.
+    const tc1 = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc" });
+    check("cursor on timestamp key: page 1 + token", tc1.data.length === 2 && typeof tc1.meta.next_cursor === "string");
+    const tc2 = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc", cursor: tc1.meta.next_cursor });
+    check("cursor on timestamp key: page 2 does not crash", Array.isArray(tc2.data));
+    const tcBack = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc", cursor: tc1.meta.next_cursor, direction: "backward" });
+    check("cursor on timestamp key: backward does not crash", Array.isArray(tcBack.data));
   } finally {
     await mongoose.disconnect();
     await replset.stop();

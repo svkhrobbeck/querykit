@@ -187,6 +187,41 @@ async function main() {
     const aliCount = agg.find(r => r.authorId === ali!.id)?.count;
     check("aggregate count by group", typeof aliCount === "number" && aliCount > 0, `ali posts=${aliCount}`);
 
+    // 13. wire (ISO string) date filters on a timestamp column — P0-1.
+    // `createdAt` is timestamp(mode:"date"), so before the fix drizzle called
+    // `value.toISOString()` on the string and the whole request 500'd.
+    // The SQL-level variants (mode:"string", text operators, param values) live
+    // in test/sql.ts, which needs no database.
+    const total = await usersRepo.count();
+    const pastIso = new Date(Date.now() - 3_600_000).toISOString();
+    const futureIso = new Date(Date.now() + 3_600_000).toISOString();
+
+    check("timestamp filter: >= ISO string", (await usersRepo.findAll({ filter: [uf.gte("createdAt", pastIso)] })).length === total);
+    check("timestamp filter: <= ISO string", (await usersRepo.findAll({ filter: [uf.lte("createdAt", futureIso)] })).length === total);
+    check("timestamp filter: between ISO tuple", (await usersRepo.findAll({ filter: [uf.between("createdAt", pastIso, futureIso)] })).length === total);
+    check("timestamp filter: >= future ISO excludes all", (await usersRepo.findAll({ filter: [uf.gte("createdAt", futureIso)] })).length === 0);
+    check("timestamp filter: notBetween ISO tuple", (await usersRepo.findAll({ filter: [uf.notBetween("createdAt", pastIso, futureIso)] })).length === 0);
+    check("timestamp filter: in ISO array does not crash", Array.isArray(await usersRepo.findAll({ filter: [uf.in("createdAt", [pastIso, futureIso])] })));
+    check("timestamp filter: Date object still works", (await usersRepo.findAll({ filter: [uf.lte("createdAt", new Date(futureIso))] })).length === total);
+    check(
+      "timestamp filter: uncastable value is skipped, not crashed",
+      (await usersRepo.findAll({ filter: [uf.gte("createdAt", "not-a-date")] })).length === total,
+    );
+    // Postgres renders the timestamp as text, so ILIKE works here. Mongo cannot
+    // regex a Date path and skips the condition instead — a documented divergence
+    // (see the mongoose adapter's buildCondition).
+    check("timestamp filter: text pattern keeps the raw string", (await usersRepo.findAll({ filter: [uf.contains("createdAt", "20")] })).length === total);
+
+    // 14. cursor pagination over a timestamp column — the second P0-1 site.
+    // A token stores the date as an ISO string, so page 2 crashed before the fix.
+    // Rows may share a `now()` timestamp, so only reachability is asserted.
+    const tc1 = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc" });
+    check("cursor on timestamp key: page 1 + token", tc1.data.length === 2 && typeof tc1.meta.next_cursor === "string");
+    const tc2 = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc", cursor: tc1.meta.next_cursor });
+    check("cursor on timestamp key: page 2 does not crash", Array.isArray(tc2.data));
+    const tcBack = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc", cursor: tc1.meta.next_cursor, direction: "backward" });
+    check("cursor on timestamp key: backward does not crash", Array.isArray(tcBack.data));
+
     console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);
   } finally {
     await client.unsafe(`DROP SCHEMA IF EXISTS qk_smoke CASCADE`);

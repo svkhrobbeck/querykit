@@ -24,6 +24,7 @@ import type {
   SortDirection,
   UpsertOptions,
 } from "./types";
+import { castForColumn, INVALID_VALUE } from "./internal/coerce";
 import { getTableKey, resolveColumn } from "./internal/columns";
 import { encodeCursor, decodeCursor } from "./internal/cursor";
 import { buildOrderBy } from "./internal/order-by";
@@ -257,7 +258,12 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       const column = resolveColumn(table, cursorKey);
       if (!column) throw new Error(`findCursor: unknown cursorKey "${cursorKey}".`);
 
-      const cursorValue = decodeCursor(params.cursor);
+      // A cursor token carries dates as ISO strings, so re-cast to the column's
+      // type — otherwise `gt(timestampColumn, "2026-…")` crashes in drizzle's
+      // driver mapping and page 2 of a date-keyed feed 500s. A token that does
+      // not fit the column is treated as "no cursor" (like an undecodable one).
+      const decoded = castForColumn(column, decodeCursor(params.cursor));
+      const cursorValue = decoded === INVALID_VALUE ? undefined : decoded;
       const baseWhere = composeWhere(params.filter, params.withDeleted);
 
       const ascInQuery = direction === "forward" ? order === "asc" : order === "desc";

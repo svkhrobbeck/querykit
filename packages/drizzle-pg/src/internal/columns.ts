@@ -31,6 +31,25 @@ export function resolveColumn(table: AnyPgTable, key: string): AnyPgColumn | und
   return undefined;
 }
 
+/**
+ * Cast a wire (JSON) value to the column's type — an ISO string / epoch number
+ * becomes a `Date`. Drizzle maps `timestamp`/`date` columns in `mode: "date"` to
+ * a JS `Date` and calls `.toISOString()` when handing the value to the driver, so
+ * a plain string crashes there. `mode: "string"` columns report
+ * `dataType: "string"` and are therefore left untouched automatically.
+ *
+ * An unparseable string is returned unchanged (drizzle reports it) — see
+ * `coerceCondition` for the operator-aware wrapper. Mirrors the mongoose
+ * adapter's `castValue` contract.
+ */
+export function castValue(column: AnyPgColumn, value: unknown): unknown {
+  if (column.dataType !== "date") return value;
+  if (value === null || value === undefined || value instanceof Date) return value;
+  if (typeof value !== "string" && typeof value !== "number") return value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date;
+}
+
 /** All real columns of a table, keyed by JS property name. */
 export function tableColumns(table: AnyPgTable): Array<[string, AnyPgColumn]> {
   const out: Array<[string, AnyPgColumn]> = [];

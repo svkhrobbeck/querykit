@@ -29,6 +29,41 @@ check(
   uf.like("name", "a%").operation === "like" && uf.ilike("name", "a").operation === "ilike" && uf.notLike("name", "a").operation === "notLike",
 );
 check("between → [min,max]", eq(uf.between("age", 18, 65).value, [18, 65]));
+check("notBetween → [min,max]", uf.notBetween("age", 18, 65).operation === "notBetween" && eq(uf.notBetween("age", 18, 65).value, [18, 65]));
+check(
+  "har bir FILTER_OPERATORS uchun builder bor (alias bundan mustasno)",
+  (() => {
+    const emitted = new Set<string>();
+    for (const cond of [
+      uf.eq("age", 1),
+      uf.ne("age", 1),
+      uf.gt("age", 1),
+      uf.gte("age", 1),
+      uf.lt("age", 1),
+      uf.lte("age", 1),
+      uf.contains("name", "a"),
+      uf.startsWith("name", "a"),
+      uf.endsWith("name", "a"),
+      uf.like("name", "a"),
+      uf.ilike("name", "a"),
+      uf.notLike("name", "a"),
+      uf.in("age", [1]),
+      uf.notIn("age", [1]),
+      uf.between("age", 1, 2),
+      uf.notBetween("age", 1, 2),
+      uf.isNull("age"),
+      uf.isNotNull("age"),
+    ]) {
+      emitted.add(cond.operation!);
+    }
+    // Aliaslar builderdan chiqmaydi — ular faqat wire'da qabul qilinadi:
+    // `eq`/`gt`/… nomlari tokenlarning (`=`/`>`) aliasi, `contains`/`startsWith`/
+    // `endsWith` esa `%_%`/`%_`/`_%` tokenlarining aliasi.
+    const aliases = new Set(["eq", "ne", "gt", "gte", "lt", "lte", "contains", "startsWith", "endsWith"]);
+    const missing = FILTER_OPERATORS.filter(op => !aliases.has(op) && !emitted.has(op));
+    return missing.length === 0;
+  })(),
+);
 check(
   "range → two conditions",
   eq(uf.range("createdAt", "x", "y"), [

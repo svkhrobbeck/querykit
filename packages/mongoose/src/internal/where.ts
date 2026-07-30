@@ -1,4 +1,5 @@
 import type { Filter, FieldCondition, FilterNode } from "../types";
+import { coerceCondition, INVALID_VALUE, isDatePath, isTextOperator } from "./coerce";
 import { operators } from "./operators";
 import { resolveField, type AnyModel } from "./fields";
 
@@ -23,7 +24,20 @@ function buildCondition(model: AnyModel, cond: FieldCondition): Query | undefine
   if (!build) throw new Error(`Unsupported filter operator: "${operator}"`);
   const field = resolveField(model, cond.key);
   if (!field) return undefined; // unknown field → skip silently
-  const fragment = build(cond.value);
+  // A text pattern cannot be matched against a Date path: Mongo rejects
+  // `$regex`/`$options` on a Date ("Can't use $options with Date"), which used to
+  // surface as a 500. Drizzle can do it (Postgres renders the timestamp as text
+  // and ILIKEs it), so exact result parity is not reachable here — the rendered
+  // forms differ. Skipping keeps both adapters non-crashing and makes the
+  // difference observable via `onSkippedCondition` instead of a stack trace.
+  if (isTextOperator(operator) && isDatePath(model, field)) return undefined;
+
+  // Cast wire (JSON) values to the path's type first, matching the drizzle
+  // adapter — text-pattern operators keep their raw string.
+  const value = coerceCondition(model, field, operator, cond.value);
+  if (value === INVALID_VALUE) return undefined; // uncastable value → skip silently
+
+  const fragment = build(value);
   if (fragment === undefined) return undefined;
   return { [field]: fragment };
 }

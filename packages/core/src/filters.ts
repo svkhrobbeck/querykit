@@ -38,6 +38,7 @@ export function createFilters<TKey extends string = string, TRaw = never>() {
     in: (key: TKey, value: Array<string | number>) => field(key, "in", value),
     notIn: (key: TKey, value: Array<string | number>) => field(key, "notIn", value),
     between: (key: TKey, min: FilterScalar | Date, max: FilterScalar | Date) => field(key, "between", [min, max] as FilterValue),
+    notBetween: (key: TKey, min: FilterScalar | Date, max: FilterScalar | Date) => field(key, "notBetween", [min, max] as FilterValue),
     /** Diapazon — ikkita shart (`>=` va `<=`) massivi (flat filterga spread qilinadi). */
     range: (key: TKey, from: FilterScalar | Date, to: FilterScalar | Date): FieldCondition<TKey>[] => [
       field(key, ">=", from as FilterValue),

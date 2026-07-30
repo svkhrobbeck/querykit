@@ -2,6 +2,7 @@ import { and, or, not, isSQLWrapper, type SQL } from "drizzle-orm";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 
 import type { FieldCondition, Filter, FilterNode } from "../types";
+import { coerceCondition, INVALID_VALUE } from "./coerce";
 import { resolveColumn } from "./columns";
 import { operators } from "./operators";
 
@@ -53,7 +54,13 @@ function buildCondition(table: AnyPgTable, condition: FieldCondition): SQL | und
   const column = resolveColumn(table, condition.key);
   if (!column) return undefined; // unknown column → skip silently
 
-  return build(column, condition.value);
+  // Wire values are always JSON (no Date), so cast to the column's type first —
+  // a `timestamp`/`date` column in `mode: "date"` otherwise crashes in drizzle's
+  // driver mapping. Covers scalars, `in` arrays and `between` tuples at once.
+  const value = coerceCondition(column, operator, condition.value);
+  if (value === INVALID_VALUE) return undefined; // uncastable value → skip silently
+
+  return build(column, value);
 }
 
 function combine(kind: "and" | "or", parts: Array<SQL | undefined>): SQL | undefined {

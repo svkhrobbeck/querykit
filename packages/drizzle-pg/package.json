@@ -42,6 +42,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test:sql": "bun run test/sql.ts",
     "test:smoke": "bun run test/smoke.ts"
   },
   "dependencies": {
