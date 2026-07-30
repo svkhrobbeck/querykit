@@ -1,0 +1,41 @@
+// Fixture schema for @querykitjs/prisma-pg tests. Generated offline (no database
+// needed): `bun run test:generate`. The generated client is gitignored.
+//
+// `@map`/`@@map` are deliberate: Prisma's `where` expects the *model field* name
+// (camelCase), never the DB column — `resolveField` is pinned against that.
+// `users` has no `deletedAt` (soft-delete unavailable path), `posts` has one.
+// `updatedAt` is a plain field, NOT `@updatedAt`, so the adapter's manual bump is
+// exercised.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  age       Int?
+  createdAt DateTime @default(now()) @map("created_at")
+  posts     Post[]
+
+  @@map("users")
+}
+
+model Post {
+  id        Int       @id @default(autoincrement())
+  title     String
+  authorId  Int       @map("author_id")
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("posts")
+}

@@ -6,6 +6,9 @@ dist
 *.tgz
 *.tsbuildinfo
 
+# generated Prisma client (test fixture — recreated by `bun run test:generate`)
+packages/prisma-pg/test/prisma/generated
+
 # coverage
 coverage
 *.lcov
