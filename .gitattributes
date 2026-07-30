@@ -1,0 +1,10 @@
+# Line endings are LF in the index (they always have been) — declare it, so a
+# Windows checkout with core.autocrlf=true does not materialize CRLF working-tree
+# files that then fail `bun run format:check` (prettier defaults to endOfLine: lf).
+* text=auto eol=lf
+
+# Binary/lock files: no conversion, no diff noise.
+bun.lock -text -diff
+*.png binary
+*.jpg binary
+*.ico binary
