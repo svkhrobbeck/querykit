@@ -42,7 +42,58 @@ Use `infiniteParamsSchema` / `cursorParamsSchema` for the other modes.
 - **`with`** (relations), **`columns`**, **`withDeleted`**.
 - The legacy `type` field is **ignored** (stripped, not rejected) — easy migration.
 
-## Schemas
+## Factories (recommended)
+
+The constant schemas are unbounded: `perPage` has no ceiling, and
+`columns`/`with`/`withDeleted` are accepted from the client. The factories are
+**safe by default**:
+
+```ts
+import { makeOffsetParamsSchema, makeInfiniteParamsSchema, makeCursorParamsSchema } from "@querykitjs/zod";
+
+const listSchema = makeOffsetParamsSchema(); // perPage ≤ 200; no columns/with/withDeleted
+type ListParams = z.infer<typeof listSchema>;
+
+// change the ceiling
+const bigList = makeOffsetParamsSchema({ maxPerPage: 500 });
+
+// deliberately open a server-owned field (it appears in the type too)
+const adminList = makeOffsetParamsSchema({ allow: ["withDeleted"] });
+```
+
+| Option       | Default                           | Meaning                                          |
+| ------------ | --------------------------------- | ------------------------------------------------ |
+| `maxPerPage` | core `DEFAULT_MAX_PER_PAGE` (200) | upper bound for `perPage`                        |
+| `maxLimit`   | core `DEFAULT_MAX_LIMIT` (200)    | upper bound for `limit` (infinite/cursor)        |
+| `allow`      | `[]`                              | open up `"columns"` / `"with"` / `"withDeleted"` |
+
+**Why they are closed by default:**
+
+- `columns` — a client could ask for `{ password: true }`;
+- `with` — a client could pull any relation (data exposure);
+- `withDeleted` — a client could switch off the soft-delete guard.
+
+If you do open one, pair `allow` with the **repository-level second layer**:
+`forcedColumns` / `allowedColumns`
+([drizzle-pg](../drizzle-pg/README.en.md) · [mongoose](../mongoose/README.en.md)).
+
+`maxPerPage: Infinity` removes the ceiling entirely — ⚠️ uncapped pagination is a
+DoS surface, since one request can ask for the whole table. Both backend
+repositories clamp from the same core constant, so the protection holds even if
+validation is bypassed.
+
+Output types: `MadeOffsetParams<TAllow>` / `MadeInfiniteParams` /
+`MadeCursorParams` (and the schema types `OffsetParamsSchema<TAllow>`, …).
+
+> Do **not** use `ReturnType<typeof makeOffsetParamsSchema>` — for a function with
+> a `const` type parameter TypeScript resolves it to `any`. Use
+> `z.infer<typeof listSchema>` or `MadeOffsetParams<...>`.
+
+## Schemas (constants — legacy parity)
+
+⚠️ The constants below have **no cap** and keep `columns`/`with`/`withDeleted`
+**open**. They are left untouched so existing projects keep working; new code
+should use the factories above.
 
 | Schema                              | Purpose                                            |
 | ----------------------------------- | -------------------------------------------------- |

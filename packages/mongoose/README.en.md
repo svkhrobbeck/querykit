@@ -83,7 +83,21 @@ export const registry = createRegistry(mongoose.connection);
 // export const registry = createRegistry(mongoose.connection, { defaultPerPage: 20, defaultLimit: 20 });
 ```
 
-`defaultPerPage` (findList) / `defaultLimit` (infinite/cursor) fall back to `@querykitjs/core`'s **20** when omitted. The `connection` is passed in (so transactions share the right session).
+The `connection` is passed in (so transactions share the right session).
+
+**`createRegistry` options** — identical to the drizzle-pg adapter:
+
+| Option               | Default                           | Meaning                                                      |
+| -------------------- | --------------------------------- | ------------------------------------------------------------ |
+| `defaultPerPage`     | core `DEFAULT_PER_PAGE` (20)      | `findList` page size                                         |
+| `defaultLimit`       | core `DEFAULT_LIMIT` (20)         | `findInfinite`/`findCursor` limit                            |
+| `maxPerPage`         | core `DEFAULT_MAX_PER_PAGE` (200) | upper bound for `perPage` (`Infinity` disables it)           |
+| `maxLimit`           | core `DEFAULT_MAX_LIMIT` (200)    | upper bound for `limit`                                      |
+| `strict`             | `false`                           | unknown key → `QueryKitError` (400) instead of a silent drop |
+| `onSkippedCondition` | —                                 | callback for every dropped condition                         |
+
+`maxPerPage`/`maxLimit` are a **second layer**: even if validation
+(`@querykitjs/zod` factories) is bypassed, the repository clamps.
 
 ### 2. Per-model repositories
 
@@ -96,6 +110,77 @@ export const usersRepository = registry.repository(User, base => ({
   findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
 }));
 ```
+
+`repository()` takes four shapes (the same as the drizzle-pg adapter):
+
+```ts
+registry.repository(User);                            // plain
+registry.repository(User, base => ({ … }));           // + custom methods
+registry.repository(User, options);                   // + per-repo options
+registry.repository(User, options, base => ({ … }));  // both
+```
+
+### 3. Projection guards (`RepositoryOptions`)
+
+`columns` can arrive straight from the client, so the safe selection is declared
+on the **repository** — where `scope` (RBAC) already lives:
+
+```ts
+export const usersRepository = registry.repository(User, {
+  forcedColumns: { _id: true, fullName: true, email: true }, // password can never come out
+});
+
+// or softer: the client picks, but only from this list
+export const postsRepository = registry.repository(Post, {
+  allowedColumns: ["_id", "title", "createdAt"],
+});
+```
+
+| Option           | Behaviour                                                                     |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `forcedColumns`  | the client's `columns` is **ignored entirely**                                |
+| `allowedColumns` | the client's selection is **intersected**; empty intersection → the allowlist |
+| `scope`          | constant equality filter on every read/write (also available via `scoped()`)  |
+| `relations`      | populatable relations (type-only — drives `with` inference)                   |
+
+Details worth knowing:
+
+- An empty intersection yields the allowlist, **not the full document**.
+- `aggregate` is guarded too: `min("password")` or `groupBy: "password"` leaks as
+  much as a projection.
+- `cursorKey` comes from the client and the cursor field must be selected for
+  pagination — under a guard it stays in the query but is **stripped** from the
+  documents you get back.
+- `forcedColumns: {}` or `allowedColumns: []` **throws** when the repository is built.
+
+### 4. Bad conditions: watch them, or refuse them
+
+An unknown filter/sort key is **dropped silently** by default. The catch: a filter
+is meant to _narrow_ a result set, so a mistyped key that vanishes makes the
+endpoint return **more** data than intended.
+
+```ts
+// step 1: watch (behaviour unchanged)
+createRegistry(mongoose.connection, {
+  onSkippedCondition: info => logger.warn({ querykit: info }, "condition dropped"),
+});
+
+// step 2: once the log is clean — strict mode
+createRegistry(mongoose.connection, { strict: true });
+```
+
+```ts
+import { QueryKitError } from "@querykitjs/core";
+
+try {
+  return await usersRepository.findList(params);
+} catch (err) {
+  if (err instanceof QueryKitError) return c.json({ error: err.message, info: err.info }, 400);
+  throw err;
+}
+```
+
+A `scope` or `cursorKey` key is **always** fatal, regardless of `strict`.
 
 ## MongoDB specifics
 
@@ -185,6 +270,36 @@ const mine = roadmapsRepository.scoped({ supervisorId: user.id });
 await mine.findList({ page: 1 }); // { supervisorId: user.id, ... }
 await mine.create({ ... });        // supervisorId forced to user.id
 ```
+
+A scope can also be given as `registry.repository(Model, { scope })`. An unknown
+scope key **throws** when the repository is built — dropping it silently would
+remove the RBAC filter.
+
+## Wire (JSON) values and migrating from DbService
+
+A request body is JSON, so a date always arrives as a **string**. The adapter
+casts it according to the schema path:
+
+```json
+{ "key": "createdAt", "operation": "<=", "value": "2026-07-28T12:00:00.000Z" }
+```
+
+- `Date` paths get the ISO string cast to a `Date`. The scope is **deliberately**
+  the same as drizzle-pg's: each adapter only judges the types it maps through JS
+  and leaves the rest to the database.
+- `in`/`notIn` arrays, `between`/`notBetween` tuples and cursor tokens are covered
+  too (`cursorKey: "createdAt"` paginates correctly).
+- ⚠️ **Documented divergence:** Mongo cannot `$regex` a `Date` path
+  (`Can't use $options with Date`), so a text-pattern operator
+  (`contains`/`ilike`/…) on a date field is **skipped**. drizzle-pg _can_ match it
+  (Postgres renders the timestamp as text). Neither adapter crashes, and the
+  difference shows up in `onSkippedCondition`.
+- An unparseable value (`"not-a-date"`) drops the condition (or 400s under
+  `strict`). **One** bad element in an `in` list drops the whole condition.
+
+**Migrating from DbService:** the old wire's `type: "date"` field is no longer
+needed — `@querykitjs/zod` strips it (without erroring) and coercion happens
+server-side from the path type.
 
 ## Soft-delete
 
