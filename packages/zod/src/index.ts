@@ -8,7 +8,7 @@
  */
 import { z } from "zod";
 import { FILTER_OPERATORS } from "@querykitjs/core";
-import type { FieldCondition, Filter, FilterNode, FilterOperator, FilterValue } from "@querykitjs/core";
+import type { FieldCondition, Filter, FilterNode, FilterOperator, FilterValue, WireCursorParams, WireInfiniteParams, WireOffsetParams } from "@querykitjs/core";
 
 /* --------------------------------- filter --------------------------------- */
 
@@ -99,3 +99,10 @@ type _Op = Expect<z.infer<typeof filterOperatorSchema> extends FilterOperator ? 
 type _Val = Expect<z.infer<typeof filterValueSchema> extends FilterValue ? true : false>;
 type _Cond = Expect<FieldConditionInput extends FieldCondition ? true : false>;
 type _Filter = Expect<FilterInput extends Filter ? true : false>;
+
+/* Schema chiqishi core'ning **wire** param shakllariga mos — backend adapterlari
+ * shu shakllarni qabul qiladi, ya'ni route'da `as` cast kerak emas. Halqa core
+ * orqali yopiladi: zod backendni ko'rmaydi, backend zod'ni ko'rmaydi. */
+type _WireOffset = Expect<OffsetParams extends WireOffsetParams ? true : false>;
+type _WireInfinite = Expect<InfiniteParams extends WireInfiniteParams ? true : false>;
+type _WireCursor = Expect<CursorParams extends WireCursorParams ? true : false>;

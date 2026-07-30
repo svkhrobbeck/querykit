@@ -4,7 +4,7 @@
  *
  *   bun run test/smoke.ts
  */
-import { createFilters, f } from "../src/index";
+import { createFilters, f, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, FILTER_OPERATORS, QueryKitError, TEXT_FILTER_OPERATORS } from "../src/index";
 import type { FieldCondition } from "../src/types";
 
 let passed = 0;
@@ -47,6 +47,33 @@ check("not group", "not" in notNode);
 
 /* untyped f */
 check("untyped f works", (f.eq("k", 1) as FieldCondition).operation === "=");
+
+/* cap defaults — yagona manba (zod factory + ikkala backend + web shundan oladi) */
+check("cap defaults", DEFAULT_MAX_PER_PAGE === 200 && DEFAULT_MAX_LIMIT === 200);
+
+/* text operatorlar ro'yxati — adapterlar date coercion'da shularni chetlab o'tadi */
+check(
+  "TEXT_FILTER_OPERATORS ⊂ FILTER_OPERATORS",
+  TEXT_FILTER_OPERATORS.length === 9 && TEXT_FILTER_OPERATORS.every(op => (FILTER_OPERATORS as readonly string[]).includes(op)),
+);
+check(
+  "TEXT_FILTER_OPERATORS token va nom aliaslarini ham qamraydi",
+  ["like", "ilike", "notLike", "contains", "startsWith", "endsWith", "%_%", "%_", "_%"].every(op => (TEXT_FILTER_OPERATORS as readonly string[]).includes(op)),
+);
+check(
+  "solishtirish operatorlari text emas (cast qilinadi)",
+  !["=", ">=", "<=", "between", "in", "isNull"].some(op => (TEXT_FILTER_OPERATORS as readonly string[]).includes(op)),
+);
+
+/* QueryKitError — strict rejim xatosi (ikkala backend uchun bitta klass) */
+const qkErr = new QueryKitError({ source: "users", site: "filter", key: "nope", operation: "=", reason: "unknown-key" });
+check("QueryKitError instanceof Error + name", qkErr instanceof Error && qkErr instanceof QueryKitError && qkErr.name === "QueryKitError");
+check("QueryKitError code + info", qkErr.code === "QUERYKIT_INVALID_CONDITION" && qkErr.info.key === "nope" && qkErr.info.site === "filter");
+check(
+  "QueryKitError xabari kalit/joy/manbani ko'rsatadi",
+  qkErr.message.includes("unknown-key") && qkErr.message.includes("nope") && qkErr.message.includes("filter") && qkErr.message.includes("users"),
+  qkErr.message,
+);
 
 console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

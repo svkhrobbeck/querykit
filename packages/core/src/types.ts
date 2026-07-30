@@ -10,6 +10,16 @@ import { FILTER_OPERATORS } from "./operators";
 export type FilterOperator = (typeof FILTER_OPERATORS)[number];
 
 /**
+ * Tiplangan kalit, lekin har qanday `string` ham qabul qilinadi. Wire (JSON) har
+ * doim string-keyed keladi va adapterlar noma'lum kalitni baribir skip qiladi —
+ * tip shunchaki haqiqatni aytsin, route'da `as` cast kerak bo'lmasin.
+ *
+ * `(string & {})` — autocomplete'ni saqlaydigan TS trick'i: IDE `TKey`
+ * variantlarini taklif qiladi, boshqa string esa xato bermaydi.
+ */
+export type LooseKey<TKey extends string> = TKey | (string & {});
+
+/**
  * A filter scalar. `Date` is accepted **in-memory** (adapters cast it for local
  * queries); over the JSON wire it serializes to an ISO string, so
  * `@querykitjs/zod` validates scalars **without** `Date` (string/number/boolean/null).
@@ -81,6 +91,62 @@ export interface AggregateSpec<TKey extends string = string, TFilter = unknown> 
   min?: TKey | TKey[];
   max?: TKey | TKey[];
   withDeleted?: boolean;
+}
+
+/* ----------------------------- wire params -------------------------------- */
+/* Client JSON body'sida keladigan shakl: string-keyed va `Date`siz (`FilterScalar`
+ * `Date`ni o'z ichiga oladi — u faqat in-memory chaqiruvlar uchun). `@querykitjs/zod`
+ * chiqishi shu tiplarga mos, adapterlar esa ularni `LooseKey` orqali qabul qiladi.
+ * Shu bilan halqa core orqali yopiladi — zod backendni, backend zod'ni ko'rmaydi. */
+
+/** Paginatsiyasiz umumiy wire params. */
+export interface WireBaseParams {
+  filter?: Filter;
+  sort?: Sort;
+  columns?: Record<string, boolean>;
+  with?: Record<string, unknown>;
+  withDeleted?: boolean;
+}
+
+/** Offset (sahifali) wire params. */
+export interface WireOffsetParams extends WireBaseParams {
+  page?: number;
+  perPage?: number;
+}
+
+/** Infinite-scroll wire params. */
+export interface WireInfiniteParams extends WireBaseParams {
+  limit?: number;
+  offset?: number;
+}
+
+/** Cursor (keyset) wire params — `sort` yo'q, tartib `order` + `direction` bilan. */
+export interface WireCursorParams extends Omit<WireBaseParams, "sort"> {
+  limit?: number;
+  cursor?: string | null;
+  cursorKey?: string;
+  order?: SortDirection;
+  direction?: "forward" | "backward";
+}
+
+/* --------------------------- skip diagnostics ----------------------------- */
+/* Adapterlar noto'g'ri shartni jimgina tashlab yuboradi (DbService-parity). Shu
+ * shakl `onSkippedCondition` hook'i va `strict` rejim xatosi uchun umumiy. */
+
+/** Shart nima uchun tashlab yuborilgani. */
+export type SkipReason = "unknown-key" | "invalid-value";
+
+/** Shart qayerda tashlab yuborilgani. */
+export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate";
+
+/** Tashlab yuborilgan bitta shart haqida ma'lumot. */
+export interface SkippedCondition {
+  /** Jadval (drizzle) yoki model (mongoose) nomi. */
+  source: string;
+  site: SkipSite;
+  key: string;
+  operation?: FilterOperator;
+  reason: SkipReason;
 }
 
 /* --------------------- wire meta (server javobi, snake) ------------------- */

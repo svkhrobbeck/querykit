@@ -7,5 +7,6 @@
  */
 export { createFilters, f } from "./filters";
 export * from "./defaults";
+export * from "./errors";
 export * from "./operators";
 export * from "./types";
