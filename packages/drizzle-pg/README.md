@@ -133,6 +133,11 @@ Muhim nozikliklar:
   qatorlardan **olib tashlanadi**.
 - `forcedColumns: {}` yoki `allowedColumns: []` — repository yaratilishida
   **xato**, chunki «hech narsa tanlanmagan» projection «hammasi» degani bo'lardi.
+- ⚠️ Guard **faqat o'qish** metodlariga ta'sir qiladi (`findAll`/`findOne`/
+  `findById`/`findList`/`findInfinite`/`findCursor` + `aggregate`). Yozish
+  metodlari (`create`, `upsert`, `updateById`, `softDelete`, …) tip kontrakti
+  bo'yicha **to'liq qatorni** qaytaradi. Yozish natijasini clientga qaytarishdan
+  oldin `findById` bilan qayta o'qing yoki o'zingiz map qiling.
 
 Shu bilan route'da `{ ...params, columns: SAFE_COLUMNS }` spread-trick'i kerak
 bo'lmaydi (va spread tartibini adashtirib yuborish imkoni yo'q).

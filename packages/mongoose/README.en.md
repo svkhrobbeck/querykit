@@ -152,6 +152,11 @@ Details worth knowing:
   pagination — under a guard it stays in the query but is **stripped** from the
   documents you get back.
 - `forcedColumns: {}` or `allowedColumns: []` **throws** when the repository is built.
+- ⚠️ The guard affects **read** methods only (`findAll`/`findOne`/`findById`/
+  `findList`/`findInfinite`/`findCursor` + `aggregate`). Write methods (`create`,
+  `upsert`, `updateById`, `softDelete`, …) return the **full document** by type
+  contract. Re-read with `findById`, or map it yourself, before handing a write
+  result to a client.
 
 ### 4. Bad conditions: watch them, or refuse them
 

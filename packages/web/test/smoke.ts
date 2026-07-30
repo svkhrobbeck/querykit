@@ -284,5 +284,15 @@ check(
   (createQuery({ maxPerPage: Infinity }).list({ perPage: 10_000 }) as { perPage: number }).perPage === 10_000,
 );
 
+/* createRegistry must be able to configure the cap too — the same option is
+ * available on createQuery, both backend registries and the zod factories. */
+const cappedRegistry = createRegistry({ adapter: "drizzle-pg", defaults: { maxPerPage: 50, maxLimit: 25 } }).resource<{ id: number }>("things");
+check("createRegistry defaults.maxPerPage is honoured", (cappedRegistry.list({ perPage: 10_000 }) as { perPage: number }).perPage === 50);
+check("createRegistry defaults.maxLimit is honoured", (cappedRegistry.infinite({ limit: 10_000 }) as { limit: number }).limit === 25);
+check(
+  "createRegistry without caps falls back to the core default",
+  (createRegistry({ adapter: "drizzle-pg" }).resource<{ id: number }>("t").list({ perPage: 10_000 }) as { perPage: number }).perPage === 200,
+);
+
 console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

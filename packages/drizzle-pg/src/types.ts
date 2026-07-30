@@ -463,6 +463,13 @@ export interface RegistryOptions {
  * Falsafa: himoya **repository'da**, route'da emas — `scope` (RBAC) allaqachon
  * shu yo'lda, projection ham shu yerga tushadi. Mongoose adapteridagi
  * `RepositoryOptions` bilan bir xil nom va bir xil semantika.
+ *
+ * ⚠️ `forcedColumns`/`allowedColumns` **faqat o'qish** metodlariga ta'sir qiladi
+ * (`findAll`/`findOne`/`findById`/`findList`/`findInfinite`/`findCursor` +
+ * `aggregate`). Yozish metodlari (`create`, `upsert`, `updateById`, `softDelete`, …)
+ * tip kontrakti bo'yicha to'liq `Row`ni qaytaradi — runtime'da uni qirqish tipni
+ * yolg'onga aylantirardi. Yozish natijasini clientga qaytarishdan oldin
+ * `findById` bilan qayta o'qing yoki o'zingiz map qiling.
  */
 export interface RepositoryOptions<TTable extends AnyPgTable> {
   /** Har bir o'qish/yozishga qo'shiladigan doimiy tenglik filtri (RBAC / multi-tenancy). */

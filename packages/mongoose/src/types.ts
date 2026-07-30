@@ -157,6 +157,13 @@ export type RelationDocs<TRel extends RelationMap> = { [K in keyof TRel]: DocOf<
  * Philosophy: the guard lives in the **repository**, not the route — `scope`
  * (RBAC) already worked that way and projection joins it. Same names and same
  * semantics as the drizzle-pg adapter's `RepositoryOptions`.
+ *
+ * ⚠️ `forcedColumns`/`allowedColumns` affect **read** methods only
+ * (`findAll`/`findOne`/`findById`/`findList`/`findInfinite`/`findCursor` +
+ * `aggregate`). Write methods (`create`, `upsert`, `updateById`, `softDelete`, …)
+ * return the full `Row` by type contract — trimming it at runtime would make the
+ * type a lie. Re-read with `findById`, or map it yourself, before handing a write
+ * result to a client.
  */
 export interface RepositoryOptions<TDoc = any, TRel extends RelationMap = RelationMap> {
   /** Declare populatable relations (field → model) so `with` types the result. */

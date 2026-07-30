@@ -29,5 +29,6 @@ The existing constants are untouched, so this is additive; smoke cases now pin
 that they still have no cap and still accept all three fields.
 
 `core` gains `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` as the single source for
-the cap, and `@querykitjs/web` clamps from the same constant — so the frontend
+the cap, and `@querykitjs/web` clamps from the same constant (configurable on both `createQuery`
+and `createRegistry`) — so the frontend
 never sends a request the server will reject.

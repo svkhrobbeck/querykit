@@ -152,6 +152,11 @@ Muhim nozikliklar:
   tanlanadi — guard bor bo'lsa u maydon so'rovda qoladi, lekin qaytariladigan
   hujjatlardan **olib tashlanadi**.
 - `forcedColumns: {}` yoki `allowedColumns: []` — repository yaratilishida **xato**.
+- ⚠️ Guard **faqat o'qish** metodlariga ta'sir qiladi (`findAll`/`findOne`/
+  `findById`/`findList`/`findInfinite`/`findCursor` + `aggregate`). Yozish
+  metodlari (`create`, `upsert`, `updateById`, `softDelete`, …) tip kontrakti
+  bo'yicha **to'liq hujjatni** qaytaradi. Yozish natijasini clientga
+  qaytarishdan oldin `findById` bilan qayta o'qing yoki o'zingiz map qiling.
 
 ### 4. Noto'g'ri shartlar: kuzatish yoki rad etish
 

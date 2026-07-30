@@ -130,6 +130,11 @@ Details worth knowing:
   rows you get back.
 - `forcedColumns: {}` or `allowedColumns: []` **throws** when the repository is
   built, because a projection that selects nothing means "select everything".
+- ⚠️ The guard affects **read** methods only (`findAll`/`findOne`/`findById`/
+  `findList`/`findInfinite`/`findCursor` + `aggregate`). Write methods (`create`,
+  `upsert`, `updateById`, `softDelete`, …) return the **full row** by type
+  contract. Re-read with `findById`, or map it yourself, before handing a write
+  result to a client.
 
 That removes the `{ ...params, columns: SAFE_COLUMNS }` trick from routes — along
 with the chance of writing the spread the wrong way round.

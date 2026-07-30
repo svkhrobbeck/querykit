@@ -450,6 +450,21 @@ const q = createQuery({ defaultPerPage: 20, pruneEmpty: true });
 const params = q.list({ filter, page });
 ```
 
+### Pagination bounds
+
+`perPage`/`limit` are **clamped** — by default to `@querykitjs/core`'s
+`DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (200). That is the same constant the
+zod factories and both backend repositories use, so the frontend never sends a
+request the server would reject.
+
+```ts
+createQuery({ maxPerPage: 50, maxLimit: 25 });
+createRegistry({ adapter: "drizzle-pg", defaults: { maxPerPage: 50, maxLimit: 25 } });
+
+// remove the ceiling (⚠️ uncapped pagination is a DoS surface):
+createQuery({ maxPerPage: Infinity });
+```
+
 ## You send the request yourself
 
 The library works only **up to the request**. No transport:

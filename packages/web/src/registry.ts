@@ -96,6 +96,14 @@ export interface RegistryDefaults {
   perPage?: number;
   /** `infinite` + `cursor` page size. */
   limit?: number;
+  /**
+   * `perPage` upper bound (core `DEFAULT_MAX_PER_PAGE` = 200) — the same constant
+   * the zod factories and both backend repositories use, so the frontend never
+   * sends a request the server would reject.
+   */
+  maxPerPage?: number;
+  /** `limit` upper bound (core `DEFAULT_MAX_LIMIT` = 200). */
+  maxLimit?: number;
   /** `list`/`infinite` sort — `[{key,direction}]` or `["-createdAt", "id"]` shorthand. */
   sort?: SortInput;
   /** Cursor-only defaults. */
@@ -141,6 +149,8 @@ export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>)
   const qcfg: QueryConfig = {};
   if (defaults.perPage !== undefined) qcfg.defaultPerPage = defaults.perPage;
   if (defaults.limit !== undefined) qcfg.defaultLimit = defaults.limit;
+  if (defaults.maxPerPage !== undefined) qcfg.maxPerPage = defaults.maxPerPage;
+  if (defaults.maxLimit !== undefined) qcfg.maxLimit = defaults.maxLimit;
   if (sort.length) qcfg.defaultSort = sort; // only override when a real sort is given
   if (config.pruneEmpty !== undefined) qcfg.pruneEmpty = config.pruneEmpty;
   const q = createQuery(qcfg);
