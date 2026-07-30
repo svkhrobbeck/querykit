@@ -7,13 +7,19 @@ function isColumn(value: unknown): value is AnyPgColumn {
 
 /**
  * Find a table's export name in the schema (used as the `db.query` key).
- * Returns `undefined` when the table is not part of the schema.
+ * Matched by **object identity**, the way drizzle keys `db.query`. Returns
+ * `undefined` when the table is not part of the schema.
  */
 export function getTableKey(schema: Record<string, unknown>, table: AnyPgTable): string | undefined {
   for (const [key, value] of Object.entries(schema)) {
     if (value === table) return key;
   }
   return undefined;
+}
+
+/** Whether a schema entry is a table (as opposed to a `relations()` declaration). */
+export function isTable(value: unknown): value is AnyPgTable {
+  return typeof value === "object" && value !== null && Symbol.for("drizzle:IsDrizzleTable") in value;
 }
 
 /**

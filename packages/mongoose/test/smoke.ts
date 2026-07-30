@@ -9,6 +9,7 @@
  * First run downloads a mongod binary (may be slow on a poor connection).
  */
 import mongoose from "mongoose";
+import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 
 import { createRegistry, createFilters } from "../src/index";
@@ -421,6 +422,85 @@ async function main() {
       "an unknown wire key is skipped, not a type error",
       (await usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] })).length === (await usersRepo.count()),
     );
+
+    /* ---------------------- strict mode + diagnostics ----------------------- */
+    /* Parity with drizzle-pg test/sql.ts §22-§27 — same case names, same shapes. */
+    const total2 = await usersRepo.count();
+    check(
+      "default: an unknown key is dropped without throwing",
+      (await usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] })).length === total2,
+    );
+
+    const seen: SkippedCondition[] = [];
+    const watchedRepo = createRegistry(mongoose.connection, { onSkippedCondition: info => seen.push(info) }).repository(User);
+
+    seen.length = 0;
+    await watchedRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] });
+    check(
+      "hook: unknown filter key reported",
+      seen.length === 1 && seen[0]!.key === "nope" && seen[0]!.site === "filter" && seen[0]!.reason === "unknown-key" && seen[0]!.source === "User",
+      JSON.stringify(seen[0]),
+    );
+
+    seen.length = 0;
+    await watchedRepo.findAll({ filter: [{ key: "age", operation: "in", value: 5 }] });
+    check("hook: a non-array `in` value reported as invalid-value", seen.length === 1 && seen[0]!.reason === "invalid-value", JSON.stringify(seen[0]));
+
+    seen.length = 0;
+    await watchedRepo.findAll({ filter: [{ key: "createdAt", operation: ">=", value: "not-a-date" }] });
+    check("hook: an uncastable date reported as invalid-value", seen.length === 1 && seen[0]!.reason === "invalid-value", JSON.stringify(seen[0]));
+
+    seen.length = 0;
+    await watchedRepo.findAll({ sort: [{ key: "nope", direction: "asc" }] });
+    check("hook: unknown sort key reported", seen.length === 1 && seen[0]!.site === "sort" && seen[0]!.key === "nope", JSON.stringify(seen[0]));
+
+    seen.length = 0;
+    await watchedRepo.aggregate({ count: true, groupBy: "nope" as never });
+    check("hook: unknown aggregate key reported", seen.length === 1 && seen[0]!.site === "aggregate", JSON.stringify(seen[0]));
+
+    seen.length = 0;
+    await watchedRepo.findList({
+      filter: [uf.gte("createdAt", pastIso), uf.isNull("age"), uf.isNotNull("name"), uf.in("name", ["Ali Valiyev"])],
+      sort: [{ key: "name", direction: "asc" }],
+      columns: { _id: true, name: true },
+    });
+    check("hook: a valid request reports nothing", seen.length === 0, JSON.stringify(seen));
+
+    const strictRepo = createRegistry(mongoose.connection, { strict: true }).repository(User);
+    const rejects = async (fn: () => Promise<unknown>) => {
+      try {
+        await fn();
+        return undefined;
+      } catch (err) {
+        return err;
+      }
+    };
+
+    const strictUnknown = await rejects(() => strictRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] }));
+    check(
+      "strict: unknown filter key throws QueryKitError",
+      strictUnknown instanceof QueryKitError && strictUnknown.info.reason === "unknown-key" && strictUnknown.code === "QUERYKIT_INVALID_CONDITION",
+      String(strictUnknown),
+    );
+    check("strict: unknown sort key throws", (await rejects(() => strictRepo.findAll({ sort: [{ key: "nope" }] }))) instanceof QueryKitError);
+    check(
+      "strict: uncastable date throws",
+      (await rejects(() => strictRepo.findAll({ filter: [{ key: "createdAt", operation: ">=", value: "nope" }] }))) instanceof QueryKitError,
+    );
+    check("strict: a valid request still works", (await rejects(() => strictRepo.findList({ filter: [uf.gte("createdAt", pastIso)] }))) === undefined);
+
+    const badCursor = await rejects(() => usersRepo.findCursor({ cursorKey: "nope" }));
+    check(
+      "unknown cursorKey throws QueryKitError even without strict",
+      badCursor instanceof QueryKitError && badCursor.info.site === "cursorKey",
+      String(badCursor),
+    );
+
+    check(
+      "an unresolvable scope key is refused at build time",
+      throws(() => registry.repository(User, { scope: { nope: 1 } as never })),
+    );
+    check("a valid scope is accepted", !throws(() => registry.repository(User, { scope: { name: "Ali Valiyev" } })));
   } finally {
     await mongoose.disconnect();
     await replset.stop();

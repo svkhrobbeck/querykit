@@ -1,4 +1,5 @@
 import type { ClientSession, Model } from "mongoose";
+import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 
 import type {
   AggregateRow,
@@ -27,6 +28,7 @@ import type {
 } from "./types";
 import { resolveField, hasPath, castValue, type AnyModel } from "./internal/fields";
 import { buildWhere, type Query } from "./internal/where";
+import { reportSkip, type Diagnostics } from "./internal/diagnostics";
 import { buildSort } from "./internal/order-by";
 import { encodeCursor, decodeCursor } from "./internal/cursor";
 
@@ -40,6 +42,10 @@ export interface RepoRuntime {
   maxPerPage: number;
   /** Upper bound for `limit` (`findInfinite`/`findCursor`). */
   maxLimit: number;
+  /** Throw `QueryKitError` instead of dropping an unresolvable condition. */
+  strict: boolean;
+  /** Called for every dropped condition (also when `strict` is off). */
+  onSkippedCondition?: (info: SkippedCondition) => void;
 }
 
 /**
@@ -72,15 +78,33 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
   const scopeConditions: FieldCondition[] = config.scope
     ? Object.entries(config.scope).map(([key, value]) => ({ key, operation: "=", value: value as never }))
     : [];
+  // A scope is the server's own RBAC / tenancy filter, so a key that does not
+  // resolve must never be dropped: that would silently widen every query on this
+  // repository. Fail when it is configured, not per request, and regardless of
+  // `strict` — this is a programming error, not bad input.
+  for (const condition of scopeConditions) {
+    if (!resolveField(m, condition.key)) {
+      throw new QueryKitError({ source: m.modelName, site: "filter", key: condition.key, reason: "unknown-key" });
+    }
+  }
   const scopeWhere = scopeConditions.length ? buildWhere(m, scopeConditions) : undefined;
 
-  const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined);
+  /* Diagnostics channel — built once, threaded into the filter/sort compilers. */
+  const diag: Diagnostics = {
+    source: m.modelName,
+    strict: runtime.strict,
+    onSkipped: runtime.onSkippedCondition,
+  };
+
+  const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag);
 
   /** Compose user filter + scope + soft-delete guard into one Mongo query. */
   const composeWhere = (userFilter?: Filter<TDoc>, withDeleted?: boolean): Query => {
-    const parts = [buildWhere(m, userFilter as Filter | undefined), scopeWhere, hasDeletedAt && !withDeleted ? { deletedAt: { $eq: null } } : undefined].filter(
-      (p): p is Query => p !== undefined,
-    );
+    const parts = [
+      buildWhere(m, userFilter as Filter | undefined, diag),
+      scopeWhere,
+      hasDeletedAt && !withDeleted ? { deletedAt: { $eq: null } } : undefined,
+    ].filter((p): p is Query => p !== undefined);
     if (parts.length === 0) return {};
     if (parts.length === 1) return parts[0]!;
     return { $and: parts };
@@ -301,7 +325,10 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
       const direction = params.direction ?? "forward";
 
       const field = resolveField(m, cursorKey);
-      if (!field) throw new Error(`findCursor: unknown cursorKey "${cursorKey}".`);
+      // Always fatal: without a usable cursor field there is no pagination to
+      // fall back to. Reported as a `QueryKitError` so the backend maps it to a
+      // 400 the same way as any other bad condition (both adapters agree).
+      if (!field) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
       const decoded = decodeCursor(params.cursor);
       const cursorValue = decoded !== undefined ? castValue(m, field, decoded) : undefined;
@@ -455,7 +482,11 @@ export function buildRepository<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, 
       // An aggregate spec can also come from a request, and `min(password)` or a
       // `groupBy` on a hidden field leaks just as much as a projection — so the
       // same guard applies here (matching the drizzle-pg adapter).
-      const aggregable = (key: string) => (permits(key) ? resolveField(m, key) : undefined);
+      const aggregable = (key: string) => {
+        const field = permits(key) ? resolveField(m, key) : undefined;
+        if (!field) reportSkip(diag, { site: "aggregate", key, reason: "unknown-key" });
+        return field;
+      };
       const groupKeys = (toArr(spec.groupBy) as string[]).filter(key => Boolean(aggregable(key)));
       // Aggregate `$match` doesn't auto-cast values the way `find()` does; cast
       // the filter against the schema so wire strings (dates / ObjectIds) become

@@ -440,6 +440,22 @@ export interface RegistryOptions {
   maxPerPage?: number;
   /** `findInfinite`/`findCursor` uchun maksimal `limit` (core `DEFAULT_MAX_LIMIT` = 200). */
   maxLimit?: number;
+  /**
+   * **Qattiq rejim.** Noma'lum filter/sort kaliti yoki operatorga mos kelmagan
+   * qiymat jimgina tashlab yuborilmaydi — `QueryKitError` tashlanadi (backend
+   * uni 400 qilib qaytaradi). Default `false`: legacy (DbService) xulqi
+   * saqlanadi, chunki tashlab yuborish o'nlab mavjud endpointning xulqi.
+   *
+   * Nega kerak: filter natijani **cheklash** uchun ishlatiladi, shuning uchun
+   * typo qilingan kalit jimgina yo'qolsa endpoint kutilganidan **ko'proq** data
+   * qaytaradi va buni hech kim sezmaydi.
+   */
+  strict?: boolean;
+  /**
+   * Tashlab yuborilgan har bir shart uchun chaqiriladi (`strict: false`da ham).
+   * Migratsiya yo'li: avval hook bilan kuzatish → log tozalanganda `strict: true`.
+   */
+  onSkippedCondition?: (info: Core.SkippedCondition) => void;
 }
 
 /**

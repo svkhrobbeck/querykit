@@ -1,5 +1,6 @@
-import { and, asc, desc, gt, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, getTableName, gt, isNull, lt, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
+import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 
 import type {
   AggregateRow,
@@ -27,7 +28,8 @@ import type {
   UpsertOptions,
 } from "./types";
 import { castForColumn, INVALID_VALUE } from "./internal/coerce";
-import { getTableKey, resolveColumn } from "./internal/columns";
+import { getTableKey, isTable, resolveColumn } from "./internal/columns";
+import { reportSkip, type Diagnostics } from "./internal/diagnostics";
 import { encodeCursor, decodeCursor } from "./internal/cursor";
 import { buildOrderBy } from "./internal/order-by";
 import { buildWhere } from "./internal/where";
@@ -46,6 +48,10 @@ export interface RepoRuntime {
   maxPerPage: number;
   /** Upper bound for `limit` (`findInfinite`/`findCursor`). */
   maxLimit: number;
+  /** Throw `QueryKitError` instead of dropping an unresolvable condition. */
+  strict: boolean;
+  /** Called for every dropped condition (also when `strict` is off). */
+  onSkippedCondition?: (info: SkippedCondition) => void;
 }
 
 interface RelationalHandle {
@@ -74,8 +80,27 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
 ): Repository<TTable, TSchema> {
   const tableKey = getTableKey(schema, table);
   if (!tableKey) {
-    throw new Error("buildRepository: table was not found in the provided schema.");
+    // The lookup is by object identity, so the usual cause is two copies of the
+    // schema module (a monorepo duplicate, a bundler, a second `* as schema`
+    // import) rather than a genuinely missing table. Say which it is: a
+    // same-named table under a different identity is almost always the former.
+    const name = getTableName(table);
+    const tableKeys = Object.keys(schema).filter(key => isTable(schema[key]));
+    const sameName = tableKeys.find(key => getTableName(schema[key] as AnyPgTable) === name);
+    throw new Error(
+      sameName
+        ? `buildRepository: table "${name}" was not found in the schema by identity, but key "${sameName}" holds a DIFFERENT table instance with the same name. ` +
+            `You are importing the schema from two different modules — pass createRegistry the SAME schema object you passed to drizzle(client, { schema }).`
+        : `buildRepository: table "${name}" was not found in the provided schema. Available tables: ${tableKeys.join(", ") || "(none)"}.`,
+    );
   }
+
+  /* Diagnostics channel — built once, threaded into the filter/sort compilers. */
+  const diag: Diagnostics = {
+    source: getTableName(table),
+    strict: runtime.strict,
+    onSkipped: runtime.onSkippedCondition,
+  };
 
   const executor = () => runtime.getExecutor();
   const handle = (): RelationalHandle => (executor().query as Record<string, RelationalHandle>)[tableKey]!;
@@ -93,11 +118,20 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
         value: value as never,
       }))
     : [];
+  // A scope is the server's own RBAC / tenancy filter, so a key that does not
+  // resolve must never be dropped: that would silently widen every query on this
+  // repository. Fail when it is configured, not per request, and regardless of
+  // `strict` — this is a programming error, not bad input.
+  for (const condition of scopeConditions) {
+    if (!resolveColumn(table, condition.key)) {
+      throw new QueryKitError({ source: getTableName(table), site: "filter", key: condition.key, reason: "unknown-key" });
+    }
+  }
   const scopeWhere = scopeConditions.length ? buildWhere(table, scopeConditions) : undefined;
 
   /** Compose user filter + scope + soft-delete guard into one WHERE. */
   const composeWhere = (userFilter?: Filter<TTable>, withDeleted?: boolean): SQL | undefined => {
-    const parts = [buildWhere(table, userFilter), scopeWhere, deletedAtCol && !withDeleted ? isNull(deletedAtCol) : undefined].filter(
+    const parts = [buildWhere(table, userFilter, diag), scopeWhere, deletedAtCol && !withDeleted ? isNull(deletedAtCol) : undefined].filter(
       (part): part is SQL => part !== undefined,
     );
     if (parts.length === 0) return undefined;
@@ -210,7 +244,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     async findAll(params: QueryParams<TTable> = {}) {
       const rows = await handle().findMany({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(table, params.sort),
+        orderBy: buildOrderBy(table, params.sort, diag),
         columns: pickColumns(params.columns),
         with: params.with,
       });
@@ -220,7 +254,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
     async findOne(params: QueryParams<TTable> = {}) {
       const row = await handle().findFirst({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(table, params.sort),
+        orderBy: buildOrderBy(table, params.sort, diag),
         columns: pickColumns(params.columns),
         with: params.with,
       });
@@ -245,7 +279,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       const [data, total_items] = await Promise.all([
         handle().findMany({
           where,
-          orderBy: buildOrderBy(table, params.sort),
+          orderBy: buildOrderBy(table, params.sort, diag),
           limit: perPage,
           offset: (page - 1) * perPage,
           columns: pickColumns(params.columns),
@@ -274,7 +308,7 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
 
       const rows = await handle().findMany({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(table, params.sort),
+        orderBy: buildOrderBy(table, params.sort, diag),
         limit: limit + 1,
         offset,
         columns: pickColumns(params.columns),
@@ -302,7 +336,10 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       const direction = params.direction ?? "forward";
 
       const column = resolveColumn(table, cursorKey);
-      if (!column) throw new Error(`findCursor: unknown cursorKey "${cursorKey}".`);
+      // Always fatal: without a usable cursor column there is no pagination to
+      // fall back to. Reported as a `QueryKitError` so the backend maps it to a
+      // 400 the same way as any other bad condition (both adapters agree).
+      if (!column) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
       // A cursor token carries dates as ISO strings, so re-cast to the column's
       // type — otherwise `gt(timestampColumn, "2026-…")` crashes in drizzle's
@@ -374,7 +411,11 @@ export function buildRepository<TTable extends AnyPgTable, TSchema extends Recor
       // An aggregate spec can also come from a request, and `min(password)` or a
       // `groupBy` on a hidden column leaks just as much as a projection — so the
       // same guard applies here.
-      const aggregable = (key: string) => (permits(key) ? resolveColumn(table, key) : undefined);
+      const aggregable = (key: string) => {
+        const column = permits(key) ? resolveColumn(table, key) : undefined;
+        if (!column) reportSkip(diag, { site: "aggregate", key, reason: "unknown-key" });
+        return column;
+      };
       const groupKeys = toArray(spec.groupBy).filter(key => Boolean(aggregable(key)));
       const selection: Record<string, SQL | AnyPgColumn> = {};
 

@@ -16,6 +16,8 @@
 import { relations, sql, type SQL } from "drizzle-orm";
 import { integer, pgSchema, serial, text, timestamp, PgDialect } from "drizzle-orm/pg-core";
 
+import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
+
 import { createRegistry, createFilters } from "../src/index";
 import type { AnyDb } from "../src/types";
 
@@ -381,6 +383,118 @@ async function main() {
   check("wire-shaped params compile without a cast", Array.isArray((await usersRepo.findList(wireParams)).data));
   const unknownKey = await capture(() => usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] }));
   check("an unknown wire key is skipped, not a type error", allOk(unknownKey) && firstParams(unknownKey).length === 0);
+
+  /* ---------------------- strict mode + diagnostics ----------------------- */
+  /* 22. the default path is unchanged — a dropped condition stays dropped */
+  const silent = await capture(() => usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] }));
+  check("default: an unknown key is dropped without throwing", allOk(silent) && firstParams(silent).length === 0);
+
+  /* 23. the hook makes those drops visible without changing behaviour */
+  const seen: SkippedCondition[] = [];
+  const watchedRepo = createRegistry(stubDb, schema, { onSkippedCondition: info => seen.push(info) }).repository(users);
+
+  seen.length = 0;
+  await watchedRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] });
+  check(
+    "hook: unknown filter key reported",
+    seen.length === 1 && seen[0]!.key === "nope" && seen[0]!.site === "filter" && seen[0]!.reason === "unknown-key" && seen[0]!.source === "users",
+    JSON.stringify(seen[0]),
+  );
+
+  seen.length = 0;
+  await watchedRepo.findAll({ filter: [{ key: "id", operation: "in", value: 5 }] });
+  check("hook: a non-array `in` value reported as invalid-value", seen.length === 1 && seen[0]!.reason === "invalid-value", JSON.stringify(seen[0]));
+
+  seen.length = 0;
+  await watchedRepo.findAll({ filter: [{ key: "createdAt", operation: ">=", value: "not-a-date" }] });
+  check("hook: an uncastable date reported as invalid-value", seen.length === 1 && seen[0]!.reason === "invalid-value", JSON.stringify(seen[0]));
+
+  seen.length = 0;
+  await watchedRepo.findAll({ sort: [{ key: "nope", direction: "asc" }] });
+  check("hook: unknown sort key reported", seen.length === 1 && seen[0]!.site === "sort" && seen[0]!.key === "nope", JSON.stringify(seen[0]));
+
+  seen.length = 0;
+  await watchedRepo.aggregate({ count: true, groupBy: "nope" as never });
+  check("hook: unknown aggregate key reported", seen.length === 1 && seen[0]!.site === "aggregate", JSON.stringify(seen[0]));
+
+  /* 24. no false positives — a valid request reports nothing */
+  seen.length = 0;
+  await watchedRepo.findList({
+    filter: [uf.gte("createdAt", ISO_FROM), uf.isNull("deletedAt"), uf.isNotNull("name"), uf.in("id", [1, 2])],
+    sort: [{ key: "name", direction: "asc" }],
+    columns: { id: true, name: true },
+    withDeleted: true,
+  });
+  check("hook: a valid request reports nothing", seen.length === 0, JSON.stringify(seen));
+
+  /* 25. strict turns each of those into a QueryKitError */
+  const strictRepo = createRegistry(stubDb, schema, { strict: true }).repository(users);
+  const rejects = async (fn: () => Promise<unknown>) => {
+    try {
+      await fn();
+      return undefined;
+    } catch (err) {
+      return err;
+    }
+  };
+
+  const strictUnknown = await rejects(() => strictRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] }));
+  check(
+    "strict: unknown filter key throws QueryKitError",
+    strictUnknown instanceof QueryKitError && strictUnknown.info.reason === "unknown-key" && strictUnknown.code === "QUERYKIT_INVALID_CONDITION",
+    String(strictUnknown),
+  );
+  check("strict: unknown sort key throws", (await rejects(() => strictRepo.findAll({ sort: [{ key: "nope" }] }))) instanceof QueryKitError);
+  check(
+    "strict: uncastable date throws",
+    (await rejects(() => strictRepo.findAll({ filter: [{ key: "createdAt", operation: ">=", value: "nope" }] }))) instanceof QueryKitError,
+  );
+  check("strict: a valid request still works", (await rejects(() => strictRepo.findList({ filter: [uf.gte("createdAt", ISO_FROM)] }))) === undefined);
+
+  /* 26. an unknown cursorKey is always fatal — there is nothing to fall back to */
+  const badCursor = await rejects(() => usersRepo.findCursor({ cursorKey: "nope" as never }));
+  check(
+    "unknown cursorKey throws QueryKitError even without strict",
+    badCursor instanceof QueryKitError && badCursor.info.site === "cursorKey",
+    String(badCursor),
+  );
+
+  /* 27. a scope key that does not resolve is a programming error, not bad input:
+   *     dropping it would silently remove the RBAC filter from every query. */
+  check(
+    "an unresolvable scope key is refused at build time",
+    throws(() => registry.repository(users, { scope: { nope: 1 } as never })),
+  );
+  check("a valid scope is accepted", !throws(() => registry.repository(users, { scope: { name: "a" } })));
+
+  /* ------------------------ P2-6: schema identity ------------------------- */
+  /* 28. the same table name under a different instance is a duplicate import,
+   *     and the message must say so instead of "not found in the schema". */
+  const otherSchema = pgSchema("qk_sql_other");
+  const duplicateUsers = otherSchema.table("users", { id: serial("id").primaryKey() });
+  let identityError = "";
+  try {
+    createRegistry(stubDb, { users: duplicateUsers }).repository(users);
+  } catch (err) {
+    identityError = (err as Error).message;
+  }
+  check(
+    "duplicate-import error names the table and explains the cause",
+    identityError.includes('"users"') && identityError.includes("DIFFERENT table instance") && identityError.includes("SAME schema object"),
+    identityError,
+  );
+
+  let missingError = "";
+  try {
+    createRegistry(stubDb, { posts }).repository(users);
+  } catch (err) {
+    missingError = (err as Error).message;
+  }
+  check(
+    "a genuinely missing table lists the available ones",
+    missingError.includes('"users"') && missingError.includes("Available tables: posts"),
+    missingError,
+  );
 
   void sql; // keep the drizzle sql import meaningful for future cases
 

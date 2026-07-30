@@ -286,6 +286,22 @@ export interface RegistryOptions {
   maxPerPage?: number;
   /** Upper bound for `limit` (`findInfinite`/`findCursor`, core `DEFAULT_MAX_LIMIT` = 200). */
   maxLimit?: number;
+  /**
+   * **Strict mode.** An unknown filter/sort key, or a value the operator cannot
+   * use, is no longer dropped silently — a `QueryKitError` is thrown (the backend
+   * maps it to a 400). Defaults to `false`, keeping the legacy (DbService)
+   * behaviour that dozens of existing endpoints rely on.
+   *
+   * Why it matters: a filter is meant to **narrow** a result set, so a mistyped
+   * key that vanishes silently makes the endpoint return **more** data than
+   * intended, with nothing in the log to show it.
+   */
+  strict?: boolean;
+  /**
+   * Called for every dropped condition (also when `strict` is off). Migration
+   * path: watch with the hook first, flip `strict: true` once the log is clean.
+   */
+  onSkippedCondition?: (info: Core.SkippedCondition) => void;
 }
 
 /** Extends a base repository with custom, model-specific methods (drizzle-pg style). */
