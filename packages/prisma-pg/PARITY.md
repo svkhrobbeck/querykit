@@ -150,7 +150,7 @@ MongoDB's two-valued logic produce the SQL answer.
 
 _Confirmed against a real database in phase 4._
 
-## 5. Known divergences
+## 5. Divergences — all resolved except one documented failure-mode difference
 
 ### 5.1 `like` / `ilike` / `notLike` — RESOLVED, no divergence
 
@@ -224,11 +224,21 @@ to crash the request. Net effect: **same rows as drizzle-pg**, never a 500.
 
 ### 5.5 Text operators on non-text fields
 
-drizzle-pg can `ILIKE` a timestamp (Postgres renders it as text). Prisma rejects
-`contains`/`mode` on a non-`String` field, and Mongo rejects `$regex` on a Date,
-so **prisma-pg and mongoose both drop** the condition and report
-`invalid-value`. Exact parity is not reachable here; a non-crashing, observable
-skip is the agreed behaviour on both.
+No adapter can actually serve this, so no rows are lost anywhere — only the
+failure mode differs.
+
+drizzle-pg compiles `contains` on a `timestamptz` to `"created_at" ilike $1`
+(verified by rendering it through `PgDialect`). Postgres has no
+`timestamptz ILIKE text` operator, so that query **raises** — a 500. Prisma
+rejects `contains`/`mode` on a non-`String` field, and Mongo rejects `$regex` on
+a Date, so **prisma-pg and mongoose drop** the condition and report
+`invalid-value` instead.
+
+So prisma-pg is not less capable here; it degrades observably
+(`onSkippedCondition`, or `QueryKitError` in `strict` mode) where drizzle-pg
+throws a driver error. Making drizzle-pg drop it too would align the three
+exactly, but that is a behaviour change to a published package and is left as a
+separate decision.
 
 ## 6. Contract audit (machine-checked)
 
