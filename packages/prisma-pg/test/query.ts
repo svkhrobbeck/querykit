@@ -125,7 +125,6 @@ console.log("\n=== 2. operator table (27 operators) ===");
     ["in", [1, 2], { in: [1, 2] }],
     ["notIn", [1, 2], { notIn: [1, 2] }],
     ["between", [1, 9], { gte: 1, lte: 9 }],
-    ["notBetween", [1, 9], { not: { gte: 1, lte: 9 } }],
     ["isNull", undefined, { equals: null }],
     ["isNotNull", undefined, { not: null }],
   ];
@@ -141,6 +140,16 @@ console.log("\n=== 2. operator table (27 operators) ===");
   check("notIn: non-array value drops the condition", operators.notIn("x" as never, ctxString) === undefined);
   check("between: non-tuple drops the condition", operators.between([1] as never, ctxString) === undefined);
   check("notBetween: 3 items drops the condition", operators.notBetween([1, 2, 3] as never, ctxString) === undefined);
+
+  // notBetween must negate the *conjunction*, at the where level. Prisma
+  // distributes a field-level `not` over each key and ANDs the results, which
+  // turns `NOT (10 <= age <= 26)` into `age < 10 AND age > 26` — never true.
+  // (Confirmed against a real Postgres; the field-level form returned 0 rows.)
+  check(
+    "notBetween uses a where-level NOT, not a field-level not",
+    eq(buildWhere(userMeta, [{ key: "age", operation: "notBetween", value: [10, 26] }]), { NOT: { age: { gte: 10, lte: 26 } } }),
+    show(buildWhere(userMeta, [{ key: "age", operation: "notBetween", value: [10, 26] }])),
+  );
 
   // `mode: "insensitive"` is only legal on String fields — Prisma errors otherwise.
   check("contains on a non-String field omits mode", eq(operators.contains("2026" as never, { isString: false }), { contains: "2026" }));

@@ -37,7 +37,7 @@ on the **SQL** they produce; mongoose on the Mongo predicate.
 | `in`               | `c IN (…)`                | `{$in: v}`                           | `{in: v}`                                |  ✅   |
 | `notIn`            | `c NOT IN (…)`            | `{$nin: [...v, null]}`               | `{notIn: v}`                             |  ✅   |
 | `between`          | `c BETWEEN a AND b`       | `{$gte: a, $lte: b}`                 | `{gte: a, lte: b}`                       |  ✅   |
-| `notBetween`       | `c NOT BETWEEN a AND b`   | `{$not: {…}, $ne: null}`             | `{not: {gte: a, lte: b}}`                |  ✅   |
+| `notBetween`       | `c NOT BETWEEN a AND b`   | `{$not: {…}, $ne: null}`             | `{NOT: {c: {gte, lte}}}` (where-level)   |  ✅   |
 | `isNull`           | `c IS NULL`               | `{$eq: null}`                        | `{equals: null}`                         |  ✅   |
 | `isNotNull`        | `c IS NOT NULL`           | `{$ne: null}`                        | `{not: null}`                            |  ✅   |
 

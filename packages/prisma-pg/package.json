@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/prisma-pg",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Advanced filtering + flexible pagination repository layer for Prisma (PostgreSQL).",
   "type": "module",
   "author": {

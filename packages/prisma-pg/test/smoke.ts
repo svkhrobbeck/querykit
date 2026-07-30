@@ -138,8 +138,10 @@ async function main() {
     check("notBetween excludes NULL rows", notBetween.length === 1, `${notBetween.length}`);
     const notGroup = await usersRepo.findAll({ filter: { not: { key: "age", operation: "=", value: 25 } } });
     check("not(...) excludes NULL rows", notGroup.length === 1, `${notGroup.length}`);
+    // "Ali Valiyev" and "Vali Aliyev" both contain "Ali" (the latter inside
+    // "Aliyev"), so only "Guli Karimova" survives.
     const notLike = await usersRepo.findAll({ filter: [{ key: "name", operation: "notLike", value: "%Ali%" }] });
-    check("notLike excludes non-matching rows only", notLike.length === 2, `${notLike.length}`);
+    check("notLike excludes every matching row", notLike.length === 1 && notLike[0]!.name === "Guli Karimova", notLike.map(u => u.name).join("|"));
     check("isNull finds the NULL-age row", (await usersRepo.findAll({ filter: [{ key: "age", operation: "isNull" }] })).length === 1);
     check("isNotNull finds the rest", (await usersRepo.findAll({ filter: [{ key: "age", operation: "isNotNull" }] })).length === 2);
     check("between is inclusive", (await usersRepo.findAll({ filter: [{ key: "age", operation: "between", value: [25, 30] }] })).length === 2);
@@ -176,9 +178,21 @@ async function main() {
     check("cursor backward returns the earlier rows in ascending order", ids(back.data) === ids(c1.data), ids(back.data));
     const cCols = await usersRepo.findCursor({ limit: 2, columns: { name: true } });
     check("cursor with columns still produces a token", cCols.meta.next_cursor !== null && (cCols.data[0] as { name: string }).name.length > 0);
+    // A keyset cursor must walk a **unique** field. The seed rows were inserted
+    // by one `createMany`, so they share a `createdAt` to the microsecond — give
+    // them distinct timestamps first, otherwise `createdAt > <tie>` legitimately
+    // skips the tied rows and the test would be asserting a broken premise.
+    const seeded = await usersRepo.findAll({ sort: [{ key: "id", direction: "asc" }] });
+    for (const [i, u] of seeded.entries()) {
+      await usersRepo.updateById(u.id, { createdAt: new Date(Date.UTC(2026, 0, i + 1)) } as never);
+    }
     const cDate = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt" });
     const cDate2 = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", cursor: cDate.meta.next_cursor });
-    check("cursor over a DateTime field (token re-cast)", cDate2.data.length === 1, `${cDate2.data.length}`);
+    check(
+      "cursor over a DateTime field (token re-cast)",
+      cDate.data.length === 2 && cDate2.data.length === seeded.length - 2,
+      `${cDate.data.length} then ${cDate2.data.length} of ${seeded.length}`,
+    );
 
     /* ------------------------------- relations ------------------------------ */
     const withPosts = await usersRepo.findOne({ filter: [{ key: "id", value: ali!.id }], with: { posts: true } });

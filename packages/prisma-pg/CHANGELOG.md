@@ -1,5 +1,19 @@
 # @querykitjs/prisma-pg
 
+## 1.0.1
+
+**Fix: `notBetween` matched nothing.** It compiled to a field-level
+`{ age: { not: { gte, lte } } }`, but Prisma distributes a field-level negation
+over each key and ANDs the results — so `NOT (10 <= age <= 26)` became
+`age < 10 AND age > 26`, which is never true. It now emits a where-level
+`{ NOT: { age: { gte, lte } } }`, which negates the conjunction as SQL
+`NOT BETWEEN` does (and drops NULL rows, matching drizzle-pg).
+
+Found by the real-Postgres smoke test, which now runs green end to end (60
+checks) — including the exact-LIKE cases (interior `%`, `_`, escaped literals)
+that confirm Prisma passes wildcards through a filter value unescaped.
+
+
 ## 1.0.0
 
 Initial release — a Prisma (PostgreSQL) backend adapter for querykit, at parity

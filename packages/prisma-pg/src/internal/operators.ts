@@ -237,8 +237,14 @@ export const operators: Record<FilterOperator, Builder> = {
   },
   notBetween: v => {
     const t = asTuple(v);
-    // Field-level negation uses lowercase `not` (uppercase `NOT` is where-level).
-    return t ? { not: { gte: t[0], lte: t[1] } } : undefined;
+    if (!t) return undefined;
+    // ⚠️ Must be a where-level `NOT`, not a field-level `not`. Prisma distributes
+    // a field-level negation over each key and ANDs the results, so
+    // `{ age: { not: { gte: 10, lte: 26 } } }` becomes `age < 10 AND age > 26` —
+    // never true. `{ NOT: { age: { gte, lte } } }` negates the conjunction as a
+    // whole, which is what SQL `NOT BETWEEN` means (and it drops NULL rows too,
+    // matching drizzle-pg). Verified against a real Postgres.
+    return { buildFor: (field: string) => ({ NOT: { [field]: { gte: t[0], lte: t[1] } } }) };
   },
 
   isNull: () => ({ equals: null }),
