@@ -108,10 +108,10 @@ const OFFSET_CASES: LimitCase[] = [
   { name: "page 1000 × perPage 20 (audit test) is rejected", limit: "maxOffset", kind: "offset", params: { page: 1000, perPage: 20 }, verdict: "reject" },
   { name: "page 502 with the default perPage (20) is rejected", limit: "maxOffset", kind: "offset", params: { page: 502 }, verdict: "reject" },
   {
-    name: "override maxOffset 100: page 6 × perPage 20 is rejected",
+    name: "override maxOffset 100: page 7 × perPage 20 (offset 120) is rejected",
     limit: "maxOffset",
     kind: "offset",
-    params: { page: 6, perPage: 20 },
+    params: { page: 7, perPage: 20 },
     limits: { maxOffset: 100 },
     verdict: "reject",
   },

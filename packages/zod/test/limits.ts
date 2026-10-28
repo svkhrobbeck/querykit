@@ -14,11 +14,10 @@ import {
   type ParamsSchemaOptions,
 } from "../src/index";
 
-/** Limits are not built yet (phase 01): every mismatch is a todo, not a failure. */
-const PENDING = true;
+/** The limits are built: a mismatch fails. */
+const PENDING = false;
 
-/* Until `ParamsSchemaOptions.limits` exists the override travels untyped. */
-const withLimits = (limits: LimitCase["limits"]): ParamsSchemaOptions => ({ limits }) as object as ParamsSchemaOptions;
+const withLimits = (limits: LimitCase["limits"]): ParamsSchemaOptions => ({ limits });
 
 const factoryJudge = (testCase: LimitCase): boolean => {
   const options = withLimits(testCase.limits);
