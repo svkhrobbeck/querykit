@@ -133,11 +133,22 @@ export interface WireCursorParams extends Omit<WireBaseParams, "sort"> {
 /* Adapterlar noto'g'ri shartni jimgina tashlab yuboradi (DbService-parity). Shu
  * shakl `onSkippedCondition` hook'i va `strict` rejim xatosi uchun umumiy. */
 
-/** Shart nima uchun tashlab yuborilgani. */
-export type SkipReason = "unknown-key" | "invalid-value";
+/**
+ * Shart nima uchun tashlab yuborilgani yoki rad etilgani. `forbidden-key`,
+ * `forbidden-operator` va `limit-exceeded` — server siyosati (`filterable` /
+ * `sortable` / `limits`): ular **hech qachon jim tashlanmaydi**, `strict`dan qat'i nazar
+ * `QueryKitError` bo'ladi.
+ */
+export type SkipReason = "unknown-key" | "invalid-value" | "forbidden-key" | "forbidden-operator" | "limit-exceeded";
 
-/** Shart qayerda tashlab yuborilgani. */
-export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate";
+/** Shart qayerda tashlab yuborilgani (`page` — offset chuqurligi). */
+export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate" | "page";
+
+/**
+ * Server siyosati: maydon → ruxsat etilgan operatorlar, yoki `"*"` (hammasi — faqat aniq
+ * yozilganda). Ro'yxatda yo'q maydon yoki operator `QueryKitError` beradi.
+ */
+export type Filterable<TKey extends string = string> = Partial<Record<TKey, readonly FilterOperator[] | "*">>;
 
 /** Tashlab yuborilgan bitta shart haqida ma'lumot. */
 export interface SkippedCondition {

@@ -12,6 +12,7 @@ description: Use when code creates or reads querykit filters, sort, pagination p
 - DO send dates over the wire as ISO strings. `Date` is accepted only in-memory (`FilterScalar`); adapters cast the string from the column type.
 - DON'T forward client `columns`, `with` or `withDeleted` (fields of `WireBaseParams`) to a repository unchecked; projection belongs to the server (`forcedColumns` / `allowedColumns` on the backend adapters).
 - DO make dropped conditions visible: a backend adapter skips an unknown key or an invalid value silently unless you pass `onSkippedCondition` (receives a `SkippedCondition`) or `strict: true` (throws `QueryKitError`).
+- DON'T treat `forbidden-key` / `forbidden-operator` / `limit-exceeded` as skippable: they mean the server policy refused the request, and adapters throw them even without `strict`.
 - DO map `QueryKitError` to HTTP 400; check `err instanceof QueryKitError`, or `err.code === "QUERYKIT_INVALID_CONDITION"` across RPC/worker boundaries. DON'T match on the message text.
 
 ## When to use
@@ -145,7 +146,7 @@ Operators: comparison `=` `!=` `>` `>=` `<` `<=` (aliases `eq` `ne` `gt` `gte` `
 
 Request limits (`QueryLimits`, defaults in `DEFAULT_QUERY_LIMITS`): `maxDepth` `5` (root-to-leaf nodes; the root and the condition each count one level), `maxConditions` `30` (field conditions across all groups), `maxInItems` `200` (items in one array value), `maxStringLength` `256` (characters in one string value, also inside an array), `maxOffset` `10000` (`(page - 1) × perPage`, or infinite `offset`), `maxSortFields` `3`. A validator error names the limit and its value, e.g. `maxInItems (200)`.
 
-Skip diagnostics: `SkippedCondition` = `{ source, site, key, operation?, reason }`, `site` one of `filter` `sort` `cursorKey` `aggregate`, `reason` one of `unknown-key` `invalid-value`.
+Skip diagnostics: `SkippedCondition` = `{ source, site, key, operation?, reason }`, `site` one of `filter` `sort` `cursorKey` `aggregate` `page`, `reason` one of `unknown-key` `invalid-value` (dropped, or thrown under `strict`) and `forbidden-key` `forbidden-operator` `limit-exceeded` (server policy: always thrown as `QueryKitError`, never dropped). `Filterable` = field → allowed operators or `"*"`.
 
 ## Mistakes to avoid
 

@@ -17,9 +17,10 @@ You usually **don't install this directly** — it's the shared foundation used 
 - **`FilterScalar` / `FilterValue`**, **`SortDirection`**.
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomic builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server response, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
+- **`Filterable`** and the skip / refusal reasons (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`; `SkipSite` + `page`) — policy reasons are never dropped silently, always a `QueryKitError`.
 - **Request limits** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` and one constant per limit (table below).
 
-- **`@querykitjs/core/internal`** — **adapter and validator authors only**: cursor tokens, skip diagnostics, the per-call repository context, sort normalization, pagination metas and the limit walk (`findFilterLimitViolation`) shared by every querykit package. Not application API; it may change in a minor release.
+- **`@querykitjs/core/internal`** — **adapter and validator authors only**: cursor tokens, skip diagnostics, the per-call repository context, sort normalization, pagination metas, the limit walk (`findFilterLimitViolation`) and the request policy (`resolvePolicy`: `filterable` / `sortable` / `limits`) shared by every querykit package. Not application API; it may change in a minor release.
 
 ## Limits
 
