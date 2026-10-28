@@ -22,10 +22,8 @@ import { decodeCursor, encodeCursor, type Diagnostics } from "@querykitjs/core/i
 import type { Filter, FilterOperator } from "../src/types";
 import { createRegistry } from "../src/index";
 
-/* Cross-adapter cursor tokens must be interchangeable. */
-// drizzle-pg issues its tokens with the shared core encoder.
-import { encodeCursor as drizzleEncode } from "@querykitjs/core/internal";
-import { encodeCursor as mongooseEncode } from "../../mongoose/src/internal/cursor";
+/* Cross-adapter cursor tokens must be interchangeable: drizzle-pg and mongoose issue theirs with the shared core encoder. */
+import { encodeCursor as drizzleEncode, encodeCursor as mongooseEncode } from "@querykitjs/core/internal";
 
 /* -------------------------------- runner ---------------------------------- */
 

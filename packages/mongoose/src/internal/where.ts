@@ -1,6 +1,6 @@
 import type { Filter, FieldCondition, FilterNode } from "../types";
 import { coerceCondition, INVALID_VALUE, isDatePath, isTextOperator } from "./coerce";
-import { reportSkip, type Diagnostics } from "./diagnostics";
+import { reportSkip, type Diagnostics } from "@querykitjs/core/internal";
 import { operators } from "./operators";
 import { resolveField, type AnyModel } from "./fields";
 

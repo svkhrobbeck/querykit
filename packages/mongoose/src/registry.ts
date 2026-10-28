@@ -1,9 +1,9 @@
-import type { Connection, Model } from "mongoose";
+import type { ClientSession, Connection, Model } from "mongoose";
 import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_PER_PAGE } from "@querykitjs/core";
+import { createContextStore } from "@querykitjs/core/internal";
 
 import type { RelationDocs, RelationMap, Registry, RegistryOptions, Repository, RepositoryExtender, RepositoryOptions } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
-import { createContextStore } from "./internal/context";
 
 /**
  * Create the DB **registry** once. It holds the Mongoose connection (for
@@ -21,7 +21,7 @@ import { createContextStore } from "./internal/context";
  * ```
  */
 export function createRegistry(connection: Connection, options: RegistryOptions = {}): Registry {
-  const ctx = createContextStore();
+  const ctx = createContextStore<{ session?: ClientSession }>();
   const runtime: RepoRuntime = {
     getSession: () => ctx.get()?.session,
     defaultPerPage: options.defaultPerPage ?? DEFAULT_PER_PAGE,
