@@ -94,11 +94,18 @@ qiladi.
 import { registry } from "../registry";
 import { users } from "../schema";
 
-export const usersRepository = registry.repository(users, base => ({
-  // base metodlar ustiga custom metod
-  findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
-}));
+export const usersRepository = registry.repository(
+  users,
+  // 4.0: filtr/sort faqat shu ro'yxatdagi ustunlar bo'yicha (Safe by default)
+  { filterable: { email: ["="], status: ["=", "in"], age: [">=", "<="] }, sortable: ["id", "createdAt"] },
+  base => ({
+    // base metodlar ustiga custom metod
+    findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
+  }),
+);
 ```
+
+⚠️ Siyosat repository'ning **har** o'qish chaqiruviga qo'llanadi — custom metodlardagi server filtrlari ham (`findByEmail` uchun `email` `filterable`da). Mijozga ochilmaydigan ustun bo'yicha ichki so'rov kerak bo'lsa, ichki ishlatish uchun alohida, kengroq repository yarating va uni route'ga bermang.
 
 `repository()` to'rt shaklda chaqiriladi (mongoose adapteri bilan bir xil):
 
@@ -182,6 +189,35 @@ try {
 
 `scope` va `cursorKey` kaliti **har doim** fatal (`strict`dan qat'i nazar) —
 ular serverning o'z ishi, jimgina tashlash xavfsizlik nuqsoni bo'lardi.
+
+## Safe by default — `filterable`, `sortable`, `limits`
+
+Mijoz faqat server ruxsat bergan ustun bo'yicha, faqat ruxsat bergan operator bilan filtrlaydi va saralaydi. Ruxsatsiz so'rov bazaga yetmasdan `QueryKitError` bilan to'xtaydi — `strict` va `onSkippedCondition`dan qat'i nazar (jim tashlanmaydi).
+
+```ts
+const usersRepository = db.repository(users, {
+  forcedColumns: { id: true, fullName: true, status: true, createdAt: true },
+  filterable: {
+    status: ["=", "in"],
+    createdAt: ["between", ">=", "<="],
+    fullName: ["contains"], // "contains" va uning tokeni "%_%" — bitta operator
+  },
+  sortable: ["id", "createdAt", "fullName"],
+  limits: { maxInItems: 500 }, // registry createRegistry(..., { limits }) ustidan
+});
+```
+
+| Opsiya       | Berilmasa (default)                                                                                                  | Rad etilsa                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `filterable` | `allowedColumns` (yo'q bo'lsa `forcedColumns` kalitlari, u ham yo'q bo'lsa faqat primary key), faqat `"="` va `"in"` | `reason: "forbidden-key"` / `"forbidden-operator"`, `site: "filter"` |
+| `sortable`   | primary key va `createdAt` (jadvalda bo'lsa); mijoz yuborgan `cursorKey` ham shu ro'yxatdan                          | `reason: "forbidden-key"`, `site: "sort"` / `"cursorKey"`            |
+| `limits`     | core `DEFAULT_QUERY_LIMITS` (chuqurlik 5, shartlar 30, massiv 200, satr 256, offset 10 000, sort 3)                  | `reason: "limit-exceeded"`, `site: "filter"` / `"sort"` / `"page"`   |
+
+- `aggregate`: `filter` va har `groupBy`/`sum`/`avg`/`min`/`max` ustuni `filterable` ichida bo'lishi shart (`site: "aggregate"`).
+- `findById`: faqat mijoz `filter`i tekshiriladi; `idKey` — server tanlovi.
+- Jadvalda **yo'q** kalit (`nope`) avvalgidek `unknown-key` — skip yoki `strict`da xato.
+- Mutatsiya metodlari (`updateMany`, `deleteMany`, …) filtri server kodi deb hisoblanadi va tekshirilmaydi.
+- Operator aliaslari bitta: `["="]` `eq`ni ham, `["contains"]` `%_%`ni ham ochadi. `"*"` — barcha operatorlar.
 
 ## Advanced filterlar
 
@@ -282,6 +318,21 @@ Scope filter har bir o'qish/yangilash/o'chirishga `AND` bilan qo'shiladi, `creat
 Scope'ni `registry.repository(table, { scope })` bilan ham berish mumkin.
 Noma'lum scope kaliti — repository yaratilishida **xato** (jimgina tashlansa
 RBAC filtri yo'qolib ketardi).
+
+## Migrating to 4.0
+
+4.0 da siyosatsiz repository **tor**: faqat `allowedColumns` / `forcedColumns` / primary key bo'yicha `=` va `in`, sort — primary key va `createdAt`. 3.x xulqini (istalgan ustun, istalgan operator) bitta repository uchun ataylab qaytarish:
+
+```ts
+const open = db.repository(users, {
+  filterable: { id: "*", fullName: "*", email: "*", status: "*", createdAt: "*" },
+  sortable: ["id", "fullName", "email", "status", "createdAt"],
+});
+```
+
+- Avval `onSkippedCondition` loglaridan qaysi maydon/operator ishlatilayotganini yig'ing, keyin `filterable`ni aynan shularga toraytiring — `"*"` vaqtinchalik yo'l.
+- `QueryKitError`ning yangi `reason`lari: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; yangi `site`: `page`. Ularni 400 qilib qaytaring.
+- Offset 10 000 dan chuqur sahifalar endi rad etiladi — `findCursor` ishlating yoki `limits: { maxOffset }` bilan oshiring.
 
 ## Wire (JSON) qiymatlari va DbService'dan migratsiya
 
