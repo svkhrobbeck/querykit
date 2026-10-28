@@ -26,7 +26,7 @@ import { createRegistry } from "../src/index";
 import { readModelMeta } from "../src/internal/fields";
 import { buildWhere as pWhere } from "../src/internal/where";
 import { buildOrderBy as pOrderBy } from "../src/internal/order-by";
-import { decodeCursor } from "../src/internal/cursor";
+import { decodeCursor } from "@querykitjs/core/internal";
 import type { OffsetParams, InfiniteParams, CursorParams } from "../src/types";
 
 /* --- the two adapters it must agree with --- */

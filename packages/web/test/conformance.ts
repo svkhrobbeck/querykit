@@ -31,7 +31,8 @@ function canonicalNode(node: FilterNode): FilterNode {
   return value === undefined ? { key, operation } : { key, operation, value };
 }
 const canonicalFilter = (filter: Filter | undefined) => (filter === undefined ? [] : Array.isArray(filter) ? filter.map(canonicalNode) : canonicalNode(filter));
-const canonicalSort = (sort: SortItem[]) => sort.map(item => ({ key: item.key, direction: item.direction ?? "asc" }));
+/** Items without a `key` (`null`, `{}`) are dropped by the builder, as by every adapter. */
+const canonicalSort = (sort: SortItem[]) => sort.filter(item => item && item.key).map(item => ({ key: item.key, direction: item.direction ?? "asc" }));
 
 /** What the builder must emit for one table field: canonical filter/sort, page sizes capped like the backend caps them. */
 function expectedField(key: string, value: unknown): unknown {

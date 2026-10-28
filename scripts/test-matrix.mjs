@@ -109,6 +109,9 @@ function oldEndWorkspace(edge) {
   const copy = name =>
     cpSync(join(ROOT, "packages", name), join(dir, "packages", name), { recursive: true, filter: src => !SKIP_DIRS.has(src.split(/[\\/]/).pop()) });
   for (const name of new Set(["core", edge.pkg, ...(edge.extra ?? [])])) copy(name);
+  // Adapters import `@querykitjs/core/internal`, which bun resolves through core's
+  // package exports (dist) — so the old end gets the dist built at the start of the run.
+  cpSync(join(ROOT, "packages", "core", "dist"), join(dir, "packages", "core", "dist"), { recursive: true });
   if (!(edge.extra ?? []).includes("mongoose") && (edge.pkg === "mongoose" || edge.pkg === "drizzle-pg"))
     cpSync(join(ROOT, "packages", "mongoose", "test", "_bun-v8-shim.ts"), join(dir, MONGO_SHIM.replace("..", "packages")));
   cpSync(join(ROOT, "tsconfig.base.json"), join(dir, "tsconfig.base.json"));

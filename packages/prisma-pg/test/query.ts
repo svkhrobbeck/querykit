@@ -18,14 +18,12 @@ import { operators, parseLikePattern } from "../src/internal/operators";
 import { buildWhere } from "../src/internal/where";
 import { buildOrderBy } from "../src/internal/order-by";
 import { coerceCondition, INVALID_VALUE } from "../src/internal/coerce";
-import { encodeCursor, decodeCursor } from "../src/internal/cursor";
-import type { Diagnostics } from "../src/internal/diagnostics";
+import { decodeCursor, encodeCursor, type Diagnostics } from "@querykitjs/core/internal";
 import type { Filter, FilterOperator } from "../src/types";
 import { createRegistry } from "../src/index";
 
-/* Cross-adapter cursor tokens must be interchangeable. */
-import { encodeCursor as drizzleEncode } from "../../drizzle-pg/src/internal/cursor";
-import { encodeCursor as mongooseEncode } from "../../mongoose/src/internal/cursor";
+/* Cross-adapter cursor tokens must be interchangeable: drizzle-pg and mongoose issue theirs with the shared core encoder. */
+import { encodeCursor as drizzleEncode, encodeCursor as mongooseEncode } from "@querykitjs/core/internal";
 
 /* -------------------------------- runner ---------------------------------- */
 

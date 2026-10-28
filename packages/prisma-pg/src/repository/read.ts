@@ -1,0 +1,81 @@
+import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta } from "@querykitjs/core/internal";
+
+import type { ByIdParams, Filter, Id, InfiniteParams, InfiniteResult, OffsetParams, OffsetResult, QueryParams } from "../types";
+import { buildOrderBy } from "../internal/order-by";
+import type { RepoContext } from "./context";
+
+/** `findAll`, `findOne`, `findById`, `findList`, `findInfinite`, `count`, `exists`. */
+export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
+  const { runtime, meta, diag, delegate, projection, composeWhere, withId, countWhere } = ctx;
+
+  return {
+    async findAll(params: QueryParams<TDelegate> = {}) {
+      const rows = await delegate().findMany({
+        where: composeWhere(params.filter, params.withDeleted),
+        orderBy: buildOrderBy(meta, params.sort as never, diag),
+        ...projection(params.columns, params.with),
+      });
+      return rows as never;
+    },
+
+    async findOne(params: QueryParams<TDelegate> = {}) {
+      const row = await delegate().findFirst({
+        where: composeWhere(params.filter, params.withDeleted),
+        orderBy: buildOrderBy(meta, params.sort as never, diag),
+        ...projection(params.columns, params.with),
+      });
+      return (row ?? undefined) as never;
+    },
+
+    async findById(id: Id, params: ByIdParams<TDelegate> = {}) {
+      const { idKey = "id", filter } = params;
+      const row = await delegate().findFirst({
+        where: composeWhere(withId(filter, idKey as string, id), params.withDeleted),
+        ...projection(params.columns, params.with),
+      });
+      return (row ?? undefined) as never;
+    },
+
+    async findList(params: OffsetParams<TDelegate> = {}) {
+      const page = clampPage(params.page);
+      const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
+      const where = composeWhere(params.filter, params.withDeleted);
+
+      const [data, totalItems] = await Promise.all([
+        delegate().findMany({
+          where,
+          orderBy: buildOrderBy(meta, params.sort as never, diag),
+          take: perPage,
+          skip: (page - 1) * perPage,
+          ...projection(params.columns, params.with),
+        }),
+        countWhere(where),
+      ]);
+
+      return { data, meta: offsetMeta(page, perPage, totalItems) } as OffsetResult<never>;
+    },
+
+    async findInfinite(params: InfiniteParams<TDelegate> = {}) {
+      const limit = clampPageSize(params.limit, runtime.defaultLimit, runtime.maxLimit);
+      const offset = clampOffset(params.offset);
+
+      const rows = await delegate().findMany({
+        where: composeWhere(params.filter, params.withDeleted),
+        orderBy: buildOrderBy(meta, params.sort as never, diag),
+        take: limit + 1,
+        skip: offset,
+        ...projection(params.columns, params.with),
+      });
+
+      return infinitePage(rows, limit, offset) as InfiniteResult<never>;
+    },
+
+    count(filter?: Filter<TDelegate>) {
+      return countWhere(composeWhere(filter));
+    },
+
+    async exists(filter?: Filter<TDelegate>) {
+      return (await countWhere(composeWhere(filter))) > 0;
+    },
+  };
+}

@@ -18,6 +18,8 @@ You usually **don't install this directly** — it's the shared foundation used 
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomic builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server response, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
 
+- **`@querykitjs/core/internal`** — **adapter authors only**: cursor tokens, skip diagnostics, the per-call repository context, sort normalization and pagination metas shared by every querykit adapter. Not application API; it may change in a minor release.
+
 ## Usage (inside an adapter)
 
 ```ts

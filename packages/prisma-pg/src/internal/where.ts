@@ -1,6 +1,6 @@
 import type { FieldCondition, Filter, FilterNode } from "../types";
 import { coerceCondition, INVALID_VALUE, isTextOperator } from "./coerce";
-import { reportSkip, type Diagnostics } from "./diagnostics";
+import { reportSkip, type Diagnostics } from "@querykitjs/core/internal";
 import { isStringField, resolveField, type ModelMeta } from "./fields";
 import { isWhereFragment, operators } from "./operators";
 

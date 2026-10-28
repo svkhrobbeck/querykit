@@ -1,0 +1,166 @@
+import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
+import type { Diagnostics } from "@querykitjs/core/internal";
+
+import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions } from "../types";
+import type { AnyExecutor } from "../internal/executor";
+import { readModelMeta, resolveField, type ModelMeta } from "../internal/fields";
+import { buildProjection, truthyKeys, type Projection, type ProjectionGuard } from "../internal/projection";
+import { andWhere, buildWhere, type Where } from "../internal/where";
+
+/** Shared, registry-level runtime injected into every repository. */
+export interface RepoRuntime {
+  /** Base (non-transactional) Prisma client. */
+  baseClient: AnyExecutor;
+  /** Current executor — the active transaction client if any, else `baseClient`. */
+  getExecutor: () => AnyExecutor;
+  /** Default page size for `findList` when `perPage` is omitted. */
+  defaultPerPage: number;
+  /** Default `limit` for `findInfinite`/`findCursor` when omitted. */
+  defaultLimit: number;
+  /** Upper bound for `perPage`, applied even when validation was bypassed. */
+  maxPerPage: number;
+  /** Upper bound for `limit` (`findInfinite`/`findCursor`). */
+  maxLimit: number;
+  /** Throw `QueryKitError` instead of dropping an unresolvable condition. */
+  strict: boolean;
+  /** Called for every dropped condition (also when `strict` is off). */
+  onSkippedCondition?: (info: SkippedCondition) => void;
+}
+
+/** The delegate methods this adapter drives, kept structural on purpose. */
+export interface RuntimeDelegate {
+  findMany(args?: Record<string, unknown>): Promise<Record<string, unknown>[]>;
+  findFirst(args?: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+  count(args?: Record<string, unknown>): Promise<number>;
+  create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  createManyAndReturn?(args: Record<string, unknown>): Promise<Record<string, unknown>[]>;
+  update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  deleteMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  upsert(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  aggregate(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  groupBy(args: Record<string, unknown>): Promise<Record<string, unknown>[]>;
+}
+
+/**
+ * Everything one model's repository methods share: the model metadata, the
+ * delegate, the compiled scope and soft-delete guard, and the projection guard.
+ * Built once per `buildRepository` call; the method groups (`read`, `cursor`,
+ * `aggregate`, `mutate`) only read from it.
+ */
+export interface RepoContext<TDelegate> {
+  runtime: RepoRuntime;
+  meta: ModelMeta;
+  diag: Diagnostics;
+  /** Resolved per call so repositories inside `registry.transaction` use the tx client. */
+  delegate: () => RuntimeDelegate;
+  guard: ProjectionGuard;
+  /** `forcedColumns` or `allowedColumns` is configured. */
+  guarded: boolean;
+  /** Whether a field may appear in a result at all. */
+  permits: (key: string) => boolean;
+  projection: (columns?: QueryParams<TDelegate>["columns"], withRelations?: QueryParams<TDelegate>["with"], forceKeys?: string[]) => Projection;
+  /** User filter + scope + soft-delete guard as one `where`. */
+  composeWhere: (userFilter?: Filter<TDelegate>, withDeleted?: boolean) => Where | undefined;
+  /** `filter AND idKey = id`; an unresolvable `idKey` throws. */
+  withId: (filter: Filter<TDelegate> | undefined, idKey: string, id: Id) => Filter<TDelegate>;
+  countWhere: (where?: Where) => Promise<number>;
+}
+
+export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: string, config: RepositoryOptions<TDelegate>): RepoContext<TDelegate> {
+  const meta: ModelMeta = readModelMeta(runtime.baseClient, modelKey, config.fields);
+  const delegate = (): RuntimeDelegate => runtime.getExecutor()[modelKey] as RuntimeDelegate;
+
+  /* Diagnostics channel — built once, threaded into the filter/sort compilers. */
+  const diag: Diagnostics = {
+    source: meta.name,
+    strict: runtime.strict,
+    onSkipped: runtime.onSkippedCondition,
+  };
+
+  const scopeWhere = buildScopeWhere(meta, config);
+
+  const composeWhere = (userFilter?: Filter<TDelegate>, withDeleted?: boolean): Where | undefined =>
+    andWhere([buildWhere(meta, userFilter as Filter, diag), scopeWhere, meta.hasDeletedAt && !withDeleted ? { deletedAt: null } : undefined]);
+
+  /*
+   * An unresolvable `idKey` is **fatal**, never skipped: the normal "drop the
+   * condition" path would leave `updateById`/`deleteById` with no predicate at
+   * all and let them hit an arbitrary row. Same reasoning (and same error) as an
+   * unknown `cursorKey`.
+   */
+  const withId = (filter: Filter<TDelegate> | undefined, idKey: string, id: Id): Filter<TDelegate> => {
+    if (!resolveField(meta, idKey)) {
+      throw new QueryKitError({ source: meta.name, site: "filter", key: idKey, reason: "unknown-key" });
+    }
+    const idCondition = { key: idKey, operation: "=" as const, value: id };
+    if (!filter) return [idCondition] as Filter<TDelegate>;
+    if (Array.isArray(filter)) return [...filter, idCondition] as Filter<TDelegate>;
+    return { and: [filter, idCondition] } as Filter<TDelegate>;
+  };
+
+  const guard = buildGuard(config);
+  const { forcedKeys, allowed } = guard;
+  const permits = (key: string): boolean => (forcedKeys ? forcedKeys.includes(key) : allowed ? allowed.has(key) : true);
+
+  const projection = (columns?: QueryParams<TDelegate>["columns"], withRelations?: QueryParams<TDelegate>["with"], forceKeys?: string[]): Projection =>
+    buildProjection(meta, guard, columns as Record<string, boolean> | undefined, withRelations, forceKeys);
+
+  const countWhere = (where?: Where): Promise<number> => delegate().count({ where });
+
+  return {
+    runtime,
+    meta,
+    diag,
+    delegate,
+    guard,
+    guarded: Boolean(forcedKeys ?? allowed),
+    permits,
+    projection,
+    composeWhere,
+    withId,
+    countWhere,
+  };
+}
+
+/** `value`, `[value]` or `[]` — for spec fields that take one key or a list. */
+export const toArray = <T>(value: T | T[] | undefined): T[] => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
+
+/** The scope as a precompiled `where` (equality on each field), or `undefined`. */
+function buildScopeWhere<TDelegate>(meta: ModelMeta, config: RepositoryOptions<TDelegate>): Where | undefined {
+  const scopeConditions: FieldCondition[] = config.scope
+    ? Object.entries(config.scope).map(([key, value]) => ({ key, operation: "=" as const, value: value as never }))
+    : [];
+  // A scope is the server's own RBAC / tenancy filter, so a key that does not
+  // resolve must never be dropped: that would silently widen every query on this
+  // repository. Fail when it is configured, not per request, and regardless of
+  // `strict` — this is a programming error, not bad input.
+  for (const condition of scopeConditions) {
+    if (!resolveField(meta, condition.key)) {
+      throw new QueryKitError({ source: meta.name, site: "filter", key: condition.key, reason: "unknown-key" });
+    }
+  }
+  return scopeConditions.length ? buildWhere(meta, scopeConditions) : undefined;
+}
+
+/**
+ * Projection guards. `columns` may arrive straight from the wire, so the safe
+ * selection belongs here rather than in every route — the same reasoning as
+ * `scope`. Both options are validated once, at build time, so a
+ * misconfiguration surfaces in development instead of quietly returning full
+ * rows in production.
+ */
+function buildGuard<TDelegate>(config: RepositoryOptions<TDelegate>): ProjectionGuard {
+  const forcedKeys = config.forcedColumns ? truthyKeys(config.forcedColumns as Record<string, boolean>) : undefined;
+  if (config.forcedColumns && forcedKeys!.length === 0) {
+    throw new Error("buildRepository: forcedColumns must select at least one field (an empty selection would return the full row).");
+  }
+
+  const allowed = config.allowedColumns ? new Set<string>(config.allowedColumns as readonly string[]) : undefined;
+  if (config.allowedColumns && allowed!.size === 0) {
+    throw new Error("buildRepository: allowedColumns must list at least one field (an empty allowlist would return the full row).");
+  }
+
+  return { forcedKeys, allowed };
+}

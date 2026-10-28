@@ -1,6 +1,7 @@
 /**
- * Opaque cursor tokens for keyset pagination. A token is the base64url encoding
- * of `{ v: <cursor column value> }`. Dates are preserved via ISO strings.
+ * Opaque cursor tokens for keyset pagination, shared by every adapter so a token
+ * is interchangeable between them. A token is the base64url encoding of
+ * `{ v: <cursor value> }`; dates travel as ISO strings.
  */
 
 interface CursorPayload {
@@ -13,6 +14,7 @@ export function encodeCursor(value: unknown): string {
   return Buffer.from(json, "utf8").toString("base64url");
 }
 
+/** The cursor value, or `undefined` for a missing or undecodable token. */
 export function decodeCursor(cursor?: string | null): unknown | undefined {
   if (!cursor) return undefined;
   try {

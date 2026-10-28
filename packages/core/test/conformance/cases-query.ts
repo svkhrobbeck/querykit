@@ -44,6 +44,19 @@ export const SORT_CASES: ConformanceCase[] = [
     call: { method: "findAll", params: { sort: [{ key: "nope", direction: "asc" }] } },
     expect: { names: ALL, skipped: [{ site: "sort", key: "nope", reason: "unknown-key" }] },
   },
+  {
+    name: "malformed sort items (null, no key) are dropped silently",
+    group: "sort",
+    call: { method: "findAll", params: { sort: [null, {}, ...byCreated] as unknown as typeof byCreated } },
+    expect: { names: BY_CREATED, ordered: true },
+  },
+  {
+    name: "strict: malformed sort items are dropped, not thrown",
+    group: "sort",
+    call: { method: "findAll", params: { sort: [null, {}, ...byCreated] as unknown as typeof byCreated } },
+    options: { strict: true },
+    expect: { names: BY_CREATED, ordered: true },
+  },
 ];
 
 export const PAGINATION_CASES: ConformanceCase[] = [
