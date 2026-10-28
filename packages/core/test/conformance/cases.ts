@@ -156,10 +156,25 @@ const GROUP_CASES: ConformanceCase[] = [
     ),
   },
   {
-    name: "not group drops NULL rows (three-valued logic)",
+    name: "not on one field drops NULL rows (three-valued logic)",
     group: "group",
     ...where({ not: { key: "age", operation: ">", value: 25 } }, ["Bob", "Eve_Ann", "Frank"]),
-    knownDifference: { mongoose: "`$nor` matches documents where the inner condition is unknown (age null), SQL NOT does not" },
+  },
+  {
+    name: "not over several fields drops rows where the inner group is unknown",
+    group: "group",
+    ...where(
+      {
+        not: {
+          and: [
+            { key: "name", operation: "=", value: "Carol" },
+            { key: "age", operation: ">", value: 3 },
+          ],
+        },
+      },
+      ["Alice", "Bob", "dave", "Eve_Ann", "Frank", "Alina"],
+    ),
+    knownDifference: { mongoose: "a multi-field `not` is a bare `$nor`, which keeps documents where the inner group is unknown (Carol, age null)" },
   },
   {
     name: "nested or / and / not",
@@ -322,7 +337,10 @@ const DIAGNOSTIC_CASES: ConformanceCase[] = [
     group: "diagnostics",
     ...where([{ key: "age", operation: "=", value: "abc" }], ALL),
     expect: { names: ALL, skipped: [{ site: "filter", key: "age", reason: "invalid-value" }] },
-    knownDifference: { "drizzle-pg": "only date columns are cast; `age = 'abc'` reaches PostgreSQL, which rejects the query (500)" },
+    knownDifference: {
+      "drizzle-pg": "only date columns are cast; `age = 'abc'` reaches PostgreSQL, which rejects the query (500)",
+      mongoose: "number fields are not cast by the adapter; mongoose throws a CastError at exec (500)",
+    },
   },
   {
     name: "a skipped condition leaves the others in force",
@@ -349,7 +367,10 @@ const DIAGNOSTIC_CASES: ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "age", operation: "=", value: "abc" }] } },
     options: { strict: true },
     expect: { error: { site: "filter", key: "age", reason: "invalid-value" } },
-    knownDifference: { "drizzle-pg": "only date columns are cast; strict mode does not see `age = 'abc'`, PostgreSQL rejects it (500)" },
+    knownDifference: {
+      "drizzle-pg": "only date columns are cast; strict mode does not see `age = 'abc'`, PostgreSQL rejects it (500)",
+      mongoose: "number fields are not cast by the adapter; strict mode does not see it, mongoose throws a CastError (500)",
+    },
   },
   {
     name: "strict: unknown sort key throws",
