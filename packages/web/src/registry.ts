@@ -104,6 +104,10 @@ export interface RegistryDefaults {
   maxPerPage?: number;
   /** `limit` upper bound (core `DEFAULT_MAX_LIMIT` = 200). */
   maxLimit?: number;
+  /** Page depth bound (core `DEFAULT_MAX_OFFSET` = 10 000) — a deeper `list`/`infinite` request throws. */
+  maxOffset?: number;
+  /** Sort field count bound (core `DEFAULT_MAX_SORT_FIELDS` = 3) — more fields throw. */
+  maxSortFields?: number;
   /** `list`/`infinite` sort — `[{key,direction}]` or `["-createdAt", "id"]` shorthand. */
   sort?: SortInput;
   /** Cursor-only defaults. */
@@ -151,6 +155,8 @@ export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>)
   if (defaults.limit !== undefined) qcfg.defaultLimit = defaults.limit;
   if (defaults.maxPerPage !== undefined) qcfg.maxPerPage = defaults.maxPerPage;
   if (defaults.maxLimit !== undefined) qcfg.maxLimit = defaults.maxLimit;
+  if (defaults.maxOffset !== undefined) qcfg.maxOffset = defaults.maxOffset;
+  if (defaults.maxSortFields !== undefined) qcfg.maxSortFields = defaults.maxSortFields;
   if (sort.length) qcfg.defaultSort = sort; // only override when a real sort is given
   if (config.pruneEmpty !== undefined) qcfg.pruneEmpty = config.pruneEmpty;
   const q = createQuery(qcfg);

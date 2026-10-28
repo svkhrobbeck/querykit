@@ -9,11 +9,10 @@ import { LIMIT_CASES, type LimitCase } from "../../core/test/conformance/cases-l
 import { runLimitCases } from "../../core/test/conformance/limits-runner";
 import { buildInfiniteParams, buildListParams, createQuery, type QueryConfig } from "../src/index";
 
-/** Limits are not built yet (phase 01): every mismatch is a todo, not a failure. */
-const PENDING = true;
+/** The limits are built: a mismatch fails. */
+const PENDING = false;
 
-/* Until `QueryConfig.maxOffset` / `maxSortFields` exist the override travels untyped. */
-const configOf = (limits: LimitCase["limits"]): QueryConfig => ({ ...limits }) as object as QueryConfig;
+const configOf = (limits: LimitCase["limits"]): QueryConfig => ({ ...limits });
 
 const builds = (build: () => unknown): boolean => {
   try {

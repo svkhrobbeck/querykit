@@ -1,8 +1,8 @@
 /**
  * The filter-limit walk shared by the validators (task 008). It runs on the raw,
  * unvalidated payload **before** any recursive schema sees it, so it is
- * iterative: memory grows with the depth limit, never with the payload's depth,
- * and a 10 000-level `not` chain is rejected after `maxDepth + 1` steps.
+ * iterative — no recursion at all, whatever the payload's depth — and a
+ * 10 000-level `not` chain is rejected after `maxDepth + 1` steps.
  *
  * Only size is judged here. Shape errors (a missing `key`, a bad operator) are
  * the validator's job — a malformed node is skipped, not reported.
@@ -21,79 +21,52 @@ export interface LimitViolation {
 /** The limits the walk checks. */
 export type FilterLimits = Pick<QueryLimits, "maxDepth" | "maxConditions" | "maxInItems" | "maxStringLength">;
 
-/** Siblings still to visit: one group's children (or the single `not` child) at one depth. */
-interface Frame {
-  items: readonly unknown[];
-  next: number;
-  depth: number;
-  path: LimitPath;
-  /** `false` for a `not` child, whose path has no index. */
-  indexed: boolean;
-}
+/** A node still to visit: the node, its level (the root is 1) and its path. */
+type Pending = [node: unknown, depth: number, path: LimitPath];
 
-type UnknownRecord = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is UnknownRecord => typeof value === "object" && value !== null && !Array.isArray(value);
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** `maxInItems (200)` — the form every package's error text uses. */
 export const formatLimit = (limit: keyof QueryLimits, max: number): string => `${limit} (${max})`;
 
-/** The first value of one condition that crosses `maxInItems` or `maxStringLength`. */
-function valueViolation(value: unknown, limits: FilterLimits, path: LimitPath): LimitViolation | undefined {
-  const valuePath = [...path, "value"];
-  if (typeof value === "string") {
-    return value.length > limits.maxStringLength ? { limit: "maxStringLength", max: limits.maxStringLength, path: valuePath } : undefined;
-  }
-  if (!Array.isArray(value)) return undefined;
-  if (value.length > limits.maxInItems) return { limit: "maxInItems", max: limits.maxInItems, path: valuePath };
-  const index = value.findIndex(item => typeof item === "string" && item.length > limits.maxStringLength);
-  return index < 0 ? undefined : { limit: "maxStringLength", max: limits.maxStringLength, path: [...valuePath, index] };
-}
-
-/** The children frame of a group node, or `undefined` for a condition / malformed node. Key order mirrors the validators: `key` first. */
-function childrenOf(node: UnknownRecord, depth: number, path: LimitPath): Frame | undefined {
-  if ("key" in node) return undefined;
-  if ("and" in node) return Array.isArray(node.and) ? { items: node.and, next: 0, depth: depth + 1, path: [...path, "and"], indexed: true } : undefined;
-  if ("or" in node) return Array.isArray(node.or) ? { items: node.or, next: 0, depth: depth + 1, path: [...path, "or"], indexed: true } : undefined;
-  if ("not" in node) return { items: [node.not], next: 0, depth: depth + 1, path: [...path, "not"], indexed: false };
-  return undefined;
-}
-
 /**
- * The first limit the filter crosses, depth-first, or `undefined` when it is
- * within all four. A flat array (implicit AND) puts its conditions at level 1.
+ * The first limit the filter crosses, depth-first in document order, or
+ * `undefined` when it is within all four. A flat array (implicit AND) puts its
+ * conditions at level 1. Key order mirrors the validators: `key` first, then
+ * `and`, `or`, `not`.
  */
 export function findFilterLimitViolation(filter: unknown, limits: FilterLimits): LimitViolation | undefined {
-  if (filter === undefined) return undefined;
-  const stack: Frame[] = [
-    Array.isArray(filter) ? { items: filter, next: 0, depth: 1, path: [], indexed: true } : { items: [filter], next: 0, depth: 1, path: [], indexed: false },
-  ];
+  const hit = (limit: keyof FilterLimits, path: LimitPath): LimitViolation => ({ limit, max: limits[limit], path });
+  const pending: Pending[] = [];
+  /* Children go on the stack last-first, so they pop in document order. */
+  const push = (children: readonly unknown[], depth: number, path: LimitPath) => {
+    for (let index = children.length - 1; index >= 0; index--) pending.push([children[index], depth, [...path, index]]);
+  };
+  if (Array.isArray(filter)) push(filter, 1, []);
+  else if (filter !== undefined) pending.push([filter, 1, []]);
+
   let conditions = 0;
-
-  while (stack.length > 0) {
-    const frame = stack[stack.length - 1]!;
-    if (frame.next >= frame.items.length) {
-      stack.pop();
-      continue;
-    }
-    const index = frame.next++;
-    const node = frame.items[index];
-    const path = frame.indexed ? [...frame.path, index] : frame.path;
-
-    if (frame.depth > limits.maxDepth) return { limit: "maxDepth", max: limits.maxDepth, path };
+  for (let next = pending.pop(); next; next = pending.pop()) {
+    const [node, depth, path] = next;
+    if (depth > limits.maxDepth) return hit("maxDepth", path);
     if (!isRecord(node)) continue;
 
-    const children = childrenOf(node, frame.depth, path);
-    if (children) {
-      stack.push(children);
+    if ("key" in node) {
+      if (++conditions > limits.maxConditions) return hit("maxConditions", path);
+      const { value } = node;
+      const valuePath = [...path, "value"];
+      if (Array.isArray(value) && value.length > limits.maxInItems) return hit("maxInItems", valuePath);
+      const items: unknown[] = Array.isArray(value) ? value : [value];
+      const tooLong = items.findIndex(item => typeof item === "string" && item.length > limits.maxStringLength);
+      if (tooLong >= 0) return hit("maxStringLength", Array.isArray(value) ? [...valuePath, tooLong] : valuePath);
       continue;
     }
-    if (!("key" in node)) continue;
 
-    conditions++;
-    if (conditions > limits.maxConditions) return { limit: "maxConditions", max: limits.maxConditions, path };
-    const violation = valueViolation(node.value, limits, path);
-    if (violation) return violation;
+    const group = "and" in node ? "and" : "or" in node ? "or" : undefined;
+    if (group) {
+      const children = node[group];
+      if (Array.isArray(children)) push(children, depth + 1, [...path, group]);
+    } else if ("not" in node) pending.push([node.not, depth + 1, [...path, "not"]]);
   }
   return undefined;
 }

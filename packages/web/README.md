@@ -477,6 +477,30 @@ createRegistry({ adapter: "drizzle-pg", defaults: { maxPerPage: 50, maxLimit: 25
 createQuery({ maxPerPage: Infinity });
 ```
 
+## Limits
+
+`perPage`/`limit` clamp qilinadi (yuqorida), lekin **sahifa chuqurligi** va **sort maydonlari soni** clamp qilinmaydi — builder `Error` tashlaydi, chunki jim kesish so'rov ma'nosini o'zgartirardi (boshqa sahifa yoki boshqa tartib). Qiymatlar `@querykitjs/core`dan — zod va class-validator bilan bir xil.
+
+| Limit           | Default  | Nima sanaladi                                        | Oshsa                                                                 |
+| --------------- | -------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| `maxOffset`     | `10 000` | `list`: `(page - 1) × perPage`; `infinite`: `offset` | `Error: querykit: page 502 × perPage 20 exceeds maxOffset (10000); …` |
+| `maxSortFields` | `3`      | normalizatsiyadan keyingi `sort` maydonlari          | `Error: querykit: sort with 4 fields exceeds maxSortFields (3)`       |
+
+```ts
+buildListParams({ page: 501, perPage: 20 }); // ✅ offset 10 000
+buildListParams({ page: 502, perPage: 20 }); // ❌ Error — chuqurroq sahifalar uchun buildCursorParams
+
+createQuery({ maxOffset: 50_000, maxSortFields: 4 });
+createRegistry({ adapter: "drizzle-pg", defaults: { maxOffset: 50_000 } });
+```
+
+- Filtr limitlari (chuqurlik, shartlar, `in` elementlari, satr uzunligi) web'da **tekshirilmaydi** — ularni server (zod / class-validator) rad etadi va 400 qaytaradi.
+- ⚠️ URL'dan o'qiladigan `page` (`useListParams`, `fromSearchParams`, `searchParamsToPayload`) foydalanuvchi qo'lida: `?page=9999` builder'ni `Error`ga olib keladi. Sahifani error boundary bilan o'rang yoki `page`ni hook'dan oldin tekshiring.
+
+## Migrating (limitlar)
+
+- `buildListParams` / `buildInfiniteParams` / `createQuery` / registry `list`/`infinite` endi offset 10 000 dan chuqur yoki 3 tadan ko'p sort maydonli so'rovda `Error` tashlaydi (ilgari payload yasalardi va server uni qabul qilardi). Chuqur sahifalar — cursor; zarur bo'lsa `maxOffset` / `maxSortFields` bilan oshiring (serverda ham xuddi shu limitni oshiring).
+
 ## So'rovni o'zingiz yuborasiz
 
 Kutubxona faqat **so'rovgacha** ishlaydi. Transport yo'q:

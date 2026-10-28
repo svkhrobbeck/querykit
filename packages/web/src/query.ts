@@ -1,4 +1,4 @@
-import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_PER_PAGE } from "@querykitjs/core";
+import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_OFFSET, DEFAULT_MAX_PER_PAGE, DEFAULT_MAX_SORT_FIELDS, DEFAULT_PER_PAGE } from "@querykitjs/core";
 
 import type {
   CursorParams,
@@ -39,6 +39,14 @@ export interface QueryConfig {
   maxPerPage?: number;
   /** `limit` yuqori chegarasi (core `DEFAULT_MAX_LIMIT` = 200). */
   maxLimit?: number;
+  /**
+   * Sahifa chuqurligi: list'da `(page - 1) × perPage`, infinite'da `offset` (core
+   * `DEFAULT_MAX_OFFSET` = 10 000). Oshsa builder `Error` tashlaydi — jim kesish
+   * so'rov ma'nosini o'zgartirardi. Chuqurroq sahifalar — cursor.
+   */
+  maxOffset?: number;
+  /** `sort` maydonlari soni (core `DEFAULT_MAX_SORT_FIELDS` = 3). Oshsa — `Error`. */
+  maxSortFields?: number;
   defaultSort?: Sort;
   /** Bo'sh qiymatli filterlarni tashlash (default `true`). */
   pruneEmpty?: boolean;
@@ -59,6 +67,8 @@ const DEFAULTS: Required<QueryConfig> = {
   defaultLimit: DEFAULT_LIMIT,
   maxPerPage: DEFAULT_MAX_PER_PAGE,
   maxLimit: DEFAULT_MAX_LIMIT,
+  maxOffset: DEFAULT_MAX_OFFSET,
+  maxSortFields: DEFAULT_MAX_SORT_FIELDS,
   defaultSort: [{ key: "createdAt", direction: "desc" }],
   pruneEmpty: true,
 };
@@ -140,23 +150,36 @@ function clampInt(value: number | undefined, fallback: number, max = Infinity): 
   return Math.min(max, resolved);
 }
 
-function build(input: Params, cfg: Required<QueryConfig>): Record<string, unknown> {
-  return { ...buildBase(input, cfg), [cfg.sortField]: normalizeSort(input.sort, cfg.defaultSort) };
+/**
+ * The server rejects a request past a limit; the builder refuses to make one.
+ * Filter limits stay with the server (task 008, Locked decision 5).
+ */
+function limitError(what: string, limit: "maxOffset" | "maxSortFields", max: number, hint = ""): Error {
+  return new Error(`querykit: ${what} exceeds ${limit} (${max})${hint}`);
 }
 
+function build(input: Params, cfg: Required<QueryConfig>): Record<string, unknown> {
+  const sort = normalizeSort(input.sort, cfg.defaultSort);
+  if (sort.length > cfg.maxSortFields) throw limitError(`sort with ${sort.length} fields`, "maxSortFields", cfg.maxSortFields);
+  return { ...buildBase(input, cfg), [cfg.sortField]: sort };
+}
+
+const CURSOR_HINT = "; use cursor pagination for deeper pages";
+
 function buildList(input: ListParams, cfg: Required<QueryConfig>): Record<string, unknown> {
-  return {
-    ...build(input, cfg),
-    [cfg.pageField]: clampInt(input.page, 1), // page >= 1 (kasr/0/manfiy → 1)
-    [cfg.perPageField]: clampInt(input.perPage, cfg.defaultPerPage, cfg.maxPerPage),
-  };
+  const page = clampInt(input.page, 1); // page >= 1 (kasr/0/manfiy → 1)
+  const perPage = clampInt(input.perPage, cfg.defaultPerPage, cfg.maxPerPage);
+  if ((page - 1) * perPage > cfg.maxOffset) throw limitError(`page ${page} × perPage ${perPage}`, "maxOffset", cfg.maxOffset, CURSOR_HINT);
+  return { ...build(input, cfg), [cfg.pageField]: page, [cfg.perPageField]: perPage };
 }
 
 function buildInfinite(input: InfiniteParams, cfg: Required<QueryConfig>): Record<string, unknown> {
+  const offset = input.offset && input.offset > 0 ? Math.trunc(input.offset) : 0;
+  if (offset > cfg.maxOffset) throw limitError(`offset ${offset}`, "maxOffset", cfg.maxOffset, CURSOR_HINT);
   return {
     ...build(input, cfg),
     [cfg.limitField]: clampInt(input.limit, cfg.defaultLimit, cfg.maxLimit),
-    [cfg.offsetField]: input.offset && input.offset > 0 ? Math.trunc(input.offset) : 0,
+    [cfg.offsetField]: offset,
   };
 }
 
