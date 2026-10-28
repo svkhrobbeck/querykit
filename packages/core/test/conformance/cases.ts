@@ -322,6 +322,7 @@ const DIAGNOSTIC_CASES: ConformanceCase[] = [
     group: "diagnostics",
     ...where([{ key: "age", operation: "=", value: "abc" }], ALL),
     expect: { names: ALL, skipped: [{ site: "filter", key: "age", reason: "invalid-value" }] },
+    knownDifference: { "drizzle-pg": "only date columns are cast; `age = 'abc'` reaches PostgreSQL, which rejects the query (500)" },
   },
   {
     name: "a skipped condition leaves the others in force",
@@ -348,6 +349,7 @@ const DIAGNOSTIC_CASES: ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "age", operation: "=", value: "abc" }] } },
     options: { strict: true },
     expect: { error: { site: "filter", key: "age", reason: "invalid-value" } },
+    knownDifference: { "drizzle-pg": "only date columns are cast; strict mode does not see `age = 'abc'`, PostgreSQL rejects it (500)" },
   },
   {
     name: "strict: unknown sort key throws",

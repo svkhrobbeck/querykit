@@ -11,9 +11,19 @@ export const and3 = (values: Tri[]): Tri => (values.includes(false) ? false : va
 export const or3 = (values: Tri[]): Tri => (values.includes(true) ? true : values.includes(null) ? null : false);
 export const not3 = (value: Tri): Tri => (value === null ? null : !value);
 
-/** A wire value compared against a stored one: ISO strings become dates when the stored value is a date. */
+/**
+ * A wire value compared against a stored one, cast like PostgreSQL casts a
+ * parameter to the column type: ISO strings become dates, numeric strings
+ * numbers, and a non-numeric string for a number throws (PostgreSQL rejects the
+ * query with `invalid input syntax`).
+ */
 export function coerceLike(stored: unknown, operand: unknown): unknown {
   if (stored instanceof Date && (typeof operand === "string" || typeof operand === "number")) return new Date(operand);
+  if (typeof stored === "number" && typeof operand === "string") {
+    const parsed = Number(operand);
+    if (operand.trim() === "" || Number.isNaN(parsed)) throw new Error(`invalid input syntax for type number: "${operand}"`);
+    return parsed;
+  }
   return operand;
 }
 
