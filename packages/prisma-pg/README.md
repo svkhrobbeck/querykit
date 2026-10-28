@@ -36,20 +36,29 @@ const { data, meta } = await usersRepository.findList({
 ## O'rnatish
 
 ```bash
-bun add @querykitjs/prisma-pg @prisma/client
-# yoki: npm i @querykitjs/prisma-pg @prisma/client
+bun add @querykitjs/prisma-pg @prisma/client @prisma/adapter-pg pg
+# yoki: npm i @querykitjs/prisma-pg @prisma/client @prisma/adapter-pg pg
 ```
 
-`@prisma/client` (>=5) — peer dependency. Paket generatsiya qilingan client'ni **import qilmaydi**: model metadata'sini ish vaqtida sizning client instansiyangizdan o'qiydi, tiplarni esa siz uzatgan delegate'dan chiqaradi.
+`@prisma/client` (`^6.19 || ^7.10`) — peer dependency; `@prisma/adapter-pg` va `pg` — ilovangizning bog'liqligi (Prisma 7 driver adapter talab qiladi). Paket generatsiya qilingan client'ni **import qilmaydi**: model metadata'sini ish vaqtida sizning client instansiyangizdan o'qiydi, tiplarni esa siz uzatgan delegate'dan chiqaradi.
 
 ### Talablar
 
-|                         | Versiya   | Tekshiriladi (`bun run test:matrix`) |
-| ----------------------- | --------- | ------------------------------------ |
-| Node.js                 | `>=22.12` | 24                                   |
-| `@prisma/client` (peer) | `>=5`     | —                                    |
+|                         | Versiya            | Tekshiriladi (`bun run test:matrix`) |
+| ----------------------- | ------------------ | ------------------------------------ |
+| Node.js                 | `>=22.12`          | 24                                   |
+| `@prisma/client` (peer) | `^6.19 \|\| ^7.10` | 6.19.3, 7.10.1                       |
 
 Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
+### Prisma 7 va Prisma 6
+
+Adapter model metadata'sini siz bergan client instansiyasidan o'qiydi, shuning uchun ikkala major bilan bir xil ishlaydi. Ikkalasi ham `prisma-client` generatori va `@prisma/adapter-pg` bilan testda (`test:matrix`).
+
+- **Prisma 7** — generator `provider = "prisma-client"` va `output` (masalan `"../generated/prisma"`); datasource `url` sxemada emas, `prisma.config.ts` da; client quyidagi Sozlash'dagidek driver adapter bilan yaratiladi.
+- **Prisma 6.19** — xuddi shu generator va adapter ishlaydi; sxemaning `datasource` blokida `url = env("DATABASE_URL")` qoladi. `prisma-client-js` bilan `new PrismaClient()` orqali yaratilgan client ham ishlashda davom etadi.
+
+**Prisma 7 ga o'tish:** generatorni `output` bilan `prisma-client` ga almashtiring, `PrismaClient`ni shu chiqishdan import qiling, `@prisma/adapter-pg` + `pg` o'rnatib `adapter` bering, `url`ni `prisma.config.ts` ga ko'chiring. `createRegistry` / repository kodingizda hech narsa o'zgarmaydi.
 
 ## Sozlash
 
@@ -57,10 +66,11 @@ Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — o
 
 ```ts
 // db/registry.ts
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { createRegistry } from "@querykitjs/prisma-pg";
+import { PrismaClient } from "../generated/prisma/client"; // `prisma-client` generator chiqishi
 
-export const prisma = new PrismaClient();
+export const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 export const registry = createRegistry(prisma);
 // yoki pagination default'larini sozlab:
 // export const registry = createRegistry(prisma, { defaultPerPage: 20, defaultLimit: 20 });

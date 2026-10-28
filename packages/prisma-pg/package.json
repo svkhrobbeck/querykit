@@ -55,7 +55,7 @@
     "@querykitjs/core": "workspace:*"
   },
   "peerDependencies": {
-    "@prisma/client": ">=5"
+    "@prisma/client": "^6.19 || ^7.10"
   },
   "devDependencies": {
     "@prisma/adapter-pg": "7.10.1",
