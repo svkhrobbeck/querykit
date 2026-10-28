@@ -38,6 +38,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -51,7 +54,7 @@
     "zod": "^4"
   },
   "devDependencies": {
-    "zod": "^4.1.12"
+    "zod": "4.6.7"
   },
   "keywords": [
     "querykit",

@@ -69,6 +69,15 @@ bun add @querykitjs/mongoose mongoose
 
 `mongoose` (>= 8) is a peer dependency.
 
+### Requirements
+
+|                   | Version            | Tested (`bun run test:matrix`) |
+| ----------------- | ------------------ | ------------------------------ |
+| Node.js           | `>=22.12`          | 24                             |
+| `mongoose` (peer) | `^8.24 \|\| ^9.11` | 8.24.7, 9.11.4                 |
+
+Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+
 ## Setup
 
 ### 1. Registry (once)

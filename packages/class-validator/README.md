@@ -27,6 +27,17 @@ import "reflect-metadata";
 
 Usiz class-transformer'ning `@Type()` dekoratori `Reflect.getMetadata is not a function` xatosini beradi.
 
+### Talablar
+
+|                                     | Versiya             | Tekshiriladi (`bun run test:matrix`) |
+| ----------------------------------- | ------------------- | ------------------------------------ |
+| Node.js                             | `>=22.12`           | 24                                   |
+| `class-validator` (peer)            | `>=0.14 <0.16`      | 0.14.4, 0.15.1                       |
+| `class-transformer` (peer)          | `^0.5`              | 0.5.1                                |
+| `reflect-metadata` (ixtiyoriy peer) | `^0.1.13 \|\| ^0.2` | 0.1.14, 0.2.2                        |
+
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
 ## Foydalanish (NestJS)
 
 `main.ts`:

@@ -42,6 +42,15 @@ bun add @querykitjs/prisma-pg @prisma/client
 
 `@prisma/client` (>=5) — peer dependency. Paket generatsiya qilingan client'ni **import qilmaydi**: model metadata'sini ish vaqtida sizning client instansiyangizdan o'qiydi, tiplarni esa siz uzatgan delegate'dan chiqaradi.
 
+### Talablar
+
+|                         | Versiya   | Tekshiriladi (`bun run test:matrix`) |
+| ----------------------- | --------- | ------------------------------------ |
+| Node.js                 | `>=22.12` | 24                                   |
+| `@prisma/client` (peer) | `>=5`     | —                                    |
+
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
 ## Sozlash
 
 ### 1. Registry (bir marta)

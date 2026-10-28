@@ -69,6 +69,15 @@ bun add @querykitjs/mongoose mongoose
 
 `mongoose` (>= 8) — peer dependency.
 
+### Talablar
+
+|                   | Versiya            | Tekshiriladi (`bun run test:matrix`) |
+| ----------------- | ------------------ | ------------------------------------ |
+| Node.js           | `>=22.12`          | 24                                   |
+| `mongoose` (peer) | `^8.24 \|\| ^9.11` | 8.24.7, 9.11.4                       |
+
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
 ## Sozlash
 
 ### 1. Registry (bir marta)

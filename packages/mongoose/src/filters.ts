@@ -13,7 +13,9 @@ import type { FieldKey, RawFilter } from "./types";
  * await usersRepo.findAll({ filter: uf.and(uf.eq("status", "active"), uf.gte("age", 18)) });
  * ```
  */
-export function createFilters<TDoc>() {
+// The explicit return type keeps `dist/index.d.ts` free of an inferred expansion:
+// inferred, the alias printed as `RawFilter<_TDoc>` — a name not in scope there.
+export function createFilters<TDoc>(): ReturnType<typeof coreCreateFilters<FieldKey<TDoc>, RawFilter<TDoc>>> {
   return coreCreateFilters<FieldKey<TDoc>, RawFilter<TDoc>>();
 }
 

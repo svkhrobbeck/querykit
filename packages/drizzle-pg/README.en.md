@@ -41,6 +41,15 @@ bun add @querykitjs/drizzle-pg drizzle-orm
 
 `drizzle-orm` is a peer dependency.
 
+### Requirements
+
+|                      | Version        | Tested (`bun run test:matrix`) |
+| -------------------- | -------------- | ------------------------------ |
+| Node.js              | `>=22.12`      | 24                             |
+| `drizzle-orm` (peer) | `>=0.44 <0.46` | 0.44.7, 0.45.4                 |
+
+Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+
 ## Setup
 
 ### 1. Registry (once)

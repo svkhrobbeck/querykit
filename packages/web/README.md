@@ -48,18 +48,30 @@ function UsersPage() {
 - **3 pagination** — offset (`list`), infinite (`infinite`), cursor/keyset (`cursor`); har birining meta'si alohida `parse*` bilan camelCase'ga o'giriladi.
 - **Adapter-aware `with`** — `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg` uchun faqat **wire-safe** (JSON) relation opsiyalari intellisense'да; funksiya/SQL formalarи ko'rsatilmaydi.
 - **Declarative schema** — `resource.schema` / `defineListSchema` bilan URL param → filter; har sahifadagi qo'lda qurishni yo'q qiladi.
-- **React hook** — `useListParams` (`react-router-dom` ichida), `useListParamsBase` (router-agnostik). Core framework'siz — Vue ham shu core'ga bog'lanadi.
+- **React hook** — `useListParams` (`react-router` ichida), `useListParamsBase` (router-agnostik). Core framework'siz — Vue ham shu core'ga bog'lanadi.
 - **SSR** — `resource.fromSearchParams(sp, {schema})` hook'siz, `URLSearchParams`'dan to'g'ridan-to'g'ri payload.
 - **Query keys** — `resource.keys` TanStack/SWR uchun barqaror kalitlar.
-- **Zero dependency** — axios/react-query/dayjs YO'Q. `react` (+ hook uchun `react-router-dom`) ixtiyoriy peer.
+- **Zero dependency** — axios/react-query/dayjs YO'Q. `react` (+ hook uchun `react-router`) ixtiyoriy peer.
 
 ## O'rnatish
 
 ```bash
 bun add @querykitjs/web
-# React hook uchun: react (peer). `useListParams` uchun qo'shimcha: react-router-dom (peer).
-# Router-agnostik `useListParamsBase` react-router-dom talab qilmaydi.
+# React hook uchun: react (peer). `useListParams` uchun qo'shimcha: react-router (peer).
+# Router-agnostik `useListParamsBase` react-router talab qilmaydi.
 ```
+
+### Talablar
+
+|                                                        | Versiya              | Tekshiriladi (`bun run test:matrix`) |
+| ------------------------------------------------------ | -------------------- | ------------------------------------ |
+| Node.js                                                | `>=22.12`            | 24                                   |
+| `react` (ixtiyoriy peer)                               | `^18.3 \|\| ^19.2.7` | 18.3.1, 19.3.1                       |
+| `react-router` (ixtiyoriy peer, faqat `useListParams`) | `^7.0 \|\| ^8.0`     | 7.18.5, 8.5.1                        |
+
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
+**`react-router-dom` → `react-router`.** `useListParams` endi `react-router`dan import qiladi (v7 va v8 ikkalasi ham `useSearchParams` eksport qiladi). `react-router-dom` o'rnatilgan loyiha `react-router` ni ham o'rnatadi — v7 da u allaqachon `react-router-dom`ning bog'liqligi: `npm i react-router`.
 
 ## Ikki xil ishlatish
 
@@ -276,7 +288,7 @@ Bo'sh/**yo'q** paramlar tashlanadi; `default` faqat param **yo'q** bo'lganда t
 ## React hook
 
 ```tsx
-import { useListParams } from "@querykitjs/web/react"; // react-router-dom ichida ishlatiladi
+import { useListParams } from "@querykitjs/web/react"; // react-router ichida ishlatiladi
 import { qk } from "@/lib/query";
 
 const users = qk.resource<IUser>("users");
@@ -301,7 +313,7 @@ function UsersListPage() {
 
 Input/sort/page o'zgarishi URL'ni o'zgartiradi → `params` o'zgaradi → `queryKey` o'zgaradi → TanStack qayta so'raydi (va har kombinatsiyani cache qiladi).
 
-**Router-agnostik** (Next.js, TanStack Router) — base hook'ga `searchParams` bering (`react-router-dom` talab qilmaydi):
+**Router-agnostik** (Next.js, TanStack Router) — base hook'ga `searchParams` bering (`react-router` talab qilmaydi):
 
 ```tsx
 import { useListParamsBase } from "@querykitjs/web/react";
@@ -499,7 +511,7 @@ const { data, meta } = users.parseList(await res.json());
 | `readListParams(schema, sp)`                                                      | searchParams → `ListParams`                            |
 | `setParam/setPage/setSize/setSort/resetParams`                                    | URL yozish (immutable, page-reset)                     |
 | `encodeSort/decodeSort`                                                           | `[{key,direction}]` ↔ `"-createdAt,id"` (multi-field)  |
-| `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router-dom)                       |
+| `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router)                           |
 | `useListParamsBase(resource, {schema, searchParams, setSearchParams})` (`/react`) | router-agnostik hook                                   |
 
 ## Ishlab chiqish
