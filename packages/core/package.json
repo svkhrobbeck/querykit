@@ -32,7 +32,8 @@
     "dist",
     "README.md",
     "README.en.md",
-    "LICENSE"
+    "LICENSE",
+    "skills"
   ],
   "sideEffects": false,
   "publishConfig": {
