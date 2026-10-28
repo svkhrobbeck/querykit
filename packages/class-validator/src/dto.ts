@@ -12,12 +12,14 @@
  * e'lon qilinmagan, ya'ni `ValidationPipe({ whitelist: true })` ularni o'chiradi;
  * `perPage` / `limit` esa core'ning `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT`
  * chegarasi bilan cheklangan. Ochish faqat factory'ning `allow` opsiyasi orqali.
+ * Har DTO core so'rov limitlarini ham qo'llaydi (filtr hajmi, sort soni, offset
+ * chuqurligi); factory'da `limits` bilan o'zgartiriladi.
  */
 import { Type } from "class-transformer";
 import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsPositive, IsString, Max, Min } from "class-validator";
-import { DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE } from "@querykitjs/core";
-import type { Filter, Sort, SortDirection } from "@querykitjs/core";
-import { IsQueryFilter, IsQuerySort, type IsQueryFilterOptions, type IsQuerySortOptions } from "./decorators";
+import { DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, resolveLimits } from "@querykitjs/core";
+import type { Filter, QueryLimits, Sort, SortDirection } from "@querykitjs/core";
+import { IsQueryFilter, IsQuerySort, IsWithinMaxOffset, type IsQueryFilterOptions, type IsQuerySortOptions } from "./decorators";
 
 /* ------------------------------ static DTOs ------------------------------- */
 
@@ -34,12 +36,13 @@ export class BaseParamsDto {
 
 /** Offset (sahifali) params — `page` + `perPage` (`perPage` ≤ core cap). */
 export class OffsetParamsDto extends BaseParamsDto {
-  /* `page`da cap yo'q — sahifa raqami emas, sahifa **o'lchami** DoS yuzasi
+  /* `page`ning o'zida cap yo'q — chegara `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`
    * (`@querykitjs/zod` factory'lari ham aynan shunday). */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @IsPositive()
+  @IsWithinMaxOffset({ mode: "page" })
   page?: number;
 
   @IsOptional()
@@ -63,6 +66,7 @@ export class InfiniteParamsDto extends BaseParamsDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
+  @IsWithinMaxOffset({ mode: "offset" })
   offset?: number;
 }
 
@@ -126,6 +130,12 @@ export interface ParamsDtoOptions {
   maxPerPage?: number;
   /** `limit` yuqori chegarasi. Default — core `DEFAULT_MAX_LIMIT` (200). */
   maxLimit?: number;
+  /**
+   * So'rov limitlari; berilmaganlari core default'ida (`DEFAULT_QUERY_LIMITS`). Aniq
+   * berilgan `filter.maxDepth`, `sort.maxSortFields`, … bundan **ustun**.
+   * `Infinity` limitni o'chiradi (⚠️ DoS yuzasi).
+   */
+  limits?: Partial<QueryLimits>;
   /** Server-owned maydonlarni **ataylab** ochish. Default — bo'sh. */
   allow?: readonly ServerOwnedField[];
 }
@@ -153,13 +163,14 @@ const applyServerOwned = (proto: object, field: ServerOwnedField): void => {
   else IsObject()(proto, field);
 };
 
-const applyFilterAndSort = (proto: object, options: ParamsDtoOptions, withSort: boolean): void => {
+const applyFilterAndSort = (proto: object, options: ParamsDtoOptions, limits: QueryLimits, withSort: boolean): void => {
+  /* `limits` first: a dedicated `filter.*` / `sort.*` option wins. Unrelated limit keys are ignored by the validators. */
   IsOptional()(proto, "filter");
-  IsQueryFilter({ ...options.filter, allowedKeys: options.filter?.allowedKeys ?? options.allowedKeys })(proto, "filter");
+  IsQueryFilter({ ...limits, ...options.filter, allowedKeys: options.filter?.allowedKeys ?? options.allowedKeys })(proto, "filter");
 
   if (withSort) {
     IsOptional()(proto, "sort");
-    IsQuerySort({ ...options.sort, allowedKeys: options.sort?.allowedKeys ?? options.allowedKeys })(proto, "sort");
+    IsQuerySort({ ...limits, ...options.sort, allowedKeys: options.sort?.allowedKeys ?? options.allowedKeys })(proto, "sort");
   }
 
   for (const field of options.allow ?? []) applyServerOwned(proto, field);
@@ -196,8 +207,10 @@ export function makeOffsetParamsDto(options: ParamsDtoOptions = {}) {
     withDeleted?: boolean;
   }
 
-  applyFilterAndSort(OffsetParams.prototype, options, true);
+  const limits = resolveLimits(options.limits);
+  applyFilterAndSort(OffsetParams.prototype, options, limits, true);
   applyNumber(OffsetParams.prototype, "page", { positive: true });
+  IsWithinMaxOffset({ mode: "page", maxOffset: limits.maxOffset })(OffsetParams.prototype, "page");
   applyNumber(OffsetParams.prototype, "perPage", { positive: true, max: options.maxPerPage ?? DEFAULT_MAX_PER_PAGE });
 
   return nameClass(OffsetParams, "OffsetParamsDto");
@@ -215,9 +228,11 @@ export function makeInfiniteParamsDto(options: ParamsDtoOptions = {}) {
     withDeleted?: boolean;
   }
 
-  applyFilterAndSort(InfiniteParams.prototype, options, true);
+  const limits = resolveLimits(options.limits);
+  applyFilterAndSort(InfiniteParams.prototype, options, limits, true);
   applyNumber(InfiniteParams.prototype, "limit", { positive: true, max: options.maxLimit ?? DEFAULT_MAX_LIMIT });
   applyNumber(InfiniteParams.prototype, "offset", { min: 0 });
+  IsWithinMaxOffset({ mode: "offset", maxOffset: limits.maxOffset })(InfiniteParams.prototype, "offset");
 
   return nameClass(InfiniteParams, "InfiniteParamsDto");
 }
@@ -237,7 +252,7 @@ export function makeCursorParamsDto(options: ParamsDtoOptions = {}) {
   }
 
   const proto = CursorParams.prototype;
-  applyFilterAndSort(proto, options, false);
+  applyFilterAndSort(proto, options, resolveLimits(options.limits), false);
   applyNumber(proto, "limit", { positive: true, max: options.maxLimit ?? DEFAULT_MAX_LIMIT });
 
   IsOptional()(proto, "cursor");

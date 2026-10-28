@@ -22,13 +22,12 @@ import {
   type QuerySortOptions,
 } from "../src/index";
 
-/** Limits are not built yet (phase 01): every mismatch is a todo, not a failure. */
-const PENDING = true;
+/** The limits are built: a mismatch fails. */
+const PENDING = false;
 
-/* Until the limit options exist they travel untyped. */
-const dtoOptions = (limits: LimitCase["limits"]): ParamsDtoOptions => ({ limits }) as object as ParamsDtoOptions;
-const filterOptions = (limits: LimitCase["limits"]): QueryFilterOptions => ({ ...limits }) as object as QueryFilterOptions;
-const sortOptions = (limits: LimitCase["limits"]): QuerySortOptions => ({ ...limits }) as object as QuerySortOptions;
+const dtoOptions = (limits: LimitCase["limits"]): ParamsDtoOptions => ({ limits });
+const filterOptions = (limits: LimitCase["limits"]): QueryFilterOptions => ({ ...limits });
+const sortOptions = (limits: LimitCase["limits"]): QuerySortOptions => ({ ...limits });
 
 const accepts = (cls: new () => object, payload: unknown): boolean => validateSync(plainToInstance(cls, payload) as object).length === 0;
 

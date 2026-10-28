@@ -170,10 +170,7 @@ check(
   formatMessage("querykit.filter.unknown_key", { path: "filter[0]", key: "zzz" }, QUERYKIT_MESSAGES_UZ) ===
     "filter[0]: `zzz` ruxsat etilgan filter kaliti emas",
 );
-check(
-  "ru formatting",
-  formatMessage("querykit.filter.max_depth", { path: "filter", max: 5 }, QUERYKIT_MESSAGES_RU) === "filter превышает максимальную глубину фильтра (5)",
-);
+check("ru formatting", formatMessage("querykit.filter.max_depth", { path: "filter", max: 5 }, QUERYKIT_MESSAGES_RU) === "filter превышает лимит maxDepth (5)");
 check(
   "localizeIssue re-renders an issue",
   opIssue ? localizeIssue(opIssue, QUERYKIT_MESSAGES_UZ) === "filter.operation: `NOPE` qo'llab-quvvatlanadigan filter operatori emas" : false,
@@ -199,7 +196,11 @@ check("page 'abc' rejected", run(OffsetParamsDto, { page: "abc" }).errors.length
 check("perPage 201 rejected (core cap 200)", Object.keys(run(OffsetParamsDto, { perPage: 201 }).errors[0]?.constraints ?? {}).includes("max"));
 check("perPage 200 accepted", run(OffsetParamsDto, { perPage: 200 }).errors.length === 0);
 check("perPage 0 rejected", run(OffsetParamsDto, { perPage: 0 }).errors.length === 1);
-check("page has no ceiling", run(OffsetParamsDto, { page: 999_999 }).errors.length === 0);
+check("page itself has no ceiling: page 10 001 × perPage 1 passes", run(OffsetParamsDto, { page: 10_001, perPage: 1 }).errors.length === 0);
+check(
+  "page past maxOffset rejected by isWithinMaxOffset (008)",
+  Object.keys(run(OffsetParamsDto, { page: 999_999 }).errors[0]?.constraints ?? {}).includes("isWithinMaxOffset"),
+);
 
 check("infinite offset 0 accepted", run(InfiniteParamsDto, { offset: 0 }).errors.length === 0);
 check("infinite offset -1 rejected", run(InfiniteParamsDto, { offset: -1 }).errors.length === 1);

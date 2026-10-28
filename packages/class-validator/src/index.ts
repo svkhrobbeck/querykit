@@ -22,8 +22,8 @@ export { DEFAULT_MAX_FILTER_DEPTH, validateFilter, validateSort } from "./valida
 export type { QueryFilterOptions, QuerySortOptions, ValidationIssue } from "./validate";
 
 /* ------------------------------- decorators ------------------------------- */
-export { IsQueryFilter, IsQueryFilterConstraint, IsQuerySort, IsQuerySortConstraint } from "./decorators";
-export type { IsQueryFilterOptions, IsQuerySortOptions, MessageStyleOptions } from "./decorators";
+export { IsQueryFilter, IsQueryFilterConstraint, IsQuerySort, IsQuerySortConstraint, IsWithinMaxOffset, IsWithinMaxOffsetConstraint } from "./decorators";
+export type { IsQueryFilterOptions, IsQuerySortOptions, IsWithinMaxOffsetOptions, MessageStyleOptions } from "./decorators";
 
 /* ---------------------------------- DTOs ---------------------------------- */
 export { BaseParamsDto, CursorParamsDto, InfiniteParamsDto, OffsetParamsDto } from "./dto";
