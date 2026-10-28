@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run typecheck
@@ -43,11 +43,11 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
       # Node + npm are needed for `npm publish` (invoked by scripts/ci-publish.mjs).
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
       # OIDC trusted publishing requires npm >= 11.5.1.
       - run: npm install -g npm@latest
