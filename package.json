@@ -15,6 +15,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"packages/*/{src,test}/**/*.{ts,json,md}\" \"*.{md,json}\"",
     "format:check": "prettier --check \"packages/*/{src,test}/**/*.{ts,json,md}\" \"*.{md,json}\"",
+    "test:skills": "node scripts/check-skills.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "bun run build && node scripts/pin-workspace-deps.mjs && node scripts/ci-publish.mjs",
