@@ -2,7 +2,8 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@querykitjs/core": ["../../core/src/index.ts"]
+      "@querykitjs/core": ["../../core/src/index.ts"],
+      "@querykitjs/core/internal": ["../../core/src/internal/index.ts"]
     },
     "noUnusedLocals": false,
     // The generated client is TypeScript source; Prisma 6.19's output fails the

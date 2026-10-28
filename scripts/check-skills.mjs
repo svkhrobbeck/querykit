@@ -143,6 +143,9 @@ function buildPaths() {
   for (const pkg of listDirs(PACKAGES_DIR)) {
     const entry = join(PACKAGES_DIR, pkg, "src", "index.ts");
     if (existsSync(entry)) paths[`@querykitjs/${pkg}`] = [toPosix(entry)];
+    // Subpath entries (R17): `@querykitjs/core/internal` and the like resolve to src as well.
+    const internal = join(PACKAGES_DIR, pkg, "src", "internal", "index.ts");
+    if (existsSync(internal)) paths[`@querykitjs/${pkg}/internal`] = [toPosix(internal)];
     const prelude = join(PACKAGES_DIR, pkg, "test", "skill-prelude.ts");
     if (existsSync(prelude)) paths[`@querykitjs/${pkg}/skill-prelude`] = [toPosix(prelude)];
   }

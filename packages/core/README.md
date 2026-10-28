@@ -18,6 +18,8 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomik builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server javobi, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
 
+- **`@querykitjs/core/internal`** — **faqat adapter yozuvchilar uchun**: cursor tokenlari, skip diagnostikasi, har chaqiruv uchun repository konteksti, sort normalizatsiyasi va pagination meta'lari — hamma querykit adapterlari uchun umumiy. Ilova API'si emas; minor relizda o'zgarishi mumkin.
+
 ## Foydalanish (adapter ichida)
 
 ```ts
