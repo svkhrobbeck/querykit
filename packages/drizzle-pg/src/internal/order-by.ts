@@ -1,14 +1,9 @@
 import { asc, desc, type SQL } from "drizzle-orm";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
+import { normalizeSort, reportSkip, type Diagnostics } from "@querykitjs/core/internal";
 
-import type { Sort, SortDirection } from "../types";
+import type { Sort } from "../types";
 import { resolveColumn } from "./columns";
-import { reportSkip, type Diagnostics } from "./diagnostics";
-
-interface NormalizedSort {
-  key: string;
-  direction: SortDirection;
-}
 
 /**
  * Build an `ORDER BY` clause list. Falls back to `createdAt DESC`, then to
@@ -19,7 +14,7 @@ interface NormalizedSort {
 export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: Sort<TTable>, diag?: Diagnostics): SQL[] {
   const orderBy: SQL[] = [];
 
-  for (const { key, direction } of normalize(sort as Sort | undefined)) {
+  for (const { key, direction } of normalizeSort(sort as Sort | undefined)) {
     const column = resolveColumn(table, key);
     if (column) orderBy.push(direction === "desc" ? desc(column) : asc(column));
     // An unknown sort key falls back to the default order, so the list looks
@@ -37,9 +32,4 @@ export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: So
   // fallback — without it Postgres returns rows in arbitrary order).
   const id = resolveColumn(table, "id");
   return id ? [desc(id)] : [];
-}
-
-function normalize(sort?: Sort): NormalizedSort[] {
-  if (!sort) return [];
-  return sort.map(item => ({ key: item.key, direction: item.direction ?? "asc" }));
 }

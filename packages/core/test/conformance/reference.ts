@@ -83,12 +83,16 @@ export function referenceFilter<T extends Row>(rows: readonly T[], filter: Filte
   return rows.filter(row => evaluate(row) === true);
 }
 
-/** Rows in sort order (PostgreSQL null ordering; ties keep fixture order). */
+/**
+ * Rows in sort order (PostgreSQL null ordering; ties keep fixture order). Items
+ * without a `key` (`null`, `{}`) are dropped, as every adapter does.
+ */
 export function referenceSort<T extends Row>(rows: readonly T[], sort: Sort | undefined): T[] {
-  if (!sort || sort.length === 0) return [...rows];
+  const items = (sort ?? []).filter(item => item && item.key);
+  if (items.length === 0) return [...rows];
   return sortRows(
     rows,
-    sort.map(item => ({ key: item.key, direction: item.direction ?? "asc" })),
+    items.map(item => ({ key: item.key, direction: item.direction ?? "asc" })),
     pgOrder,
   );
 }

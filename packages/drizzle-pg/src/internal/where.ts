@@ -4,7 +4,7 @@ import type { AnyPgTable } from "drizzle-orm/pg-core";
 import type { FieldCondition, Filter, FilterNode } from "../types";
 import { coerceCondition, INVALID_VALUE } from "./coerce";
 import { resolveColumn } from "./columns";
-import { reportSkip, type Diagnostics } from "./diagnostics";
+import { reportSkip, type Diagnostics } from "@querykitjs/core/internal";
 import { operators } from "./operators";
 
 /**

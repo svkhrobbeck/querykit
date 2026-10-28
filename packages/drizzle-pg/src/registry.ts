@@ -3,7 +3,7 @@ import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_PER_PAG
 
 import type { AnyDb, Registry, RegistryOptions, Repository, RepositoryExtender, RepositoryOptions } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
-import { createContextStore } from "./internal/context";
+import { createContextStore } from "@querykitjs/core/internal";
 
 /**
  * DB **registry**'sini bir marta yaratadi. Registry — Drizzle `db` va `schema`'ni
@@ -34,7 +34,7 @@ import { createContextStore } from "./internal/context";
  * ```
  */
 export function createRegistry<TSchema extends Record<string, unknown>>(db: AnyDb, schema: TSchema, options: RegistryOptions = {}): Registry<TSchema> {
-  const ctx = createContextStore();
+  const ctx = createContextStore<{ executor?: AnyDb }>();
   const runtime: RepoRuntime = {
     baseDb: db,
     getExecutor: () => ctx.get()?.executor ?? db,
