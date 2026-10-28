@@ -17,8 +17,30 @@ You usually **don't install this directly** — it's the shared foundation used 
 - **`FilterScalar` / `FilterValue`**, **`SortDirection`**.
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomic builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server response, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
+- **Request limits** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` and one constant per limit (table below).
 
-- **`@querykitjs/core/internal`** — **adapter authors only**: cursor tokens, skip diagnostics, the per-call repository context, sort normalization and pagination metas shared by every querykit adapter. Not application API; it may change in a minor release.
+- **`@querykitjs/core/internal`** — **adapter and validator authors only**: cursor tokens, skip diagnostics, the per-call repository context, sort normalization, pagination metas and the limit walk (`findFilterLimitViolation`) shared by every querykit package. Not application API; it may change in a minor release.
+
+## Limits
+
+Every filter and pagination request is bounded in size at parse time. `@querykitjs/zod` and `@querykitjs/class-validator` reject a payload past any limit; `@querykitjs/web` does not build a payload past the offset or sort limit.
+
+| Limit             | Constant                    | Default  | What counts                                                                       |
+| ----------------- | --------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `maxDepth`        | `DEFAULT_MAX_FILTER_DEPTH`  | `5`      | root-to-leaf nodes: the root is 1, every `and`/`or`/`not` and the condition add 1 |
+| `maxConditions`   | `DEFAULT_MAX_CONDITIONS`    | `30`     | `FieldCondition` leaves across all groups                                         |
+| `maxInItems`      | `DEFAULT_MAX_IN_ITEMS`      | `200`    | items in one array value (`in`, `notIn`, …)                                       |
+| `maxStringLength` | `DEFAULT_MAX_STRING_LENGTH` | `256`    | characters in one string value, also inside an array                              |
+| `maxOffset`       | `DEFAULT_MAX_OFFSET`        | `10 000` | offset: `(page - 1) × perPage`; infinite: `offset`. Deeper — use a cursor         |
+| `maxSortFields`   | `DEFAULT_MAX_SORT_FIELDS`   | `3`      | fields in the `sort` array                                                        |
+
+```ts
+import { resolveLimits } from "@querykitjs/core";
+
+resolveLimits({ maxInItems: 500 }); // the other five keep their defaults
+```
+
+Raise a limit for one schema or DTO with its `limits` option; `Infinity` turns a limit off (⚠️ a DoS surface).
 
 ## Usage (inside an adapter)
 

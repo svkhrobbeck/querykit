@@ -32,7 +32,8 @@
     "strict": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@querykitjs/core": ["../../../core/src/index.ts"]
+      "@querykitjs/core": ["../../../core/src/index.ts"],
+      "@querykitjs/core/internal": ["../../../core/src/internal/index.ts"]
     }
   }
 }

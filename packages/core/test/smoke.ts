@@ -4,7 +4,23 @@
  *
  *   bun run test/smoke.ts
  */
-import { createFilters, f, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, FILTER_OPERATORS, QueryKitError, TEXT_FILTER_OPERATORS } from "../src/index";
+import {
+  createFilters,
+  f,
+  DEFAULT_MAX_CONDITIONS,
+  DEFAULT_MAX_FILTER_DEPTH,
+  DEFAULT_MAX_IN_ITEMS,
+  DEFAULT_MAX_LIMIT,
+  DEFAULT_MAX_OFFSET,
+  DEFAULT_MAX_PER_PAGE,
+  DEFAULT_MAX_SORT_FIELDS,
+  DEFAULT_MAX_STRING_LENGTH,
+  DEFAULT_QUERY_LIMITS,
+  FILTER_OPERATORS,
+  QueryKitError,
+  resolveLimits,
+  TEXT_FILTER_OPERATORS,
+} from "../src/index";
 import type { FieldCondition } from "../src/types";
 
 let passed = 0;
@@ -85,6 +101,21 @@ check("untyped f works", (f.eq("k", 1) as FieldCondition).operation === "=");
 
 /* cap defaults — yagona manba (zod factory + ikkala backend + web shundan oladi) */
 check("cap defaults", DEFAULT_MAX_PER_PAGE === 200 && DEFAULT_MAX_LIMIT === 200);
+check(
+  "request limit defaults (008)",
+  DEFAULT_MAX_FILTER_DEPTH === 5 &&
+    DEFAULT_MAX_CONDITIONS === 30 &&
+    DEFAULT_MAX_IN_ITEMS === 200 &&
+    DEFAULT_MAX_STRING_LENGTH === 256 &&
+    DEFAULT_MAX_OFFSET === 10_000 &&
+    DEFAULT_MAX_SORT_FIELDS === 3,
+);
+check("DEFAULT_QUERY_LIMITS is frozen", Object.isFrozen(DEFAULT_QUERY_LIMITS) && DEFAULT_QUERY_LIMITS.maxOffset === DEFAULT_MAX_OFFSET);
+check("resolveLimits(): the defaults, a fresh object", eq(resolveLimits(), DEFAULT_QUERY_LIMITS) && resolveLimits() !== DEFAULT_QUERY_LIMITS);
+check(
+  "resolveLimits: override wins, undefined keeps the default",
+  eq(resolveLimits({ maxInItems: 50, maxDepth: undefined }), { ...DEFAULT_QUERY_LIMITS, maxInItems: 50 }),
+);
 
 /* text operatorlar ro'yxati — adapterlar date coercion'da shularni chetlab o'tadi */
 check(
