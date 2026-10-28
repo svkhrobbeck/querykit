@@ -104,19 +104,6 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
 
   const guards = buildProjection(m, config);
 
-  const applyPopulate = (q: AnyQuery, withRel?: QueryParams<TDoc>["with"]): AnyQuery => {
-    if (withRel) {
-      for (const key of Object.keys(withRel)) {
-        const value = (withRel as Record<string, unknown>)[key];
-        if (!value) continue;
-        // `true` → populate the field; an object → pass through as populate options
-        // (`{ author: { select: "name" } }` → `.populate({ path, select })`).
-        q.populate(typeof value === "object" ? { path: key, ...(value as object) } : key);
-      }
-    }
-    return q;
-  };
-
   const attachSession = (q: AnyQuery): AnyQuery => {
     const s = runtime.getSession();
     if (s) q.session(s);
@@ -149,6 +136,20 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     runFind,
     countWhere,
   };
+}
+
+/** `.populate()` every truthy `with` entry. */
+function applyPopulate(q: AnyQuery, withRel?: Record<string, unknown>): AnyQuery {
+  if (withRel) {
+    for (const key of Object.keys(withRel)) {
+      const value = withRel[key];
+      if (!value) continue;
+      // `true` → populate the field; an object → pass through as populate options
+      // (`{ author: { select: "name" } }` → `.populate({ path, select })`).
+      q.populate(typeof value === "object" ? { path: key, ...(value as object) } : key);
+    }
+  }
+  return q;
 }
 
 /** `value`, `[value]` or `[]` — for spec fields that take one key or a list. */
