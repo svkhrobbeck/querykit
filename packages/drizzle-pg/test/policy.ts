@@ -9,8 +9,8 @@ import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 import { createRegistry } from "../src/index";
 import type { AnyDb } from "../src/types";
 
-/** The policy is not built yet (phase 01): every mismatch is a todo, not a failure. */
-const PENDING = true;
+/** The policy is built: a mismatch fails. */
+const PENDING = false;
 
 const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),

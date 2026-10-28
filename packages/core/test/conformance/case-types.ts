@@ -2,11 +2,15 @@
  * Types and small builders of the conformance table (`cases.ts` assembles the
  * cases). Expectations are written against `fixtures.ts`.
  */
-import type { SkipReason, SkipSite, WireBaseParams, WireCursorParams, WireInfiniteParams, WireOffsetParams } from "../../src/types";
+import type { QueryLimits } from "../../src/defaults";
+import type { Filterable, SkipReason, SkipSite, WireBaseParams, WireCursorParams, WireInfiniteParams, WireOffsetParams } from "../../src/types";
 
 export type AdapterName = "drizzle-pg" | "prisma-pg" | "mongoose";
 
-export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection";
+export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection" | "policy";
+
+/** Repository request policy (task 009). `"default"` — none given, the adapter's safe default applies. */
+export type CasePolicy = "default" | { filterable?: Filterable; sortable?: readonly string[]; limits?: Partial<QueryLimits> };
 
 export type Call =
   | { method: "findAll"; params: WireBaseParams }
@@ -18,6 +22,8 @@ export interface CaseOptions {
   strict?: boolean;
   forcedColumns?: Record<string, true>;
   allowedColumns?: readonly string[];
+  /** Absent ⇒ the open 3.x policy (every field and operator, every sort field), so the older cases keep their meaning. */
+  policy?: CasePolicy;
 }
 
 export interface SkipExpectation {

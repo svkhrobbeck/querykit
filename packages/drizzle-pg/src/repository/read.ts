@@ -7,11 +7,18 @@ import type { RepoContext } from "./context";
 
 /** `findAll`, `findOne`, `findById`, `findList`, `findInfinite`, `count`, `exists`. */
 export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>) {
-  const { runtime, table, diag, handle, composeWhere, withId, countWhere } = ctx;
+  const { runtime, table, diag, handle, policy, composeWhere, withId, countWhere } = ctx;
   const { pickColumns } = ctx.projection;
+
+  /** The client's filter and sort, checked before any SQL is built. */
+  const checked = (params: QueryParams<TTable>) => {
+    policy.checkFilter(params.filter);
+    policy.checkSort(params.sort);
+  };
 
   return {
     async findAll(params: QueryParams<TTable> = {}) {
+      checked(params);
       const rows = await handle().findMany({
         where: composeWhere(params.filter, params.withDeleted),
         orderBy: buildOrderBy(table, params.sort, diag),
@@ -22,6 +29,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
     },
 
     async findOne(params: QueryParams<TTable> = {}) {
+      checked(params);
       const row = await handle().findFirst({
         where: composeWhere(params.filter, params.withDeleted),
         orderBy: buildOrderBy(table, params.sort, diag),
@@ -33,6 +41,8 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
 
     async findById(id: Id, params: ByIdParams<TTable> = {}) {
       const { idKey = "id", filter, ...rest } = params;
+      // Only the client's filter: `idKey` is the server's own choice.
+      policy.checkFilter(filter);
       const row = await handle().findFirst({
         where: composeWhere(withId(filter, idKey, id), params.withDeleted),
         columns: pickColumns(rest.columns),
@@ -42,8 +52,10 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
     },
 
     async findList(params: OffsetParams<TTable> = {}) {
+      checked(params);
       const page = clampPage(params.page);
       const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
+      policy.checkPage({ page, perPage });
       const where = composeWhere(params.filter, params.withDeleted);
 
       const [data, totalItems] = await Promise.all([
@@ -64,6 +76,8 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
     async findInfinite(params: InfiniteParams<TTable> = {}) {
       const limit = clampPageSize(params.limit, runtime.defaultLimit, runtime.maxLimit);
       const offset = clampOffset(params.offset);
+      checked(params);
+      policy.checkPage({ offset });
 
       const rows = await handle().findMany({
         where: composeWhere(params.filter, params.withDeleted),
@@ -77,11 +91,13 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
       return infinitePage(rows, limit, offset) as InfiniteResult<never>;
     },
 
-    count(filter?: Filter<TTable>) {
+    async count(filter?: Filter<TTable>) {
+      policy.checkFilter(filter);
       return countWhere(composeWhere(filter));
     },
 
     async exists(filter?: Filter<TTable>) {
+      policy.checkFilter(filter);
       return (await countWhere(composeWhere(filter))) > 0;
     },
   };

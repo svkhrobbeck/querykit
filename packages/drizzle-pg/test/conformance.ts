@@ -70,11 +70,21 @@ const fakeDb = {
   select: () => ({ from: () => countQuery() }),
 } as unknown as AnyDb;
 
+/** The 3.x behaviour for the cases that predate the policy: every column, every operator, every sort field. */
+const COLUMNS = Object.keys(getTableColumns(users));
+const OPEN_POLICY = { filterable: Object.fromEntries(COLUMNS.map(key => [key, "*"])), sortable: COLUMNS };
+
+const policyOptions = (policy: CaseOptions["policy"]) => (policy === undefined ? OPEN_POLICY : policy === "default" ? {} : policy);
+
 export const drizzleHarness: Harness = {
   name: "drizzle-pg",
   async run(call: Call, options: CaseOptions, onSkipped) {
     const registry = createRegistry(fakeDb, schema, { strict: options.strict, onSkippedCondition: onSkipped });
-    const repository = registry.repository(users, { forcedColumns: options.forcedColumns, allowedColumns: options.allowedColumns } as never);
+    const repository = registry.repository(users, {
+      ...policyOptions(options.policy),
+      forcedColumns: options.forcedColumns,
+      allowedColumns: options.allowedColumns,
+    } as never);
     const result = (await (repository[call.method] as (params: unknown) => Promise<unknown>)(call.params)) as
       Record<string, unknown>[] | { data: Record<string, unknown>[]; meta: Record<string, unknown> };
     return Array.isArray(result) ? { rows: result } : { rows: result.data, meta: result.meta };

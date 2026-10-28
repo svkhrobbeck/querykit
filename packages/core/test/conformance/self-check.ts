@@ -85,6 +85,12 @@ require(CASES.some(c => c.options?.strict && c.expect.error?.reason === "unknown
 require(CASES.some(c => (c.expect.skipped?.length ?? 0) > 0), "onSkippedCondition is called");
 require(CASES.some(c => c.options?.forcedColumns && c.expect.keys && !c.expect.keys.includes("email")), "forcedColumns hides a column");
 
+require(CASES.some(c => c.expect.error?.reason === "forbidden-key" && c.expect.error.site === "filter"), "policy: forbidden-key filter case (K1)");
+require(CASES.some(c => c.expect.error?.reason === "forbidden-operator"), "policy: forbidden-operator case");
+require(CASES.some(c => c.expect.error?.site === "sort" && c.expect.error.reason === "forbidden-key"), "policy: forbidden sort key case (Y5)");
+require(CASES.some(c => c.expect.error?.reason === "limit-exceeded" && c.expect.error.site === "page"), "policy: offset limit case (Y4)");
+require(CASES.some(c => c.options?.policy === "default" && c.expect.names), "policy: safe default lets the primary key through");
+
 /* Request-limit table (task 008): every limit has a case inside and a case outside it, and an override. */
 for (const limit of LIMIT_NAMES) {
   const cases = LIMIT_CASES.filter(c => c.limit === limit);

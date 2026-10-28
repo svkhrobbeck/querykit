@@ -44,6 +44,7 @@ export function createRegistry<TSchema extends Record<string, unknown>>(db: AnyD
     maxLimit: options.maxLimit ?? DEFAULT_MAX_LIMIT,
     strict: options.strict ?? false,
     onSkippedCondition: options.onSkippedCondition,
+    limits: options.limits,
   };
 
   function repository<TTable extends AnyPgTable>(table: TTable): Repository<TTable, TSchema>;

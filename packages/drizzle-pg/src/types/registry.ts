@@ -34,6 +34,13 @@ export interface RegistryOptions {
    * Migratsiya yo'li: avval hook bilan kuzatish → log tozalanganda `strict: true`.
    */
   onSkippedCondition?: (info: Core.SkippedCondition) => void;
+  /**
+   * Server-side so'rov limitlari (core `DEFAULT_QUERY_LIMITS`: chuqurlik 5, shartlar 30,
+   * massiv 200, satr 256, offset 10 000, sort 3) — validator chetlab o'tilsa ham.
+   * Oshgan so'rov `QueryKitError` (`reason: "limit-exceeded"`) bilan to'xtaydi. Repository
+   * `limits` bundan ustun.
+   */
+  limits?: Partial<Core.QueryLimits>;
 }
 
 /**
@@ -65,6 +72,26 @@ export interface RepositoryOptions<TTable extends AnyPgTable> {
    * Bo'sh massiv berilishi xato (hech narsa tanlanmagan projection = to'liq qator).
    */
   allowedColumns?: readonly ColumnKey<TTable>[];
+  /**
+   * Mijoz filtrlay oladigan ustunlar va har biri uchun operatorlar (`"*"` — hammasi).
+   * Ro'yxatda yo'q ustun → `reason: "forbidden-key"`, yo'q operator →
+   * `"forbidden-operator"` — `strict`dan qat'i nazar `QueryKitError`, so'rov bazaga yetmaydi.
+   * **Berilmasa** — `allowedColumns` (yo'q bo'lsa `forcedColumns` kalitlari, u ham yo'q
+   * bo'lsa faqat primary key) va faqat `"="` / `"in"`. `aggregate` kalitlari ham shu ro'yxatdan.
+   *
+   * @example
+   * ```ts
+   * filterable: { status: ["=", "in"], createdAt: ["between", ">=", "<="], name: ["contains"] }
+   * ```
+   */
+  filterable?: Core.Filterable<ColumnKey<TTable>>;
+  /**
+   * Mijoz saralay oladigan (va `cursorKey` qila oladigan) ustunlar. Berilmasa — primary
+   * key va `createdAt` (jadvalda bo'lsa). Boshqasi → `reason: "forbidden-key"`.
+   */
+  sortable?: readonly ColumnKey<TTable>[];
+  /** Shu repository uchun so'rov limitlari — registry `limits` ustidan. */
+  limits?: Partial<Core.QueryLimits>;
 }
 
 /** DB registry: bir marta yaratiladi, jadval repositorylarini chiqaradi. */
