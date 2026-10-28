@@ -2,7 +2,8 @@ import { DEFAULT_LIMIT, DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_PER_PAG
 
 import type { AnyClient, AnyDelegate, DelegateOf, ModelKey, Registry, RegistryOptions, Repository, RepositoryExtender, RepositoryOptions } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
-import { createContextStore, type AnyExecutor } from "./internal/context";
+import { createContextStore } from "@querykitjs/core/internal";
+import type { AnyExecutor } from "./internal/executor";
 import { delegateKeys } from "./internal/fields";
 
 /** A Prisma client's interactive-transaction method. */
@@ -59,7 +60,7 @@ function resolveModelKey(client: AnyClient, model: string | AnyDelegate): string
  * ```
  */
 export function createRegistry<TClient extends AnyClient>(prisma: TClient, options: RegistryOptions = {}): Registry<TClient> {
-  const ctx = createContextStore();
+  const ctx = createContextStore<{ executor?: AnyExecutor }>();
   const runtime: RepoRuntime = {
     baseClient: prisma as AnyExecutor,
     getExecutor: () => ctx.get()?.executor ?? (prisma as AnyExecutor),
