@@ -21,10 +21,8 @@ import { createRegistry, createFilters } from "../src/index";
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("Set DATABASE_URL to run the smoke test.");
 
+/** An isolated schema, handed to the driver adapter, so the test never touches real tables. */
 const SCHEMA = "qk_prisma_smoke";
-/** Point Prisma at an isolated schema so the test never touches real tables. */
-const scoped = new URL(url);
-scoped.searchParams.set("schema", SCHEMA);
 
 /* -------------------------------- runner ---------------------------------- */
 
@@ -37,7 +35,7 @@ function check(label: string, ok: boolean, extra = "") {
 }
 const ids = (rows: Array<{ id: number }>) => rows.map(r => r.id).join(",");
 
-const prisma = createTestClient(scoped.toString());
+const prisma = createTestClient(url, SCHEMA);
 
 async function main() {
   const registry = createRegistry(prisma);
