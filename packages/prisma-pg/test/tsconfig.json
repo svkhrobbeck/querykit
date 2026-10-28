@@ -4,7 +4,10 @@
     "paths": {
       "@querykitjs/core": ["../../core/src/index.ts"]
     },
-    "noUnusedLocals": false
+    "noUnusedLocals": false,
+    // The generated client is TypeScript source; Prisma 6.19's output fails the
+    // declaration-emit checks (TS4094). Nothing is emitted here anyway.
+    "declaration": false
   },
   "include": ["types.ts", "../src"],
   "exclude": ["node_modules"]

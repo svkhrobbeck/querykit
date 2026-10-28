@@ -27,7 +27,14 @@ const WORK = join(tmpdir(), "qk-matrix");
 const MONGO_SHIM = "../mongoose/test/_bun-v8-shim.ts";
 const SKIP_DIRS = new Set(["node_modules", "dist", ".cache", "generated"]);
 
-/** One end of one package's peer range: versions to install (old end) and what to run. */
+/** `script:<name>` runs a package.json script; anything else is a test file run with bun. */
+const PRISMA_RUNS = ["script:test:generate", "script:test:query", "script:test:types", "script:test:contract", "test/conformance.ts"];
+
+/**
+ * One end of one package's peer range: versions to install (old end), what to run,
+ * the peers to report, and `extra` packages a test imports from (test:contract
+ * drives drizzle-pg, mongoose and web from source).
+ */
 const EDGES = [
   { pkg: "drizzle-pg", label: "drizzle-orm 0.44.7", deps: { "drizzle-orm": "0.44.7" }, runs: ["test/sql.ts", "test/conformance.ts"] },
   { pkg: "drizzle-pg", label: "drizzle-orm 0.45.4", runs: ["test/sql.ts", "test/conformance.ts"] },
@@ -55,6 +62,21 @@ const EDGES = [
   },
   { pkg: "web", label: "react 19.3.1 + react-router 8.5.1", runs: ["test/smoke.ts", "test/hook.ts"] },
   { pkg: "zod", label: "zod 4.6.7", runs: ["test/smoke.ts"] },
+  {
+    pkg: "prisma-pg",
+    label: "Prisma 6.19.3",
+    deps: { "@prisma/client": "6.19.3", prisma: "6.19.3", "@prisma/adapter-pg": "6.19.3" },
+    peers: ["@prisma/client", "prisma", "@prisma/adapter-pg"],
+    extra: ["drizzle-pg", "mongoose", "web"],
+    // Prisma 6 requires the datasource `url` in the schema; Prisma 7 rejects it (prisma.config.ts).
+    prepare: dir => {
+      const schema = join(dir, "packages", "prisma-pg", "test", "prisma", "schema.prisma");
+      const datasource = 'provider = "postgresql"';
+      writeFileSync(schema, readFileSync(schema, "utf8").replace(datasource, `${datasource}\n  url      = env("DATABASE_URL")`));
+    },
+    runs: PRISMA_RUNS,
+  },
+  { pkg: "prisma-pg", label: "Prisma 7.10.1", peers: ["@prisma/client", "prisma", "@prisma/adapter-pg"], runs: PRISMA_RUNS },
 ];
 
 const CONSUMER_ENTRIES = {
@@ -86,9 +108,8 @@ function oldEndWorkspace(edge) {
   mkdirSync(join(dir, "packages"), { recursive: true });
   const copy = name =>
     cpSync(join(ROOT, "packages", name), join(dir, "packages", name), { recursive: true, filter: src => !SKIP_DIRS.has(src.split(/[\\/]/).pop()) });
-  copy("core");
-  copy(edge.pkg);
-  if (edge.pkg === "mongoose" || edge.pkg === "drizzle-pg")
+  for (const name of new Set(["core", edge.pkg, ...(edge.extra ?? [])])) copy(name);
+  if (!(edge.extra ?? []).includes("mongoose") && (edge.pkg === "mongoose" || edge.pkg === "drizzle-pg"))
     cpSync(join(ROOT, "packages", "mongoose", "test", "_bun-v8-shim.ts"), join(dir, MONGO_SHIM.replace("..", "packages")));
   cpSync(join(ROOT, "tsconfig.base.json"), join(dir, "tsconfig.base.json"));
 
@@ -103,6 +124,7 @@ function oldEndWorkspace(edge) {
     JSON.stringify({ name: "qk-matrix", private: true, workspaces: ["packages/*"], devDependencies: { "@types/node": typesNode } }, null, 2),
   );
 
+  edge.prepare?.(dir);
   const install = run("bun", ["install", "--ignore-scripts"], dir);
   if (!install.ok) throw new Error(`bun install failed for ${edge.label}:\n${install.output}`);
   return dir;
@@ -122,11 +144,12 @@ function runEdge(edge) {
   const root = edge.deps ? oldEndWorkspace(edge) : ROOT;
   const pkgDir = join(root, "packages", edge.pkg);
   const steps = [["typecheck", run("node", [TSC["6.0"], "--noEmit", "-p", pkgDir], pkgDir)]];
-  for (const file of edge.runs) {
-    const args = edge.preload ? ["--preload", edge.preload, file] : [file];
-    steps.push([file, run("bun", args, join(pkgDir, edge.cwd ?? ""))]);
+  for (const entry of edge.runs) {
+    const script = entry.startsWith("script:") ? entry.slice("script:".length) : undefined;
+    const args = script ? ["run", script] : edge.preload ? ["--preload", edge.preload, entry] : [entry];
+    steps.push([script ?? entry, run("bun", args, join(pkgDir, edge.cwd ?? ""))]);
   }
-  const peers = Object.keys(edge.deps ?? {}).length ? Object.keys(edge.deps) : edge.label.split(" + ").map(part => part.split(" ")[0]);
+  const peers = edge.peers ?? (Object.keys(edge.deps ?? {}).length ? Object.keys(edge.deps) : edge.label.split(" + ").map(part => part.split(" ")[0]));
   const ok = steps.every(([, step]) => step.ok);
   print(
     `${ok ? "✅" : "❌"} ${edge.pkg} · ${edge.label} (resolved ${resolvedVersions(pkgDir, peers)}) — ${steps.map(([name, step]) => `${name} ${step.ok ? "✓" : "✗"}`).join(", ")}`,
