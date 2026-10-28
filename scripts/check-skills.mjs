@@ -77,6 +77,8 @@ function checkFrontmatter(file, lines, folder) {
   if (!name) fail(file, 1, "frontmatter has no `name`");
   else if (name.value !== folder) fail(file, name.line, `name "${name.value}" must equal the folder name "${folder}"`);
   if (!description) fail(file, 1, "frontmatter has no `description`");
+  else if (/^[>|][+-]?$/.test(description.value))
+    fail(file, description.line, "description must be a single-line value (block scalars `>` / `|` are not checked)");
   else {
     const length = [...description.value].length;
     if (length < 1 || length > MAX_DESCRIPTION) fail(file, description.line, `description is ${length} chars (allowed 1–${MAX_DESCRIPTION})`);
