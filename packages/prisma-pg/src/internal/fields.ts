@@ -89,7 +89,7 @@ const KINDS = new Set(["scalar", "enum", "object", "unsupported"]);
 const normalizeKind = (kind: unknown): FieldMeta["kind"] => (typeof kind === "string" && KINDS.has(kind) ? (kind as FieldMeta["kind"]) : "scalar");
 
 /**
- * Source 1 — `client._runtimeDataModel` (Prisma 5/6). Internal, but the only
+ * Source 1 — `client._runtimeDataModel` (Prisma 6.19 and 7). Internal, but the only
  * source that carries `isId` / `isUpdatedAt`, which soft-delete, id aliasing and
  * the `updatedAt` bump all depend on.
  */
@@ -181,7 +181,7 @@ export function readModelMeta(client: Record<string, unknown>, delegateKey: stri
     throw new Error(
       `createRegistry: could not read field metadata for model "${delegateKey}". ` +
         `This adapter reads it from the Prisma client at runtime (\`_runtimeDataModel\`, then \`delegate.fields\`); ` +
-        `both were unavailable, which usually means an unsupported @prisma/client version (>=5 expected). ` +
+        `both were unavailable, which usually means an unsupported @prisma/client version (^6.19 or ^7.10 expected). ` +
         `Pass \`fields\` in the repository options to supply it explicitly.`,
     );
   }

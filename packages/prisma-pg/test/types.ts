@@ -9,9 +9,9 @@
  * client. Every `const _x: T = …` below fails to compile if inference drifts.
  */
 import { createRegistry, createFilters, type Row, type Insert, type RawWhere, type FieldKey } from "../src/index";
-import { PrismaClient } from "./prisma/generated/index.js";
+import { createTestClient } from "./prisma/client";
 
-const prisma = new PrismaClient();
+const prisma = createTestClient();
 const registry = createRegistry(prisma);
 
 const users = registry.repository("user");

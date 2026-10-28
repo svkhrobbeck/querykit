@@ -14,7 +14,7 @@
  * The mirror of this file is `packages/drizzle-pg/test/smoke.ts` — the checks are
  * deliberately the same, because the two adapters must agree.
  */
-import { PrismaClient } from "./prisma/generated/index.js";
+import { createTestClient } from "./prisma/client";
 
 import { createRegistry, createFilters } from "../src/index";
 
@@ -37,7 +37,7 @@ function check(label: string, ok: boolean, extra = "") {
 }
 const ids = (rows: Array<{ id: number }>) => rows.map(r => r.id).join(",");
 
-const prisma = new PrismaClient({ datasources: { db: { url: scoped.toString() } } });
+const prisma = createTestClient(scoped.toString());
 
 async function main() {
   const registry = createRegistry(prisma);

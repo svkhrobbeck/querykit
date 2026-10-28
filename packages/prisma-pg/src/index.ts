@@ -16,10 +16,11 @@
  * @example
  * ```ts
  * // registry.ts (once)
- * import { PrismaClient } from "@prisma/client";
+ * import { PrismaPg } from "@prisma/adapter-pg";
  * import { createRegistry } from "@querykitjs/prisma-pg";
+ * import { PrismaClient } from "./generated/prisma/client"; // Prisma 7 `prisma-client` generator output
  *
- * export const prisma = new PrismaClient();
+ * export const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
  * export const registry = createRegistry(prisma);
  *
  * // users.repository.ts
