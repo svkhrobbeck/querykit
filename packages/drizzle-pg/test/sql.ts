@@ -20,6 +20,7 @@ import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 
 import { createRegistry, createFilters } from "../src/index";
 import type { AnyDb } from "../src/types";
+import "./policy";
 
 /* -------------------------------- schema ---------------------------------- */
 
