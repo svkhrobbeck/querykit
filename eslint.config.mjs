@@ -1,8 +1,10 @@
 import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
-export default tseslint.config(
+// `defineConfig` (ESLint core) replaces the deprecated `tseslint.config()`.
+export default defineConfig(
   // `test/prisma/generated` is a `prisma generate` artifact, not source.
   { ignores: ["**/dist/**", "**/node_modules/**", "**/test/prisma/generated/**"] },
   js.configs.recommended,
