@@ -41,6 +41,15 @@ bun add @querykitjs/drizzle-pg drizzle-orm
 
 `drizzle-orm` — peer dependency.
 
+### Talablar
+
+|                      | Versiya        | Tekshiriladi (`bun run test:matrix`) |
+| -------------------- | -------------- | ------------------------------------ |
+| Node.js              | `>=22.12`      | 24                                   |
+| `drizzle-orm` (peer) | `>=0.44 <0.46` | 0.44.7, 0.45.4                       |
+
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
 ## Sozlash
 
 ### 1. Registry (bir marta)

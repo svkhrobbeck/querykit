@@ -30,6 +30,14 @@ const f = createFilters<"status" | "age", MyRawSql>();
 f.and(f.eq("status", "active"), f.gte("age", 18));
 ```
 
+### Requirements
+
+|         | Version   | Tested (`bun run test:matrix`) |
+| ------- | --------- | ------------------------------ |
+| Node.js | `>=22.12` | 24                             |
+
+Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+
 ## License
 
 MIT © Suhrobbek Soatov

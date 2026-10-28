@@ -17,6 +17,15 @@ bun add @querykitjs/zod zod
 # @querykitjs/core avtomatik keladi (dependency); zod — peer
 ```
 
+### Talablar
+
+|              | Versiya   | Tekshiriladi (`bun run test:matrix`) |
+| ------------ | --------- | ------------------------------------ |
+| Node.js      | `>=22.12` | 24                                   |
+| `zod` (peer) | `^4`      | 4.6.7                                |
+
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
 ## Foydalanish (Hono misol)
 
 ```ts

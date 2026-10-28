@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "scripts": {
     "build": "bun run --filter @querykitjs/core build && bun run --filter @querykitjs/zod build && bun run --filter @querykitjs/class-validator build && bun run --filter @querykitjs/drizzle-pg build && bun run --filter @querykitjs/prisma-pg build && bun run --filter @querykitjs/mongoose build && bun run --filter @querykitjs/web build",

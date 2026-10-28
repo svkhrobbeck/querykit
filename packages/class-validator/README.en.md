@@ -27,6 +27,17 @@ import "reflect-metadata";
 
 Without it, class-transformer's `@Type()` throws `Reflect.getMetadata is not a function`.
 
+### Requirements
+
+|                                    | Version             | Tested (`bun run test:matrix`) |
+| ---------------------------------- | ------------------- | ------------------------------ |
+| Node.js                            | `>=22.12`           | 24                             |
+| `class-validator` (peer)           | `>=0.14 <0.16`      | 0.14.4, 0.15.1                 |
+| `class-transformer` (peer)         | `^0.5`              | 0.5.1                          |
+| `reflect-metadata` (optional peer) | `^0.1.13 \|\| ^0.2` | 0.1.14, 0.2.2                  |
+
+Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+
 ## Usage (NestJS)
 
 `main.ts`:

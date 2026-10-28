@@ -17,6 +17,15 @@ bun add @querykitjs/zod zod
 # @querykitjs/core comes transitively (dependency); zod is a peer
 ```
 
+### Requirements
+
+|              | Version   | Tested (`bun run test:matrix`) |
+| ------------ | --------- | ------------------------------ |
+| Node.js      | `>=22.12` | 24                             |
+| `zod` (peer) | `^4`      | 4.6.7                          |
+
+Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+
 ## Usage (Hono example)
 
 ```ts

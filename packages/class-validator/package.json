@@ -38,6 +38,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -48,9 +51,9 @@
     "@querykitjs/core": "workspace:*"
   },
   "peerDependencies": {
-    "class-transformer": ">=0.5",
-    "class-validator": ">=0.14",
-    "reflect-metadata": ">=0.1.13"
+    "class-transformer": "^0.5",
+    "class-validator": ">=0.14 <0.16",
+    "reflect-metadata": "^0.1.13 || ^0.2"
   },
   "peerDependenciesMeta": {
     "reflect-metadata": {

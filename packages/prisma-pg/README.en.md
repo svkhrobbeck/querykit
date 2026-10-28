@@ -42,6 +42,15 @@ bun add @querykitjs/prisma-pg @prisma/client
 
 `@prisma/client` (>=5) is a peer dependency. The package never **imports** your generated client: it reads model metadata off your client instance at runtime and derives types from the delegate you pass in.
 
+### Requirements
+
+|                         | Version   | Tested (`bun run test:matrix`) |
+| ----------------------- | --------- | ------------------------------ |
+| Node.js                 | `>=22.12` | 24                             |
+| `@prisma/client` (peer) | `>=5`     | —                              |
+
+Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+
 ## Setup
 
 ### 1. Registry (once)

@@ -30,6 +30,14 @@ const f = createFilters<"status" | "age", MyRawSql>();
 f.and(f.eq("status", "active"), f.gte("age", 18));
 ```
 
+### Talablar
+
+|         | Versiya   | Tekshiriladi (`bun run test:matrix`) |
+| ------- | --------- | ------------------------------------ |
+| Node.js | `>=22.12` | 24                                   |
+
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+
 ## Litsenziya
 
 MIT © Suhrobbek Soatov
