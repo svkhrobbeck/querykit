@@ -9,7 +9,7 @@
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
-import { and3, not3, or3, pgOrder, sortRows, sqlCompare, sqlLike, type Direction, type Tri } from "../../core/test/conformance/semantics";
+import { and3, not3, or3, pgOrder, sortRows, sqlCompare, sqlIn, sqlLike, type Direction, type Tri } from "../../core/test/conformance/semantics";
 
 type Row = Record<string, unknown>;
 type Token = { kind: "ident" | "param" | "punct" | "op" | "word"; text: string };
@@ -153,8 +153,7 @@ function evaluate(node: Node, row: Row): Tri {
       return node.negated ? not3(matched) : matched;
     }
     case "in": {
-      const stored = row[node.column];
-      const found: Tri = stored === null || stored === undefined ? null : node.values.some(value => sqlCompare(stored, value, o => o === 0) === true);
+      const found = sqlIn(row[node.column], node.values);
       return node.negated ? not3(found) : found;
     }
     case "between": {

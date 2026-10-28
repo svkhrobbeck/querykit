@@ -65,6 +65,15 @@ export function sqlLike(stored: unknown, pattern: unknown, caseInsensitive: bool
   return likeToRegExp(String(pattern), caseInsensitive).test(String(stored));
 }
 
+/** Escape a literal for use inside a LIKE pattern (`contains`-style operators). */
+export const escapeLike = (text: string): string => text.replace(/[\\%_]/g, "\\$&");
+
+/** SQL `x IN (…)`: UNKNOWN for a NULL value. */
+export function sqlIn(stored: unknown, values: unknown): Tri {
+  if (stored === null || stored === undefined) return null;
+  return (values as unknown[]).some(value => sqlCompare(stored, value, order => order === 0) === true);
+}
+
 export type Direction = "asc" | "desc";
 
 /** PostgreSQL default ordering: NULLS LAST for ASC, NULLS FIRST for DESC. */

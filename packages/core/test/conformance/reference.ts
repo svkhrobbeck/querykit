@@ -10,16 +10,9 @@
  */
 import type { FieldCondition, Filter, FilterNode, Sort } from "../../src/types";
 
-import { and3, compareValues, not3, or3, pgOrder, sortRows, sqlCompare, sqlLike, type Tri } from "./semantics";
+import { and3, escapeLike, not3, or3, pgOrder, sortRows, sqlCompare, sqlIn, sqlLike, type Tri } from "./semantics";
 
 type Row = Record<string, unknown>;
-
-const escapeLike = (text: string): string => text.replace(/[\\%_]/g, "\\$&");
-
-function inList(stored: unknown, list: unknown): Tri {
-  if (stored === null || stored === undefined) return null;
-  return (list as unknown[]).some(item => item !== null && compareValues(stored, item) === 0);
-}
 
 function evalCondition(condition: FieldCondition, row: Row): Tri {
   const stored = row[condition.key];
@@ -60,9 +53,9 @@ function evalCondition(condition: FieldCondition, row: Row): Tri {
     case "notLike":
       return not3(sqlLike(stored, value, false));
     case "in":
-      return inList(stored, value);
+      return sqlIn(stored, value);
     case "notIn":
-      return not3(inList(stored, value));
+      return not3(sqlIn(stored, value));
     case "between": {
       const [min, max] = value as unknown[];
       return and3([sqlCompare(stored, min, order => order >= 0), sqlCompare(stored, max, order => order <= 0)]);

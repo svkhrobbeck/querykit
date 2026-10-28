@@ -4,20 +4,26 @@
  * three-valued logic, `contains`-style filters as escaped LIKE (case-insensitive
  * with `mode: "insensitive"`), PostgreSQL null ordering. Test-only.
  */
-import { and3, not3, or3, pgOrder, pick, sortRows, sqlCompare, sqlLike, type Direction, type Tri } from "../../core/test/conformance/semantics";
+import {
+  and3,
+  escapeLike,
+  not3,
+  or3,
+  pgOrder,
+  pick,
+  sortRows,
+  sqlCompare,
+  sqlIn,
+  sqlLike,
+  type Direction,
+  type Tri,
+} from "../../core/test/conformance/semantics";
 
 type Row = Record<string, unknown>;
 type Filter = Record<string, unknown>;
 
 const isPlainObject = (value: unknown): value is Filter => typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
 const asList = (value: unknown): unknown[] => (Array.isArray(value) ? value : [value]);
-const escapeLike = (text: string): string => text.replace(/[\\%_]/g, "\\$&");
-
-function inList(stored: unknown, values: unknown): Tri {
-  if (stored === null || stored === undefined) return null;
-  return (values as unknown[]).some(value => sqlCompare(stored, value, order => order === 0) === true);
-}
-
 /** One field's filter object (`{ equals, not, gt, in, contains, mode, … }`) or a bare value. */
 function evalField(stored: unknown, filter: unknown): Tri {
   if (filter === null) return stored === null || stored === undefined;
@@ -47,10 +53,10 @@ function evalField(stored: unknown, filter: unknown): Tri {
         parts.push(sqlCompare(stored, operand, order => order <= 0));
         break;
       case "in":
-        parts.push(inList(stored, operand));
+        parts.push(sqlIn(stored, operand));
         break;
       case "notIn":
-        parts.push(not3(inList(stored, operand)));
+        parts.push(not3(sqlIn(stored, operand)));
         break;
       case "contains":
         parts.push(sqlLike(stored, `%${escapeLike(String(operand))}%`, insensitive));
