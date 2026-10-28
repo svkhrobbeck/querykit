@@ -51,8 +51,8 @@
     "mongoose": ">=8"
   },
   "devDependencies": {
-    "mongodb-memory-server": "^11.2.0",
-    "mongoose": "^9.7.4"
+    "mongodb-memory-server": "11.3.0",
+    "mongoose": "9.11.4"
   },
   "keywords": [
     "mongoose",

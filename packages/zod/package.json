@@ -51,7 +51,7 @@
     "zod": "^4"
   },
   "devDependencies": {
-    "zod": "^4.1.12"
+    "zod": "4.6.7"
   },
   "keywords": [
     "querykit",
