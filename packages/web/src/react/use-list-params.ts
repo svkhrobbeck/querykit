@@ -1,4 +1,4 @@
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 
 import type { AdapterName, WithFor } from "../adapter";
 import type { Resource } from "../registry";
@@ -16,7 +16,7 @@ export interface UseListParamsOptions<A extends AdapterName> {
 }
 
 /**
- * List URL-state hook — turnkey with **react-router-dom** (uses `useSearchParams`
+ * List URL-state hook — turnkey with **react-router** v7 / v8 (uses `useSearchParams`
  * internally). Reads filters/sort/page from the URL via the schema, builds a
  * ready-to-send payload through the `resource`, and returns URL setters (which
  * reset `page` on filter/sort/size change). Does **not** fetch — pass `params`
