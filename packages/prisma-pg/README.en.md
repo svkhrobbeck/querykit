@@ -36,20 +36,30 @@ const { data, meta } = await usersRepository.findList({
 ## Install
 
 ```bash
-bun add @querykitjs/prisma-pg @prisma/client
-# or: npm i @querykitjs/prisma-pg @prisma/client
+bun add @querykitjs/prisma-pg @prisma/client @prisma/adapter-pg pg
+# or: npm i @querykitjs/prisma-pg @prisma/client @prisma/adapter-pg pg
 ```
 
-`@prisma/client` (>=5) is a peer dependency. The package never **imports** your generated client: it reads model metadata off your client instance at runtime and derives types from the delegate you pass in.
+`@prisma/client` (`^6.19 || ^7.10`) is a peer dependency; `@prisma/adapter-pg` and `pg` belong to your app (Prisma 7 requires a driver adapter). The package never **imports** your generated client: it reads model metadata off your client instance at runtime and derives types from the delegate you pass in.
 
 ### Requirements
 
-|                         | Version   | Tested (`bun run test:matrix`) |
-| ----------------------- | --------- | ------------------------------ |
-| Node.js                 | `>=22.12` | 24                             |
-| `@prisma/client` (peer) | `>=5`     | —                              |
+|                         | Version            | Tested (`bun run test:matrix`) |
+| ----------------------- | ------------------ | ------------------------------ |
+| Node.js                 | `>=22.12`          | 24                             |
+| `@prisma/client` (peer) | `^6.19 \|\| ^7.10` | 6.19.3, 7.10.1                 |
 
 Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+
+### Prisma 7 and Prisma 6
+
+The adapter reads model metadata from the client instance you pass in, so it works the same with either major. Both are tested (`test:matrix`) with the `prisma-client` generator and `@prisma/adapter-pg`.
+
+- **Prisma 7** — generator `provider = "prisma-client"` with an `output` (e.g. `"../generated/prisma"`); the datasource `url` lives in `prisma.config.ts`, not in the schema; build the client with a driver adapter as in the Setup below.
+- **Prisma 6.19** — the same generator and adapter work; keep `url = env("DATABASE_URL")` in the schema's `datasource` block. A `prisma-client-js` client created with `new PrismaClient()` keeps working too.
+- **Pitfall — non-`public` schema:** with a driver adapter Prisma ignores a `?schema=` parameter in the connection string, so queries go to `public`. Pass the schema to the adapter: `new PrismaPg({ connectionString }, { schema: "app" })`.
+
+**Migrating to Prisma 7:** switch the generator to `prisma-client` with an `output`, import `PrismaClient` from that output, install `@prisma/adapter-pg` + `pg` and pass `adapter`, and move the `url` to `prisma.config.ts`. Nothing changes in your `createRegistry` / repository code.
 
 ## Setup
 
@@ -57,10 +67,11 @@ Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the las
 
 ```ts
 // db/registry.ts
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { createRegistry } from "@querykitjs/prisma-pg";
+import { PrismaClient } from "../generated/prisma/client"; // `prisma-client` generator output
 
-export const prisma = new PrismaClient();
+export const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 export const registry = createRegistry(prisma);
 // or with pagination defaults:
 // export const registry = createRegistry(prisma, { defaultPerPage: 20, defaultLimit: 20 });

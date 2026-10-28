@@ -19,7 +19,7 @@
  * dependencies relative to that module — `../../drizzle-pg/src/...` finds its own
  * `drizzle-orm`.
  */
-import { PrismaClient } from "./prisma/generated/index.js";
+import { createTestClient } from "./prisma/client";
 
 /* --- the adapter under audit --- */
 import { createRegistry } from "../src/index";
@@ -58,7 +58,7 @@ const overTheWire = <T>(payload: T): T => JSON.parse(JSON.stringify(payload)) as
 
 /* ------------------------- one model, three adapters ----------------------- */
 
-const prisma = new PrismaClient({ datasources: { db: { url: "postgresql://x:x@127.0.0.1:5432/x" } } });
+const prisma = createTestClient();
 const userMeta = readModelMeta(prisma as never, "user");
 
 interface Call {

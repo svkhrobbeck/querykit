@@ -11,7 +11,7 @@
  * and it keeps the **cross-adapter parity** (the whole point of querykit) under
  * a test that runs in CI without a server.
  */
-import { PrismaClient } from "./prisma/generated/index.js";
+import { createTestClient } from "./prisma/client";
 
 import { readModelMeta, resolveField, delegateKeys, isDateField, isStringField, castValue, type ModelMeta, type FieldMeta } from "../src/internal/fields";
 import { operators, parseLikePattern } from "../src/internal/operators";
@@ -46,7 +46,7 @@ function spy() {
   return { diag, seen };
 }
 
-const prisma = new PrismaClient({ datasources: { db: { url: "postgresql://x:x@localhost:5432/x" } } });
+const prisma = createTestClient();
 const userMeta = readModelMeta(prisma as never, "user");
 const postMeta = readModelMeta(prisma as never, "post");
 

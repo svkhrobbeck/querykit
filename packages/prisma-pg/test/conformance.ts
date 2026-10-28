@@ -14,10 +14,10 @@ import { runConformanceCli, type Harness } from "../../core/test/conformance/run
 import { createRegistry } from "../src/index";
 
 import { count, findMany, type FindManyArgs } from "./fake-prisma";
-import { PrismaClient } from "./prisma/generated/index.js";
+import { createTestClient } from "./prisma/client";
 
 /** Model metadata comes from the generated client; no connection is opened. */
-const prisma = new PrismaClient({ datasources: { db: { url: "postgresql://conformance:conformance@127.0.0.1:5432/conformance" } } });
+const prisma = createTestClient();
 
 const fakeClient = {
   _runtimeDataModel: (prisma as unknown as { _runtimeDataModel: unknown })._runtimeDataModel,

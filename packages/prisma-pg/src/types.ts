@@ -9,13 +9,14 @@
  * names, same semantics, one shared source in core.
  *
  * ⚠️ This file must never import from `@prisma/client` itself — only from
- * `@prisma/client/runtime/library`, which exists whether or not a client has been
- * generated. That is what lets the package typecheck and build in CI with no
+ * `@prisma/client/runtime/client`, which exists whether or not a client has been
+ * generated (Prisma 6.19 and 7 both ship it; 7 has no `runtime/library`). That
+ * is what lets the package typecheck and build in CI with no
  * `prisma generate` step, while still inferring exact row types in a consumer's
  * project. `Types.Public.*` are Prisma's own public type utilities; the generated
  * client re-exports the very same ones as `Prisma.Result` / `Prisma.Args`.
  */
-import type { Types } from "@prisma/client/runtime/library";
+import type { Types } from "@prisma/client/runtime/client";
 import type * as Core from "@querykitjs/core";
 
 import type { FieldMeta } from "./internal/fields";

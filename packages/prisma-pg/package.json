@@ -55,11 +55,14 @@
     "@querykitjs/core": "workspace:*"
   },
   "peerDependencies": {
-    "@prisma/client": ">=5"
+    "@prisma/client": "^6.19 || ^7.10"
   },
   "devDependencies": {
-    "@prisma/client": "^6.19.1",
-    "prisma": "^6.19.1"
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
+    "prisma": "7.10.1"
   },
   "keywords": [
     "prisma",
