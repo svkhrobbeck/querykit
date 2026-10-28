@@ -9,6 +9,7 @@
  * `experimentalDecorators`. See ./.bun/tsconfig.json for the full reasoning.
  */
 import "reflect-metadata";
+import "./limits";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { plainToInstance } from "class-transformer";

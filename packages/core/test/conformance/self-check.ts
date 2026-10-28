@@ -11,6 +11,7 @@ import { FILTER_OPERATORS } from "../../src/operators";
 import type { Filter, FilterNode, SortItem } from "../../src/types";
 
 import { CASES, type ConformanceCase } from "./cases";
+import { LIMIT_CASES, LIMIT_NAMES } from "./cases-limits";
 import { ROWS } from "./fixtures";
 import { referenceFilter, referenceSort } from "./reference";
 
@@ -84,8 +85,20 @@ require(CASES.some(c => c.options?.strict && c.expect.error?.reason === "unknown
 require(CASES.some(c => (c.expect.skipped?.length ?? 0) > 0), "onSkippedCondition is called");
 require(CASES.some(c => c.options?.forcedColumns && c.expect.keys && !c.expect.keys.includes("email")), "forcedColumns hides a column");
 
+/* Request-limit table (task 008): every limit has a case inside and a case outside it, and an override. */
+for (const limit of LIMIT_NAMES) {
+  const cases = LIMIT_CASES.filter(c => c.limit === limit);
+  require(cases.some(c => c.verdict === "ok"), `limit ${limit} has no case inside it`);
+  require(cases.some(c => c.verdict === "reject"), `limit ${limit} has no case outside it`);
+  require(cases.some(c => c.limits?.[limit] !== undefined), `limit ${limit} has no override case`);
+}
+require(LIMIT_CASES.some(c => c.kind === "infinite"), "limit table: no infinite offset case");
+require(new Set(LIMIT_CASES.map(c => c.name)).size === LIMIT_CASES.length, "limit table: case names are unique");
+
 if (problems.length > 0) {
   for (const problem of problems) console.log(`❌ ${problem}`);
   process.exitCode = 1;
 }
-console.log(`conformance table: ${CASES.length} cases, ${operators.size}/${FILTER_OPERATORS.length} operators, ${problems.length} problems`);
+console.log(
+  `conformance table: ${CASES.length} cases, ${operators.size}/${FILTER_OPERATORS.length} operators · limit table: ${LIMIT_CASES.length} cases · ${problems.length} problems`,
+);

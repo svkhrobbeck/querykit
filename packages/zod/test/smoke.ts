@@ -12,6 +12,7 @@ import {
   makeOffsetParamsSchema,
   offsetParamsSchema,
 } from "../src/index";
+import "./limits";
 
 let passed = 0;
 let failed = 0;
