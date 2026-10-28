@@ -57,6 +57,7 @@ Adapter model metadata'sini siz bergan client instansiyasidan o'qiydi, shuning u
 
 - **Prisma 7** — generator `provider = "prisma-client"` va `output` (masalan `"../generated/prisma"`); datasource `url` sxemada emas, `prisma.config.ts` da; client quyidagi Sozlash'dagidek driver adapter bilan yaratiladi.
 - **Prisma 6.19** — xuddi shu generator va adapter ishlaydi; sxemaning `datasource` blokida `url = env("DATABASE_URL")` qoladi. `prisma-client-js` bilan `new PrismaClient()` orqali yaratilgan client ham ishlashda davom etadi.
+- **Tuzoq — `public` bo'lmagan schema:** driver adapter bilan Prisma connection string'dagi `?schema=` parametrini e'tiborsiz qoldiradi va so'rovlar `public`ga ketadi. Schema'ni adapterga bering: `new PrismaPg({ connectionString }, { schema: "app" })`.
 
 **Prisma 7 ga o'tish:** generatorni `output` bilan `prisma-client` ga almashtiring, `PrismaClient`ni shu chiqishdan import qiling, `@prisma/adapter-pg` + `pg` o'rnatib `adapter` bering, `url`ni `prisma.config.ts` ga ko'chiring. `createRegistry` / repository kodingizda hech narsa o'zgarmaydi.
 

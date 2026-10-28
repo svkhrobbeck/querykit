@@ -57,6 +57,7 @@ The adapter reads model metadata from the client instance you pass in, so it wor
 
 - **Prisma 7** — generator `provider = "prisma-client"` with an `output` (e.g. `"../generated/prisma"`); the datasource `url` lives in `prisma.config.ts`, not in the schema; build the client with a driver adapter as in the Setup below.
 - **Prisma 6.19** — the same generator and adapter work; keep `url = env("DATABASE_URL")` in the schema's `datasource` block. A `prisma-client-js` client created with `new PrismaClient()` keeps working too.
+- **Pitfall — non-`public` schema:** with a driver adapter Prisma ignores a `?schema=` parameter in the connection string, so queries go to `public`. Pass the schema to the adapter: `new PrismaPg({ connectionString }, { schema: "app" })`.
 
 **Migrating to Prisma 7:** switch the generator to `prisma-client` with an `output`, import `PrismaClient` from that output, install `@prisma/adapter-pg` + `pg` and pass `adapter`, and move the `url` to `prisma.config.ts`. Nothing changes in your `createRegistry` / repository code.
 
