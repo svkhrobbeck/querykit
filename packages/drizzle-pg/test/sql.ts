@@ -20,6 +20,7 @@ import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 
 import { createRegistry, createFilters } from "../src/index";
 import type { AnyDb } from "../src/types";
+import "./policy";
 
 /* -------------------------------- schema ---------------------------------- */
 
@@ -144,7 +145,12 @@ function check(label: string, ok: boolean, extra = "") {
 }
 
 const registry = createRegistry(stubDb, schema);
-const usersRepo = registry.repository(users);
+/** The 3.x behaviour (task 009 "Migrating to 4.0"): every column filterable with every operator, every column sortable. */
+const OPEN = {
+  filterable: { id: "*", name: "*", email: "*", age: "*", createdAt: "*", createdAtText: "*", deletedAt: "*" },
+  sortable: ["id", "name", "email", "age", "createdAt", "createdAtText", "deletedAt"],
+} as const;
+const usersRepo = registry.repository(users, OPEN);
 const uf = createFilters<typeof users>();
 
 const ISO_FROM = "2026-01-01T00:00:00.000Z";
@@ -278,14 +284,14 @@ async function main() {
   const columnsOf = (results: Awaited<ReturnType<typeof capture>>) => Object.keys(results[0]!.entry.columns ?? {}).sort();
 
   /* 13. forcedColumns ignores the client's selection outright */
-  const forcedRepo = registry.repository(users, { forcedColumns: { id: true, name: true } });
+  const forcedRepo = registry.repository(users, { ...OPEN, forcedColumns: { id: true, name: true } });
   const forced = await capture(() => forcedRepo.findAll({ columns: { email: true } as never }));
   check("forcedColumns: client selection ignored", JSON.stringify(columnsOf(forced)) === JSON.stringify(["id", "name"]), columnsOf(forced).join());
   const forcedNoColumns = await capture(() => forcedRepo.findList({}));
   check("forcedColumns: applied when the client sends nothing", JSON.stringify(columnsOf(forcedNoColumns)) === JSON.stringify(["id", "name"]));
 
   /* 14. allowedColumns intersects — and never falls back to the full row */
-  const allowRepo = registry.repository(users, { allowedColumns: ["id", "name"] });
+  const allowRepo = registry.repository(users, { ...OPEN, allowedColumns: ["id", "name"] });
   const intersected = await capture(() => allowRepo.findAll({ columns: { name: true, email: true } as never }));
   check("allowedColumns: intersects the client selection", JSON.stringify(columnsOf(intersected)) === JSON.stringify(["name"]), columnsOf(intersected).join());
 
@@ -350,7 +356,7 @@ async function main() {
   check("cursor limit is capped at 200", (await usersRepo.findCursor({ limit: 10_000 })).meta.limit === 200);
 
   const cappedRegistry = createRegistry(stubDb, schema, { maxPerPage: 50, maxLimit: 25 });
-  const cappedRepo = cappedRegistry.repository(users);
+  const cappedRepo = cappedRegistry.repository(users, OPEN);
   check("registry maxPerPage is honoured", (await cappedRepo.findList({ perPage: 10_000 })).meta.per_page === 50);
   check("registry maxLimit is honoured", (await cappedRepo.findInfinite({ limit: 10_000 })).meta.limit === 25);
   check("a request under the cap is untouched", (await usersRepo.findList({ perPage: 15 })).meta.per_page === 15);
@@ -359,7 +365,7 @@ async function main() {
   /* --------------------------- registry arities --------------------------- */
   /* 19. repository(table) / (table, extend) / (table, options) / (table, options, extend) */
   check("arity: repository(table)", typeof registry.repository(users).findAll === "function");
-  const extended = registry.repository(users, base => ({ byName: (name: string) => base.findAll({ filter: [uf.eq("name", name)] }) }));
+  const extended = registry.repository(users, OPEN, base => ({ byName: (name: string) => base.findAll({ filter: [uf.eq("name", name)] }) }));
   check("arity: repository(table, extend)", typeof extended.byName === "function" && typeof extended.findAll === "function");
   check("arity: repository(table, options)", typeof registry.repository(users, { allowedColumns: ["id"] }).findAll === "function");
   const both = registry.repository(users, { allowedColumns: ["id", "name"] }, base => ({ first: () => base.findOne({}) }));
@@ -391,7 +397,7 @@ async function main() {
 
   /* 23. the hook makes those drops visible without changing behaviour */
   const seen: SkippedCondition[] = [];
-  const watchedRepo = createRegistry(stubDb, schema, { onSkippedCondition: info => seen.push(info) }).repository(users);
+  const watchedRepo = createRegistry(stubDb, schema, { onSkippedCondition: info => seen.push(info) }).repository(users, OPEN);
 
   seen.length = 0;
   await watchedRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] });
@@ -428,7 +434,7 @@ async function main() {
   check("hook: a valid request reports nothing", seen.length === 0, JSON.stringify(seen));
 
   /* 25. strict turns each of those into a QueryKitError */
-  const strictRepo = createRegistry(stubDb, schema, { strict: true }).repository(users);
+  const strictRepo = createRegistry(stubDb, schema, { strict: true }).repository(users, OPEN);
   const rejects = async (fn: () => Promise<unknown>) => {
     try {
       await fn();

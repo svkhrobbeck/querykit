@@ -92,10 +92,17 @@ export const registry = createRegistry(db, schema);
 import { registry } from "../registry";
 import { users } from "../schema";
 
-export const usersRepository = registry.repository(users, base => ({
-  findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
-}));
+export const usersRepository = registry.repository(
+  users,
+  // 4.0: filter/sort only by the columns listed here (Safe by default)
+  { filterable: { email: ["="], status: ["=", "in"], age: [">=", "<="] }, sortable: ["id", "createdAt"] },
+  base => ({
+    findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
+  }),
+);
 ```
+
+⚠️ The policy applies to **every** read call on the repository — the server's own filters in custom methods too (`email` is in `filterable` for `findByEmail`). When internal code must query a column you do not open to clients, build a separate, wider repository for that and never hand it to a route.
 
 `repository()` takes four shapes (the same as the mongoose adapter):
 
@@ -180,6 +187,35 @@ try {
 A `scope` or `cursorKey` key is **always** fatal, regardless of `strict` — those
 are the server's own, and dropping them silently would be a security defect.
 
+## Safe by default — `filterable`, `sortable`, `limits`
+
+A client filters and sorts only by the columns the server allows, and only with the operators it allows. A refused request stops with a `QueryKitError` before it reaches the database — whatever `strict` and `onSkippedCondition` say (it is never dropped silently).
+
+```ts
+const usersRepository = db.repository(users, {
+  forcedColumns: { id: true, fullName: true, status: true, createdAt: true },
+  filterable: {
+    status: ["=", "in"],
+    createdAt: ["between", ">=", "<="],
+    fullName: ["contains"], // "contains" and its token "%_%" are one operator
+  },
+  sortable: ["id", "createdAt", "fullName"],
+  limits: { maxInItems: 500 }, // over the registry's createRegistry(..., { limits })
+});
+```
+
+| Option       | When not given (default)                                                                                | When refused                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `filterable` | `allowedColumns` (else the `forcedColumns` keys, else only the primary key), with `"="` and `"in"` only | `reason: "forbidden-key"` / `"forbidden-operator"`, `site: "filter"` |
+| `sortable`   | the primary key and `createdAt` (when the table has it); a client-sent `cursorKey` too                  | `reason: "forbidden-key"`, `site: "sort"` / `"cursorKey"`            |
+| `limits`     | core `DEFAULT_QUERY_LIMITS` (depth 5, conditions 30, array 200, string 256, offset 10 000, sort 3)      | `reason: "limit-exceeded"`, `site: "filter"` / `"sort"` / `"page"`   |
+
+- `aggregate`: the `filter` and every `groupBy`/`sum`/`avg`/`min`/`max` column must be in `filterable` (`site: "aggregate"`).
+- `findById`: only the client `filter` is checked; `idKey` is the server's choice.
+- A key the table does **not** have (`nope`) stays `unknown-key` — skipped, or an error under `strict`.
+- Mutation filters (`updateMany`, `deleteMany`, …) count as server code and are not checked.
+- Operator aliases are one: `["="]` also admits `eq`, `["contains"]` also `%_%`. `"*"` admits every operator.
+
 ## Advanced filters
 
 A filter is a tree of field conditions and logical groups (`and`/`or`/`not`). A flat array is treated as implicit `AND`.
@@ -258,6 +294,21 @@ await mine.create({ ... });        // supervisor_id forced to user.id
 A scope can also be given as `registry.repository(table, { scope })`. An unknown
 scope key **throws** when the repository is built — dropping it silently would
 remove the RBAC filter.
+
+## Migrating to 4.0
+
+In 4.0 a repository without a policy is **narrow**: `=` and `in` on `allowedColumns` / `forcedColumns` / the primary key only, sorting by the primary key and `createdAt`. To bring back the 3.x behaviour (any column, any operator) for one repository on purpose:
+
+```ts
+const open = db.repository(users, {
+  filterable: { id: "*", fullName: "*", email: "*", status: "*", createdAt: "*" },
+  sortable: ["id", "fullName", "email", "status", "createdAt"],
+});
+```
+
+- First collect from `onSkippedCondition` logs which fields and operators are in use, then narrow `filterable` to exactly those — `"*"` is a stopgap.
+- New `QueryKitError` reasons: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; new site: `page`. Return them as 400.
+- Pages deeper than offset 10 000 are now refused — use `findCursor`, or raise it with `limits: { maxOffset }`.
 
 ## Wire (JSON) values and migrating from DbService
 

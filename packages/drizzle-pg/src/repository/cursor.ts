@@ -10,7 +10,7 @@ import type { RepoContext } from "./context";
 
 /** `findCursor` — keyset pagination on one column. */
 export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>) {
-  const { runtime, table, diag, handle, composeWhere } = ctx;
+  const { runtime, table, diag, handle, policy, composeWhere } = ctx;
   const { guarded, permits, pickColumns } = ctx.projection;
 
   return {
@@ -19,6 +19,9 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       const cursorKey = (params.cursorKey ?? "id") as string;
       const order: SortDirection = params.order ?? "asc";
       const direction = params.direction ?? "forward";
+      policy.checkFilter(params.filter);
+      // The default `id` is the server's choice; a client-sent key must be sortable.
+      if (params.cursorKey !== undefined) policy.checkCursorKey(cursorKey);
 
       const column = resolveColumn(table, cursorKey);
       // Always fatal: without a usable cursor column there is no pagination to

@@ -1,10 +1,11 @@
 import { and, getTableName, isNull, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
-import type { Diagnostics } from "@querykitjs/core/internal";
+import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import type { QueryLimits } from "@querykitjs/core";
 
 import type { AnyDb, ColumnKey, FieldCondition, Filter, Id, RepositoryOptions } from "../types";
-import { getTableKey, isTable, resolveColumn } from "../internal/columns";
+import { getTableKey, isTable, resolveColumn, tableColumns } from "../internal/columns";
 import { buildWhere } from "../internal/where";
 import { buildProjection, type Projection } from "./projection";
 
@@ -26,6 +27,8 @@ export interface RepoRuntime {
   strict: boolean;
   /** Called for every dropped condition (also when `strict` is off). */
   onSkippedCondition?: (info: SkippedCondition) => void;
+  /** Registry-level request limits; a repository's own `limits` win. */
+  limits?: Partial<QueryLimits>;
 }
 
 export interface RelationalHandle {
@@ -48,6 +51,8 @@ export interface RepoContext<TTable extends AnyPgTable> {
   updatedAtCol: AnyPgColumn | undefined;
   deletedAtCol: AnyPgColumn | undefined;
   projection: Projection<TTable>;
+  /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
+  policy: Policy;
   /** User filter + scope + soft-delete guard as one WHERE. */
   composeWhere: (userFilter?: Filter<TTable>, withDeleted?: boolean) => SQL | undefined;
   /** `filter AND idKey = id`. */
@@ -80,6 +85,7 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
 
   const scopeWhere = buildScopeWhere(table, config);
   const projection = buildProjection(config);
+  const policy = buildPolicy(table, config, runtime.limits);
 
   const composeWhere = (userFilter?: Filter<TTable>, withDeleted?: boolean): SQL | undefined => {
     const parts = [buildWhere(table, userFilter, diag), scopeWhere, deletedAtCol && !withDeleted ? isNull(deletedAtCol) : undefined].filter(
@@ -105,7 +111,29 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
     return rows[0]?.value ?? 0;
   };
 
-  return { runtime, table, diag, executor, handle, updatedAtCol, deletedAtCol, projection, composeWhere, withId, countWhere };
+  return { runtime, table, diag, executor, handle, updatedAtCol, deletedAtCol, projection, policy, composeWhere, withId, countWhere };
+}
+
+/** The table's request policy. Fields are named by JS property; a DB column name maps to the same field. */
+function buildPolicy<TTable extends AnyPgTable>(table: TTable, config: RepositoryOptions<TTable>, registryLimits?: Partial<QueryLimits>): Policy {
+  const columns = tableColumns(table);
+  const fieldByName = new Map<string, string>();
+  for (const [key, column] of columns) {
+    fieldByName.set(key, key);
+    fieldByName.set(column.name, key);
+  }
+  const fieldOf = (key: string) => fieldByName.get(key);
+  return resolvePolicy({
+    source: getTableName(table),
+    fieldOf,
+    primaryKey: columns.find(([, column]) => column.primary)?.[0] ?? "id",
+    createdAt: fieldOf("createdAt") ?? fieldOf("created_at"),
+    filterable: config.filterable,
+    sortable: config.sortable,
+    allowedColumns: config.allowedColumns,
+    forcedColumns: config.forcedColumns,
+    limits: { ...registryLimits, ...config.limits },
+  });
 }
 
 /** `value`, `[value]` or `[]` — for spec fields that take one key or a list. */

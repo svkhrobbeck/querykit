@@ -8,7 +8,7 @@ import { toArray, type RepoContext } from "./context";
 
 /** `aggregate` — `count`/`sum`/`avg`/`min`/`max`, optionally grouped. */
 export function aggregateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>) {
-  const { table, diag, executor, composeWhere } = ctx;
+  const { table, diag, executor, policy, composeWhere } = ctx;
   const { permits } = ctx.projection;
 
   // An aggregate spec can also come from a request, and `min(password)` or a
@@ -22,6 +22,9 @@ export function aggregateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTa
 
   return {
     async aggregate(spec: AggregateSpec<TTable>): Promise<AggregateRow[]> {
+      // `groupBy` or `min(secret)` reads a column as surely as a filter does.
+      policy.checkFilter(spec.filter);
+      for (const key of [spec.groupBy, spec.sum, spec.avg, spec.min, spec.max].flatMap(toArray)) policy.checkAggregateKey(key);
       const groupKeys = toArray(spec.groupBy).filter(key => Boolean(aggregable(key)));
       const selection: Record<string, SQL | AnyPgColumn> = {};
 

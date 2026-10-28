@@ -19,9 +19,12 @@ import {
   offsetMeta,
   offsetOf,
   reportSkip,
+  resolvePolicy,
+  type PolicyOptions,
 } from "../src/internal/index";
 import { HOSTILE_DEPTH, LIMIT_CASES, notChain } from "./conformance/cases-limits";
 import { runLimitCases } from "./conformance/limits-runner";
+import "./dist";
 
 let passed = 0;
 let failed = 0;
@@ -122,6 +125,96 @@ check(
   offsetOf(501, 20) === 10_000 && offsetOf(502, undefined) === 10_020 && offsetOf(undefined, 50) === 0,
 );
 check("formatLimit", formatLimit("maxInItems", 200) === "maxInItems (200)");
+
+/* request policy (task 009) */
+const FIELDS = new Map([
+  ["id", "id"],
+  ["status", "status"],
+  ["secret", "secret"],
+  ["createdAt", "createdAt"],
+  ["created_at", "createdAt"],
+]);
+const policyOf = (options: Partial<PolicyOptions> = {}) =>
+  resolvePolicy({ source: "accounts", fieldOf: key => FIELDS.get(key), primaryKey: "id", createdAt: "createdAt", ...options });
+const refusal = (run: () => void): string => {
+  try {
+    run();
+    return "ok";
+  } catch (error) {
+    return error instanceof QueryKitError ? `${error.info.reason}/${error.info.site}/${error.info.key}` : `threw ${String(error)}`;
+  }
+};
+const statusPolicy = policyOf({ filterable: { status: ["=", "in"] } });
+check(
+  "policy: forbidden field",
+  refusal(() => statusPolicy.checkFilter([{ key: "secret", operation: "startsWith", value: "a" }])) === "forbidden-key/filter/secret",
+);
+check(
+  "policy: forbidden operator",
+  refusal(() => statusPolicy.checkFilter([{ key: "status", operation: "like", value: "%" }])) === "forbidden-operator/filter/status",
+);
+check(
+  "policy: nested or/not is walked",
+  refusal(() => statusPolicy.checkFilter({ or: [{ key: "status" }, { not: { key: "secret" } }] })) === "forbidden-key/filter/secret",
+);
+check("policy: unknown key is left to the adapter", refusal(() => statusPolicy.checkFilter([{ key: "nope", operation: "like" }])) === "ok");
+check(
+  'policy: alias eq passes a ["="] rule',
+  refusal(() => policyOf({ filterable: { status: ["="] } }).checkFilter([{ key: "status", operation: "eq" }])) === "ok",
+);
+check(
+  'policy: "*" admits every operator',
+  refusal(() => policyOf({ filterable: { status: "*" } }).checkFilter([{ key: "status", operation: "notLike" }])) === "ok",
+);
+check(
+  "policy: DB column name maps to the field",
+  refusal(() => policyOf({ filterable: { createdAt: [">="] } }).checkFilter([{ key: "created_at", operation: ">=" }])) === "ok",
+);
+check("policy: raw / malformed nodes are skipped", refusal(() => statusPolicy.checkFilter([null, 3, { sql: "x" }] as never)) === "ok");
+check("policy: filter limit → limit-exceeded", refusal(() => statusPolicy.checkFilter(notChain(6))) === "limit-exceeded/filter/maxDepth");
+check(
+  "policy default: allowedColumns, equality only",
+  refusal(() => policyOf({ allowedColumns: ["status"] }).checkFilter([{ key: "status", operation: "in" }])) === "ok" &&
+    refusal(() => policyOf({ allowedColumns: ["status"] }).checkFilter([{ key: "status", operation: ">" }])) === "forbidden-operator/filter/status",
+);
+check(
+  "policy default: forcedColumns keys",
+  refusal(() => policyOf({ forcedColumns: { status: true, secret: false } }).checkFilter([{ key: "secret" }])) === "forbidden-key/filter/secret",
+);
+check(
+  "policy default: primary key only",
+  refusal(() => policyOf().checkFilter([{ key: "id" }])) === "ok" &&
+    refusal(() => policyOf().checkFilter([{ key: "status" }])) === "forbidden-key/filter/status",
+);
+check(
+  "policy sort: default sortable = id, createdAt",
+  refusal(() => policyOf().checkSort([{ key: "createdAt" }, { key: "id" }])) === "ok" &&
+    refusal(() => policyOf().checkSort([{ key: "secret" }])) === "forbidden-key/sort/secret",
+);
+check(
+  "policy sort: field count → limit-exceeded",
+  refusal(() => policyOf({ sortable: ["id", "status", "secret", "createdAt"] }).checkSort(["id", "status", "secret", "createdAt"].map(key => ({ key })))) ===
+    "limit-exceeded/sort/maxSortFields",
+);
+check(
+  "policy cursorKey",
+  refusal(() => policyOf().checkCursorKey("secret")) === "forbidden-key/cursorKey/secret" && refusal(() => policyOf().checkCursorKey("id")) === "ok",
+);
+check(
+  "policy page: 501 ok, 502 refused, offset 10 001 refused",
+  refusal(() => policyOf().checkPage({ page: 501, perPage: 20 })) === "ok" &&
+    refusal(() => policyOf().checkPage({ page: 502, perPage: 20 })) === "limit-exceeded/page/maxOffset" &&
+    refusal(() => policyOf().checkPage({ offset: 10_001 })) === "limit-exceeded/page/maxOffset",
+);
+check(
+  "policy page: limits override",
+  refusal(() => policyOf({ limits: { maxOffset: 100 } }).checkPage({ page: 7, perPage: 20 })) === "limit-exceeded/page/maxOffset",
+);
+check(
+  "policy aggregate key",
+  refusal(() => statusPolicy.checkAggregateKey("secret")) === "forbidden-key/aggregate/secret" &&
+    refusal(() => statusPolicy.checkAggregateKey("status")) === "ok",
+);
 
 console.log(`\ncore/internal: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exitCode = 1;

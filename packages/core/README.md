@@ -17,9 +17,10 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle
 - **`FilterScalar` / `FilterValue`**, **`SortDirection`**.
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomik builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server javobi, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
+- **`Filterable`** va skip/rad etish sabablari (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`; `SkipSite` + `page`) — siyosat sabablari hech qachon jim tashlanmaydi, har doim `QueryKitError`.
 - **So'rov limitlari** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` va alohida konstantalar (pastdagi jadval).
 
-- **`@querykitjs/core/internal`** — **faqat adapter va validator yozuvchilar uchun**: cursor tokenlari, skip diagnostikasi, har chaqiruv uchun repository konteksti, sort normalizatsiyasi, pagination meta'lari va limit tekshiruvi (`findFilterLimitViolation`) — hamma querykit paketlari uchun umumiy. Ilova API'si emas; minor relizda o'zgarishi mumkin.
+- **`@querykitjs/core/internal`** — **faqat adapter va validator yozuvchilar uchun**: cursor tokenlari, skip diagnostikasi, har chaqiruv uchun repository konteksti, sort normalizatsiyasi, pagination meta'lari, limit tekshiruvi (`findFilterLimitViolation`) va so'rov siyosati (`resolvePolicy`: `filterable` / `sortable` / `limits`) — hamma querykit paketlari uchun umumiy. Ilova API'si emas; minor relizda o'zgarishi mumkin.
 
 ## Limits
 
