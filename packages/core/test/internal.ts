@@ -3,7 +3,7 @@
  *
  *   bun run test/internal.ts
  */
-import { QueryKitError, type SkippedCondition } from "../src/index";
+import { DEFAULT_QUERY_LIMITS, QueryKitError, resolveLimits, type SkippedCondition } from "../src/index";
 import {
   clampOffset,
   clampPage,
@@ -12,11 +12,16 @@ import {
   cursorPage,
   decodeCursor,
   encodeCursor,
+  findFilterLimitViolation,
+  formatLimit,
   infinitePage,
   normalizeSort,
   offsetMeta,
+  offsetOf,
   reportSkip,
 } from "../src/internal/index";
+import { HOSTILE_DEPTH, LIMIT_CASES, notChain } from "./conformance/cases-limits";
+import { runLimitCases } from "./conformance/limits-runner";
 
 let passed = 0;
 let failed = 0;
@@ -80,6 +85,43 @@ check(
   "cursorPage backward flips to display order",
   same(backward.data, [{ id: 4 }, { id: 5 }]) && backward.meta.has_prev && backward.meta.has_next && backward.meta.prev_cursor === encodeCursor(4),
 );
+
+/* request limits (task 008) — the walk judges the filter cases of the shared limit table */
+const filterLimitResult = runLimitCases(
+  "core walk",
+  testCase => findFilterLimitViolation(testCase.params.filter, resolveLimits(testCase.limits)) === undefined,
+  { cases: LIMIT_CASES.filter(testCase => testCase.kind === "filter") },
+);
+passed += filterLimitResult.passed;
+failed += filterLimitResult.failed;
+
+const inViolation = findFilterLimitViolation(
+  { and: [{ key: "a" }, { or: [{ key: "id", operation: "in", value: Array.from({ length: 201 }, (_, i) => i) }] }] },
+  DEFAULT_QUERY_LIMITS,
+);
+check("violation names limit, max and path", same(inViolation, { limit: "maxInItems", max: 200, path: ["and", 1, "or", 0, "value"] }));
+check(
+  "string inside an array: path ends at the item index",
+  same(findFilterLimitViolation([{ key: "n", value: ["a", "b".repeat(257)] }], DEFAULT_QUERY_LIMITS)?.path, [0, "value", 1]),
+);
+check(
+  "depth violation path follows the not chain",
+  same(findFilterLimitViolation(notChain(6), DEFAULT_QUERY_LIMITS)?.path, ["not", "not", "not", "not", "not"]),
+);
+check("malformed nodes are left to the validator", findFilterLimitViolation([null, 3, { and: "x" }, { foo: 1 }], DEFAULT_QUERY_LIMITS) === undefined);
+check("undefined filter has no violation", findFilterLimitViolation(undefined, DEFAULT_QUERY_LIMITS) === undefined);
+
+const hostileStarted = performance.now();
+const hostile = findFilterLimitViolation(notChain(HOSTILE_DEPTH), DEFAULT_QUERY_LIMITS);
+const hostileMs = performance.now() - hostileStarted;
+check(`hostile depth ${HOSTILE_DEPTH} stops at maxDepth`, hostile?.limit === "maxDepth" && hostile.path.length === 5);
+check(`hostile depth ${HOSTILE_DEPTH} < 50 ms`, hostileMs < 50, `${hostileMs.toFixed(2)} ms`);
+
+check(
+  "offsetOf: (page - 1) × perPage, default perPage 20",
+  offsetOf(501, 20) === 10_000 && offsetOf(502, undefined) === 10_020 && offsetOf(undefined, 50) === 0,
+);
+check("formatLimit", formatLimit("maxInItems", 200) === "maxInItems (200)");
 
 console.log(`\ncore/internal: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exitCode = 1;

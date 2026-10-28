@@ -23,7 +23,7 @@ export const QUERYKIT_MESSAGES_EN = {
   "querykit.filter.invalid_operator": "{path}: `{operation}` is not a supported filter operator",
   "querykit.filter.invalid_value": "{path} must be a string, number, boolean, null, or an array of those",
   "querykit.filter.invalid_group": "{path} must be an array of filter nodes",
-  "querykit.filter.max_depth": "{path} exceeds the maximum filter depth of {max}",
+  "querykit.filter.max_depth": "{path} exceeds maxDepth ({max})",
   "querykit.filter.value_requires_array": "{path}: `{operation}` requires an array value",
   "querykit.filter.value_requires_tuple": "{path}: `{operation}` requires exactly two values",
   "querykit.filter.value_forbidden": "{path}: `{operation}` must not carry a value",
@@ -32,6 +32,7 @@ export const QUERYKIT_MESSAGES_EN = {
   "querykit.sort.missing_key": "{path} is missing the required `key` string",
   "querykit.sort.unknown_key": "{path}: `{key}` is not an allowed sort key",
   "querykit.sort.invalid_direction": "{path}: direction must be `asc` or `desc`",
+  "querykit.limit.exceeded": "{path} exceeds {limit} ({max})",
 } as const satisfies Record<string, string>;
 
 /**
@@ -51,7 +52,7 @@ export const QUERYKIT_MESSAGES_UZ: QueryKitMessageCatalog = {
   "querykit.filter.invalid_operator": "{path}: `{operation}` qo'llab-quvvatlanadigan filter operatori emas",
   "querykit.filter.invalid_value": "{path} string, raqam, boolean, null yoki shularning massivi bo'lishi kerak",
   "querykit.filter.invalid_group": "{path} filter tugunlari massivi bo'lishi kerak",
-  "querykit.filter.max_depth": "{path} ruxsat etilgan filter chuqurligidan ({max}) oshib ketdi",
+  "querykit.filter.max_depth": "{path} limitdan oshdi: maxDepth ({max})",
   "querykit.filter.value_requires_array": "{path}: `{operation}` massiv qiymat talab qiladi",
   "querykit.filter.value_requires_tuple": "{path}: `{operation}` aynan ikkita qiymat talab qiladi",
   "querykit.filter.value_forbidden": "{path}: `{operation}` qiymat qabul qilmaydi",
@@ -60,6 +61,7 @@ export const QUERYKIT_MESSAGES_UZ: QueryKitMessageCatalog = {
   "querykit.sort.missing_key": "{path} da majburiy `key` (string) yo'q",
   "querykit.sort.unknown_key": "{path}: `{key}` ruxsat etilgan sort kaliti emas",
   "querykit.sort.invalid_direction": "{path}: direction `asc` yoki `desc` bo'lishi kerak",
+  "querykit.limit.exceeded": "{path} limitdan oshdi: {limit} ({max})",
 };
 
 /** Ruscha katalog. */
@@ -70,7 +72,7 @@ export const QUERYKIT_MESSAGES_RU: QueryKitMessageCatalog = {
   "querykit.filter.invalid_operator": "{path}: `{operation}` — неподдерживаемый оператор фильтра",
   "querykit.filter.invalid_value": "{path} должен быть строкой, числом, boolean, null или массивом из них",
   "querykit.filter.invalid_group": "{path} должен быть массивом узлов фильтра",
-  "querykit.filter.max_depth": "{path} превышает максимальную глубину фильтра ({max})",
+  "querykit.filter.max_depth": "{path} превышает лимит maxDepth ({max})",
   "querykit.filter.value_requires_array": "{path}: `{operation}` требует значение-массив",
   "querykit.filter.value_requires_tuple": "{path}: `{operation}` требует ровно два значения",
   "querykit.filter.value_forbidden": "{path}: `{operation}` не должен содержать значение",
@@ -79,6 +81,7 @@ export const QUERYKIT_MESSAGES_RU: QueryKitMessageCatalog = {
   "querykit.sort.missing_key": "в {path} отсутствует обязательное поле `key` (строка)",
   "querykit.sort.unknown_key": "{path}: `{key}` — недопустимый ключ сортировки",
   "querykit.sort.invalid_direction": "{path}: direction должен быть `asc` или `desc`",
+  "querykit.limit.exceeded": "{path} превышает лимит {limit} ({max})",
 };
 
 /**

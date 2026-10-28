@@ -7,8 +7,19 @@
  * Backend (Hono, Express, …) so'rov body'sini shu bilan validatsiya qiladi.
  */
 import { z } from "zod";
-import { DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, FILTER_OPERATORS } from "@querykitjs/core";
-import type { FieldCondition, Filter, FilterNode, FilterOperator, FilterValue, WireCursorParams, WireInfiniteParams, WireOffsetParams } from "@querykitjs/core";
+import { DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE, DEFAULT_QUERY_LIMITS, FILTER_OPERATORS, resolveLimits } from "@querykitjs/core";
+import type {
+  FieldCondition,
+  Filter,
+  FilterNode,
+  FilterOperator,
+  FilterValue,
+  QueryLimits,
+  WireCursorParams,
+  WireInfiniteParams,
+  WireOffsetParams,
+} from "@querykitjs/core";
+import { findFilterLimitViolation, formatLimit, offsetOf } from "@querykitjs/core/internal";
 
 /* --------------------------------- filter --------------------------------- */
 
@@ -27,7 +38,11 @@ export const fieldConditionSchema = z.object({
   value: filterValueSchema.optional(),
 });
 
-/** Nested filter tuguni: shart yoki `and`/`or`/`not` guruh (rekursiv). */
+/**
+ * Nested filter tuguni: shart yoki `and`/`or`/`not` guruh (rekursiv).
+ * ⚠️ O'zi **limitsiz** — so'rov body'si uchun {@link filterSchema} yoki factory'lardan
+ * foydalaning: ular daraxtni shu sxemaga berishdan oldin hajm limitlarini tekshiradi.
+ */
 export const filterNodeSchema: z.ZodType<FilterNode> = z.lazy(() =>
   z.union([
     fieldConditionSchema,
@@ -37,15 +52,61 @@ export const filterNodeSchema: z.ZodType<FilterNode> = z.lazy(() =>
   ]),
 );
 
-/** Public filter — daraxt/tugun yoki flat massiv (implicit AND). */
-export const filterSchema = z.union([filterNodeSchema, z.array(fieldConditionSchema)]);
+const filterShapeSchema = z.union([filterNodeSchema, z.array(fieldConditionSchema)]);
+
+/**
+ * Hajm limitlari (chuqurlik, shartlar, massiv elementlari, satr uzunligi) xom
+ * payload'da, iterativ, **`z.lazy` daraxtidan oldin** tekshiriladi: limitdan oshgan
+ * payload rekursiv sxemaga yetib bormaydi, ya'ni 10 000 darajali `not` zanjiri stekni
+ * to'ldirmaydi.
+ */
+const limitedFilterSchema = (limits: QueryLimits) =>
+  z
+    .unknown()
+    .superRefine((value, ctx) => {
+      const violation = findFilterLimitViolation(value, limits);
+      if (violation) ctx.addIssue({ code: "custom", path: violation.path, message: `filter exceeds ${formatLimit(violation.limit, violation.max)}` });
+    })
+    .pipe(filterShapeSchema);
+
+/** Public filter — daraxt/tugun yoki flat massiv (implicit AND), core default limitlari bilan. */
+export const filterSchema = limitedFilterSchema(DEFAULT_QUERY_LIMITS);
 
 /* ---------------------------------- sort ---------------------------------- */
 
 const directionSchema = z.enum(["asc", "desc"]);
 
-/** Sort — an array of `{ key, direction }`. */
-export const sortSchema = z.array(z.object({ key: z.string(), direction: directionSchema.optional() }));
+const sortItemSchema = z.object({ key: z.string(), direction: directionSchema.optional() });
+
+const limitedSortSchema = (maxSortFields: number) => z.array(sortItemSchema).max(maxSortFields, `sort exceeds ${formatLimit("maxSortFields", maxSortFields)}`);
+
+/** Sort — an array of `{ key, direction }`, at most core `DEFAULT_MAX_SORT_FIELDS` (3) items. */
+export const sortSchema = limitedSortSchema(DEFAULT_QUERY_LIMITS.maxSortFields);
+
+/* ------------------------------ offset depth ------------------------------ */
+
+/** `(page - 1) × perPage` ≤ `maxOffset`; `perPage` yo'q bo'lsa core `DEFAULT_PER_PAGE` (20). */
+const offsetDepthCheck =
+  (maxOffset: number) =>
+  (params: { page?: unknown; perPage?: unknown }, ctx: z.RefinementCtx): void => {
+    /* The factories' output type is generic over `allow`; field errors are reported by the fields themselves. */
+    const page = typeof params.page === "number" ? params.page : undefined;
+    const perPage = typeof params.perPage === "number" ? params.perPage : undefined;
+    if (offsetOf(page, perPage) <= maxOffset) return;
+    ctx.addIssue({
+      code: "custom",
+      path: ["page"],
+      message: `(page - 1) × perPage exceeds ${formatLimit("maxOffset", maxOffset)}; use cursor pagination for deeper pages`,
+    });
+  };
+
+const offsetField = (maxOffset: number) =>
+  z
+    .number()
+    .int()
+    .nonnegative()
+    .max(maxOffset, `offset exceeds ${formatLimit("maxOffset", maxOffset)}`)
+    .optional();
 
 /* -------------------------------- params ---------------------------------- */
 
@@ -58,16 +119,18 @@ export const baseParamsSchema = z.object({
   withDeleted: z.boolean().optional(),
 });
 
-/** Offset (sahifali) params — `page` + `perPage`. */
-export const offsetParamsSchema = baseParamsSchema.extend({
-  page: z.number().int().positive().optional(),
-  perPage: z.number().int().positive().optional(),
-});
+/** Offset (sahifali) params — `page` + `perPage`; `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`. */
+export const offsetParamsSchema = baseParamsSchema
+  .extend({
+    page: z.number().int().positive().optional(),
+    perPage: z.number().int().positive().optional(),
+  })
+  .superRefine(offsetDepthCheck(DEFAULT_QUERY_LIMITS.maxOffset));
 
-/** Infinite-scroll params — `limit` + `offset`. */
+/** Infinite-scroll params — `limit` + `offset` (`offset` ≤ `DEFAULT_MAX_OFFSET`). */
 export const infiniteParamsSchema = baseParamsSchema.extend({
   limit: z.number().int().positive().optional(),
-  offset: z.number().int().nonnegative().optional(),
+  offset: offsetField(DEFAULT_QUERY_LIMITS.maxOffset),
 });
 
 /**
@@ -84,8 +147,9 @@ export const cursorParamsSchema = baseParamsSchema.omit({ sort: true }).extend({
 
 /* ------------------------------- factories -------------------------------- */
 /* Sozlanadigan schema quruvchilar — **xavfsiz default** bilan. Yuqoridagi
- * konstantalar legacy-parity uchun o'z holida qoladi (cap yo'q, uch maydon ochiq);
- * yangi kod shu factory'lardan foydalanadi. */
+ * konstantalar ham core so'rov limitlarini oladi, lekin legacy-parity uchun
+ * `perPage`/`limit` cap'siz va uch server-owned maydon ochiq qoladi; yangi kod shu
+ * factory'lardan foydalanadi. */
 
 /** Server'ga tegishli, default'da clientdan **qabul qilinmaydigan** maydonlar. */
 export type ServerOwnedField = "columns" | "with" | "withDeleted";
@@ -111,6 +175,17 @@ export interface ParamsSchemaOptions<TAllow extends readonly ServerOwnedField[] 
   /** `limit` yuqori chegarasi. Default — core `DEFAULT_MAX_LIMIT` (200). */
   maxLimit?: number;
   /**
+   * So'rov limitlari; berilmaganlari core default'ida (`DEFAULT_QUERY_LIMITS`:
+   * chuqurlik 5, shartlar 30, massiv 200, satr 256, offset 10 000, sort 3).
+   * `Infinity` limitni o'chiradi (⚠️ DoS yuzasi).
+   *
+   * @example
+   * ```ts
+   * makeOffsetParamsSchema({ limits: { maxInItems: 500 } });
+   * ```
+   */
+  limits?: Partial<QueryLimits>;
+  /**
    * Server-owned maydonlarni **ataylab** ochish. Default — bo'sh: `columns`,
    * `with` va `withDeleted` schema'ga umuman kirmaydi va client yuborsa
    * jimgina strip qilinadi. Repository darajasidagi ikkinchi himoya qatlami —
@@ -124,10 +199,6 @@ const pickServerOwned = <TAllow extends readonly ServerOwnedField[]>(allow?: TAl
   for (const key of allow ?? []) picked[key] = serverOwnedShape[key];
   return picked as Pick<ServerOwnedShape, TAllow[number]>;
 };
-
-/* Uch factory bir xil `filter`/`sort` maydonlarini ulashadi — takrorlanmasin. */
-const filterField = filterSchema.optional();
-const sortField = sortSchema.optional();
 
 const positive = (max: number) => z.number().int().positive().max(max).optional();
 
@@ -144,23 +215,27 @@ const positive = (max: number) => z.number().int().positive().max(max).optional(
  * ```
  */
 export function makeOffsetParamsSchema<const TAllow extends readonly ServerOwnedField[] = []>(options: ParamsSchemaOptions<TAllow> = {}) {
-  return z.object({
-    filter: filterField,
-    sort: sortField,
-    ...pickServerOwned(options.allow),
-    page: z.number().int().positive().optional(),
-    perPage: positive(options.maxPerPage ?? DEFAULT_MAX_PER_PAGE),
-  });
+  const limits = resolveLimits(options.limits);
+  return z
+    .object({
+      filter: limitedFilterSchema(limits).optional(),
+      sort: limitedSortSchema(limits.maxSortFields).optional(),
+      ...pickServerOwned(options.allow),
+      page: z.number().int().positive().optional(),
+      perPage: positive(options.maxPerPage ?? DEFAULT_MAX_PER_PAGE),
+    })
+    .superRefine(offsetDepthCheck(limits.maxOffset));
 }
 
 /** Infinite-scroll params schema — `limit` cap'i bilan. Qarang: {@link makeOffsetParamsSchema}. */
 export function makeInfiniteParamsSchema<const TAllow extends readonly ServerOwnedField[] = []>(options: ParamsSchemaOptions<TAllow> = {}) {
+  const limits = resolveLimits(options.limits);
   return z.object({
-    filter: filterField,
-    sort: sortField,
+    filter: limitedFilterSchema(limits).optional(),
+    sort: limitedSortSchema(limits.maxSortFields).optional(),
     ...pickServerOwned(options.allow),
     limit: positive(options.maxLimit ?? DEFAULT_MAX_LIMIT),
-    offset: z.number().int().nonnegative().optional(),
+    offset: offsetField(limits.maxOffset),
   });
 }
 
@@ -170,7 +245,7 @@ export function makeInfiniteParamsSchema<const TAllow extends readonly ServerOwn
  */
 export function makeCursorParamsSchema<const TAllow extends readonly ServerOwnedField[] = []>(options: ParamsSchemaOptions<TAllow> = {}) {
   return z.object({
-    filter: filterField,
+    filter: limitedFilterSchema(resolveLimits(options.limits)).optional(),
     ...pickServerOwned(options.allow),
     limit: positive(options.maxLimit ?? DEFAULT_MAX_LIMIT),
     cursor: z.string().nullish(),

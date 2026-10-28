@@ -13,7 +13,8 @@
     // the classic decorator/class-property footgun. Nest apps run with `false`.
     "useDefineForClassFields": false,
     "paths": {
-      "@querykitjs/core": ["../core/src/index.ts"]
+      "@querykitjs/core": ["../core/src/index.ts"],
+      "@querykitjs/core/internal": ["../core/src/internal/index.ts"]
     }
   },
   "include": ["src", "test"],

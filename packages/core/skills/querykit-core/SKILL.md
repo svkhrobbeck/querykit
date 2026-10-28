@@ -1,12 +1,13 @@
 ---
 name: querykit-core
-description: Use when code creates or reads querykit filters, sort, pagination params or response meta, writes a querykit adapter or validator, or handles QueryKitError. @querykitjs/core is the single source of the request contract shared by every querykit package (backend adapters, zod and class-validator, the web client) - filter helpers (createFilters, f), operators, wire param and meta types, pagination defaults and caps, skip diagnostics.
+description: Use when code creates or reads querykit filters, sort, pagination params or response meta, writes a querykit adapter or validator, or handles QueryKitError. @querykitjs/core is the single source of the request contract shared by every querykit package (backend adapters, zod and class-validator, the web client) - filter helpers (createFilters, f), operators, wire param and meta types, pagination defaults and caps, request limits, skip diagnostics.
 ---
 
 ## Safety rules
 
 - DO cap page sizes with `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (both `200`) imported from `@querykitjs/core`. Uncapped pagination is a DoS surface.
 - DON'T write your own page-size cap (`100`, `500`, …) next to querykit code; the validators, the repositories and the web client all read the core constants.
+- DO keep the request limits (`DEFAULT_QUERY_LIMITS`: filter depth `5`, conditions `30`, array items `200`, string length `256`, offset `10 000`, sort fields `3`). Raise one per schema or DTO with `limits` (`resolveLimits` fills the rest), never by turning a limit off; deeper pages than `maxOffset` go through cursor pagination.
 - DON'T redeclare `FieldCondition`, `Filter`, `Sort`, `Wire*Params` or `*Meta` in an app or an adapter; import them from `@querykitjs/core` so both ends of the wire share one type.
 - DO send dates over the wire as ISO strings. `Date` is accepted only in-memory (`FilterScalar`); adapters cast the string from the column type.
 - DON'T forward client `columns`, `with` or `withDeleted` (fields of `WireBaseParams`) to a repository unchecked; projection belongs to the server (`forcedColumns` / `allowedColumns` on the backend adapters).
@@ -62,6 +63,17 @@ export function perPageFrom(raw: unknown): number {
   const requested = typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_PER_PAGE;
   return Math.min(requested, DEFAULT_MAX_PER_PAGE);
 }
+```
+
+### Raise one request limit
+
+```ts
+import { DEFAULT_QUERY_LIMITS, resolveLimits, type QueryLimits } from "@querykitjs/core";
+
+// An import endpoint that filters by up to 500 ids; every other limit keeps its default.
+export const importLimits: QueryLimits = resolveLimits({ maxInItems: 500 });
+
+export const isDefaultDepth = importLimits.maxDepth === DEFAULT_QUERY_LIMITS.maxDepth;
 ```
 
 ### Type a request and its response meta
@@ -130,6 +142,8 @@ The same JSON shape travels from `@querykitjs/web` through a validator to a back
 | response meta | snake_case: `total_items`, `per_page`, `has_next`, `next_cursor`, …                          | `OffsetMeta`, `InfiniteMeta`, `CursorMeta` |
 
 Operators: comparison `=` `!=` `>` `>=` `<` `<=` (aliases `eq` `ne` `gt` `gte` `lt` `lte`); text `like` `ilike` `notLike` `contains` `startsWith` `endsWith` (tokens `%_%` = contains, `%_` = startsWith, `_%` = endsWith); sets `in` `notIn`; ranges `between` `notBetween` (value `[min, max]`); `isNull` `isNotNull` (no value).
+
+Request limits (`QueryLimits`, defaults in `DEFAULT_QUERY_LIMITS`): `maxDepth` `5` (root-to-leaf nodes; the root and the condition each count one level), `maxConditions` `30` (field conditions across all groups), `maxInItems` `200` (items in one array value), `maxStringLength` `256` (characters in one string value, also inside an array), `maxOffset` `10000` (`(page - 1) × perPage`, or infinite `offset`), `maxSortFields` `3`. A validator error names the limit and its value, e.g. `maxInItems (200)`.
 
 Skip diagnostics: `SkippedCondition` = `{ source, site, key, operation?, reason }`, `site` one of `filter` `sort` `cursorKey` `aggregate`, `reason` one of `unknown-key` `invalid-value`.
 

@@ -90,17 +90,18 @@ Both flags are **required**, otherwise the guarantees are only half in place:
 
 - **Filter** — a flat array (`{key, operation, value}[]`) or a nested `and`/`or`/`not` tree.
 - **Operators** — the full core set: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ tokens `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
-- **Sort** — `{ key, direction }[]` (multi-field).
+- **Sort** — `{ key, direction }[]` (multi-field, at most 3).
+- **Request limits** — filter size, sort fields, offset depth ([Limits](#limits)).
 - **Pagination** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **Values** — a scalar or an array of scalars. Because the wire is JSON, a `Date` object, `NaN` and `Infinity` are **rejected** (dates arrive as ISO strings).
-- **A field allowlist** (`allowedKeys`) and a **depth cap** (`maxDepth`) — neither exists in zod, see below.
+- **A field allowlist** (`allowedKeys`) — zod has none, see below.
 - The legacy `type` field is **ignored** (not rejected) — easy migration.
 
 ## Safe by default
 
 | Layer                              | Default behaviour                                                                                                                                                                                                          |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `perPage` / `limit`                | Capped at core's `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (200). `page` is uncapped — the DoS surface is page **size**, not page number.                                                                               |
+| `perPage` / `limit`                | Capped at core's `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (200). `page` itself is uncapped, but `(page - 1) × perPage` ≤ `maxOffset` (10 000).                                                                         |
 | `columns` / `with` / `withDeleted` | Declared on no DTO, so `whitelist: true` strips them. Only `allow` opens them.                                                                                                                                             |
 | `allowedKeys`                      | Omitted (`undefined`), any key passes — the allowlist is **opt-in** (zod parity). Provided, an unknown key is **rejected**; `[]` allows nothing, so an allowlist computed from an empty set fails closed rather than open. |
 | `maxDepth`                         | `5`. An unbounded recursive tree is a DoS surface.                                                                                                                                                                         |
@@ -111,14 +112,15 @@ If you do open a field with `allow`, add the **second layer at the repository**:
 
 `makeOffsetParamsDto` / `makeInfiniteParamsDto` / `makeCursorParamsDto`:
 
-| Option        | Default                           | Meaning                                                     |
-| ------------- | --------------------------------- | ----------------------------------------------------------- |
-| `allowedKeys` | —                                 | Shared allowlist shorthand for `filter` and `sort`          |
-| `filter`      | —                                 | Full options for `filter` (below) — wins over the shorthand |
-| `sort`        | —                                 | `allowedKeys` / `messageStyle` for `sort`                   |
-| `maxPerPage`  | core `DEFAULT_MAX_PER_PAGE` (200) | `perPage` ceiling. `Infinity` disables the cap (⚠️ DoS)     |
-| `maxLimit`    | core `DEFAULT_MAX_LIMIT` (200)    | `limit` ceiling                                             |
-| `allow`       | `[]`                              | Deliberately open `"columns"` / `"with"` / `"withDeleted"`  |
+| Option        | Default                           | Meaning                                                                           |
+| ------------- | --------------------------------- | --------------------------------------------------------------------------------- |
+| `allowedKeys` | —                                 | Shared allowlist shorthand for `filter` and `sort`                                |
+| `filter`      | —                                 | Full options for `filter` (below) — wins over the shorthand                       |
+| `sort`        | —                                 | `allowedKeys` / `messageStyle` for `sort`                                         |
+| `maxPerPage`  | core `DEFAULT_MAX_PER_PAGE` (200) | `perPage` ceiling. `Infinity` disables the cap (⚠️ DoS)                           |
+| `maxLimit`    | core `DEFAULT_MAX_LIMIT` (200)    | `limit` ceiling                                                                   |
+| `allow`       | `[]`                              | Deliberately open `"columns"` / `"with"` / `"withDeleted"`                        |
+| `limits`      | core `DEFAULT_QUERY_LIMITS`       | request limits ([Limits](#limits)); a dedicated `filter.*` / `sort.*` option wins |
 
 `@IsQueryFilter(options)` (and `options.filter`):
 
@@ -126,12 +128,50 @@ If you do open a field with `allow`, add the **second layer at the repository**:
 | ------------------ | ------------------------ | ------------------------------------------------------------------------------------------ |
 | `allowedKeys`      | —                        | When set, an unknown filter key is rejected                                                |
 | `allowedOperators` | every `FILTER_OPERATORS` | Narrow the accepted operator set                                                           |
-| `maxDepth`         | `5`                      | `and`/`or`/`not` depth cap                                                                 |
+| `maxDepth`         | `5`                      | root-to-leaf node count                                                                    |
+| `maxConditions`    | `30`                     | condition count                                                                            |
+| `maxInItems`       | `200`                    | items in an array value                                                                    |
+| `maxStringLength`  | `256`                    | length of a string value                                                                   |
 | `strictValue`      | `false`                  | `in`/`notIn` → array, `between`/`notBetween` → two values, `isNull`/`isNotNull` → no value |
 | `messageStyle`     | `"text"`                 | `"key"` returns the i18n key instead of a sentence                                         |
 | `rootPath`         | the property name        | Root of the reported path (`filter[0].operation`)                                          |
 
-`@IsQuerySort(options)` — `allowedKeys`, `messageStyle`, `rootPath`.
+`@IsQuerySort(options)` — `allowedKeys`, `maxSortFields` (`3`), `messageStyle`, `rootPath`.
+
+`@IsWithinMaxOffset({ mode, maxOffset? })` — `mode: "page"` (`(page - 1) × perPage`) or `"offset"`; `maxOffset` defaults to `10 000`.
+
+## Limits
+
+Every DTO and `validateFilter` / `validateSort` apply the core request limits — the same values as `@querykitjs/zod` (`DEFAULT_QUERY_LIMITS`).
+
+| Limit             | Default  | What counts                                                                       | Where                                                |
+| ----------------- | -------- | --------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `maxDepth`        | `5`      | root-to-leaf nodes: the root is 1, every `and`/`or`/`not` and the condition add 1 | `@IsQueryFilter` / `validateFilter`                  |
+| `maxConditions`   | `30`     | conditions (leaves) across all groups                                             | `@IsQueryFilter` / `validateFilter`                  |
+| `maxInItems`      | `200`    | items in one array value                                                          | `@IsQueryFilter` / `validateFilter`                  |
+| `maxStringLength` | `256`    | characters in one string value, also inside an array                              | `@IsQueryFilter` / `validateFilter`                  |
+| `maxSortFields`   | `3`      | fields in the `sort` array                                                        | `@IsQuerySort` / `validateSort`                      |
+| `maxOffset`       | `10 000` | `(page - 1) × perPage` (20 without `perPage`); infinite `offset`                  | `@IsWithinMaxOffset` (`page` / `offset` in the DTOs) |
+
+```ts
+// raise a limit for one endpoint — the others keep their defaults
+const ImportDto = makeOffsetParamsDto({ limits: { maxInItems: 500 } });
+
+// a dedicated option wins over `limits`
+const DeepDto = makeOffsetParamsDto({ limits: { maxDepth: 6 }, filter: { maxDepth: 8 } }); // 8
+```
+
+- Filter size is checked iteratively, **before** the shape check: a 10 000-level `not` chain does not fill the stack.
+- The error text names the limit and its value (`filter[0].value exceeds maxInItems (200)`). Keys: `querykit.filter.max_depth` for depth, `querykit.limit.exceeded` for the other five (args `limit`, `max`) — in the en/uz/ru catalogs.
+- Pages deeper than `maxOffset` use cursor pagination (`makeCursorParamsDto`).
+- `Infinity` turns a limit off — ⚠️ a DoS surface.
+
+## Migrating (DTO limits)
+
+- A payload past a limit is now rejected — by the static DTOs and by the factories: an `in` with 201 items, a 257-char string, 31 conditions, 4 sort fields, `page=502, perPage=20` or `offset=10001` now return 400. Raise a limit with `limits` where you need it.
+- `page` now carries `@IsWithinMaxOffset({ mode: "page" })`; if your DTO redeclares `page`, add that decorator too.
+- The `querykit.filter.max_depth` text changed (it now says `maxDepth (5)`); rely on the key, not the text.
+- `DEFAULT_MAX_FILTER_DEPTH` is now re-exported from `@querykitjs/core` (same value, 5).
 
 ## i18n (more than one language)
 
@@ -192,7 +232,7 @@ if (issues.length > 0) {
 | Contract, operators      | from core         | **the same**                              |
 | Stripping unknown fields | automatic         | via `ValidationPipe({ whitelist: true })` |
 | Field allowlist          | none              | `allowedKeys`                             |
-| Depth cap                | none              | `maxDepth` (default 5)                    |
+| Request limits           | the same (core)   | the same (core) — `limits`                |
 | `NaN` / `Infinity`       | `Infinity` passes | both rejected (neither exists in JSON)    |
 | i18n                     | —                 | `querykit.*` keys + en/uz/ru catalogs     |
 

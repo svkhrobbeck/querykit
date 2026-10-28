@@ -8,6 +8,9 @@
  */
 import { registerDecorator, ValidatorConstraint } from "class-validator";
 import type { ValidationArguments, ValidationOptions, ValidatorConstraintInterface } from "class-validator";
+import { DEFAULT_MAX_OFFSET } from "@querykitjs/core";
+import { offsetOf } from "@querykitjs/core/internal";
+import { formatMessage } from "./messages";
 import { validateFilter, validateSort, type QueryFilterOptions, type QuerySortOptions, type ValidationIssue } from "./validate";
 
 /** Dekorator darajasidagi qo'shimcha — yadro buni o'qimaydi. */
@@ -71,7 +74,60 @@ export class IsQuerySortConstraint implements ValidatorConstraintInterface {
   }
 }
 
+/** `@IsWithinMaxOffset()` opsiyalari. */
+export interface IsWithinMaxOffsetOptions {
+  /**
+   * `"page"` — property `page`, offset `(page - 1) × perPage` (o'sha obyektning `perPage`i,
+   * yo'q bo'lsa core `DEFAULT_PER_PAGE`); `"offset"` — property qiymatining o'zi (infinite).
+   */
+  mode: "page" | "offset";
+  /** Default — core `DEFAULT_MAX_OFFSET` (10 000). `Infinity` tekshiruvni o'chiradi. */
+  maxOffset?: number;
+}
+
+const maxOffsetOf = (args: ValidationArguments | undefined): number =>
+  (args?.constraints?.[0] as IsWithinMaxOffsetOptions | undefined)?.maxOffset ?? DEFAULT_MAX_OFFSET;
+
+/** `@IsWithinMaxOffset()` ortidagi konstraint. Raqam bo'lmagan qiymatni `@IsInt()` rad etadi, bu yerda o'tadi. */
+@ValidatorConstraint({ name: "isWithinMaxOffset", async: false })
+export class IsWithinMaxOffsetConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown, args?: ValidationArguments): boolean {
+    if (typeof value !== "number") return true;
+    const perPage = (args?.object as { perPage?: unknown } | undefined)?.perPage;
+    const isPage = (args?.constraints?.[0] as IsWithinMaxOffsetOptions | undefined)?.mode === "page";
+    return (isPage ? offsetOf(value, typeof perPage === "number" ? perPage : undefined) : value) <= maxOffsetOf(args);
+  }
+
+  defaultMessage(args?: ValidationArguments): string {
+    return formatMessage("querykit.limit.exceeded", { path: args?.property ?? "offset", limit: "maxOffset", max: maxOffsetOf(args) });
+  }
+}
+
 /* ------------------------------- decorators ------------------------------- */
+
+/**
+ * Sahifa chuqurligini cheklaydi: `page` uchun `(page - 1) × perPage`, infinite `offset` uchun
+ * qiymatning o'zi `maxOffset`dan oshmasin. Chuqurroq sahifalar — cursor paginatsiya.
+ *
+ * @example
+ * ```ts
+ * class ListDto {
+ *   @IsOptional() @Type(() => Number) @IsInt() @IsPositive() @IsWithinMaxOffset({ mode: "page" })
+ *   page?: number;
+ * }
+ * ```
+ */
+export function IsWithinMaxOffset(options: IsWithinMaxOffsetOptions, validationOptions?: ValidationOptions): PropertyDecorator {
+  return (target, propertyName) => {
+    registerDecorator({
+      target: target.constructor,
+      propertyName: propertyName as string,
+      options: validationOptions,
+      constraints: [options],
+      validator: IsWithinMaxOffsetConstraint,
+    });
+  };
+}
 
 /**
  * Property'ni querykit `Filter` kontraktiga tekshiradi: flat massiv (implicit AND),

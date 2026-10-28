@@ -90,17 +90,18 @@ Ikkala flag ham **zarur**, aks holda kafolatlar yarim ishlaydi:
 
 - **Filter** — flat massiv (`{key, operation, value}[]`) yoki nested `and`/`or`/`not` daraxt.
 - **Operatorlar** — core'ning to'liq to'plami: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ token `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
-- **Sort** — `{ key, direction }[]` (ko'p-maydon).
+- **Sort** — `{ key, direction }[]` (ko'p-maydon, ko'pi bilan 3).
+- **So'rov limitlari** — filtr hajmi, sort soni, offset chuqurligi ([Limits](#limits)).
 - **Paginatsiya** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **Qiymat** — skalyar yoki skalyar massiv. Wire JSON bo'lgani uchun `Date` obyekti, `NaN` va `Infinity` **rad etiladi** (sana ISO string sifatida keladi).
-- **Field allowlist** (`allowedKeys`) va **chuqurlik limiti** (`maxDepth`) — zod'da yo'q, quyiga qarang.
+- **Field allowlist** (`allowedKeys`) — zod'da yo'q, quyiga qarang.
 - Eski `type` maydoni **e'tiborsiz** qoldiriladi (rad etilmaydi) — migratsiya oson.
 
 ## Xavfsiz default
 
 | Qatlam                             | Default xulq                                                                                                                                                                                                                           |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `perPage` / `limit`                | core `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (200) bilan cheklangan. `page` cheklanmagan — DoS yuzasi sahifa **o'lchami**, raqami emas.                                                                                           |
+| `perPage` / `limit`                | core `DEFAULT_MAX_PER_PAGE` / `DEFAULT_MAX_LIMIT` (200) bilan cheklangan. `page` o'zi cheklanmagan, lekin `(page - 1) × perPage` ≤ `maxOffset` (10 000).                                                                               |
 | `columns` / `with` / `withDeleted` | Hech qaysi DTO'da e'lon qilinmagan → `whitelist: true` ularni o'chiradi. Ochish faqat `allow` bilan.                                                                                                                                   |
 | `allowedKeys`                      | Berilmasa (`undefined`) istalgan kalit o'tadi — allowlist **opt-in** (zod bilan parity). Berilsa, noma'lum kalit **rad etiladi**; `[]` esa hech biriga ruxsat bermaydi (hisoblab chiqarilgan bo'sh ro'yxat fail-open bo'lib qolmasin). |
 | `maxDepth`                         | `5`. Cheklovsiz rekursiv daraxt DoS yuzasi.                                                                                                                                                                                            |
@@ -111,14 +112,15 @@ Ikkala flag ham **zarur**, aks holda kafolatlar yarim ishlaydi:
 
 `makeOffsetParamsDto` / `makeInfiniteParamsDto` / `makeCursorParamsDto`:
 
-| Opsiya        | Default                           | Ma'nosi                                                                             |
-| ------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
-| `allowedKeys` | —                                 | `filter` va `sort` uchun umumiy allowlist qisqartmasi                               |
-| `filter`      | —                                 | `filter` uchun to'liq opsiyalar (quyiga qarang) — `allowedKeys` shorthand'dan ustun |
-| `sort`        | —                                 | `sort` uchun `allowedKeys` / `messageStyle`                                         |
-| `maxPerPage`  | core `DEFAULT_MAX_PER_PAGE` (200) | `perPage` yuqori chegarasi. `Infinity` — cap yo'q (⚠️ DoS)                          |
-| `maxLimit`    | core `DEFAULT_MAX_LIMIT` (200)    | `limit` yuqori chegarasi                                                            |
-| `allow`       | `[]`                              | `"columns"` / `"with"` / `"withDeleted"`ni ataylab ochish                           |
+| Opsiya        | Default                           | Ma'nosi                                                                               |
+| ------------- | --------------------------------- | ------------------------------------------------------------------------------------- |
+| `allowedKeys` | —                                 | `filter` va `sort` uchun umumiy allowlist qisqartmasi                                 |
+| `filter`      | —                                 | `filter` uchun to'liq opsiyalar (quyiga qarang) — `allowedKeys` shorthand'dan ustun   |
+| `sort`        | —                                 | `sort` uchun `allowedKeys` / `messageStyle`                                           |
+| `maxPerPage`  | core `DEFAULT_MAX_PER_PAGE` (200) | `perPage` yuqori chegarasi. `Infinity` — cap yo'q (⚠️ DoS)                            |
+| `maxLimit`    | core `DEFAULT_MAX_LIMIT` (200)    | `limit` yuqori chegarasi                                                              |
+| `allow`       | `[]`                              | `"columns"` / `"with"` / `"withDeleted"`ni ataylab ochish                             |
+| `limits`      | core `DEFAULT_QUERY_LIMITS`       | so'rov limitlari ([Limits](#limits)); `filter.*` / `sort.*` dagi alohida opsiya ustun |
 
 `@IsQueryFilter(options)` (va `options.filter`):
 
@@ -126,12 +128,50 @@ Ikkala flag ham **zarur**, aks holda kafolatlar yarim ishlaydi:
 | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------ |
 | `allowedKeys`      | —                         | Berilsa, noma'lum filter kaliti rad etiladi                                                |
 | `allowedOperators` | barcha `FILTER_OPERATORS` | Ruxsat etilgan operatorlar to'plamini toraytirish                                          |
-| `maxDepth`         | `5`                       | `and`/`or`/`not` chuqurlik limiti                                                          |
+| `maxDepth`         | `5`                       | ildizdan bargacha tugunlar soni                                                            |
+| `maxConditions`    | `30`                      | shartlar soni                                                                              |
+| `maxInItems`       | `200`                     | massiv qiymat elementlari                                                                  |
+| `maxStringLength`  | `256`                     | satr qiymat uzunligi                                                                       |
 | `strictValue`      | `false`                   | `in`/`notIn` → massiv, `between`/`notBetween` → 2 qiymat, `isNull`/`isNotNull` → qiymatsiz |
 | `messageStyle`     | `"text"`                  | `"key"` — xato o'rniga i18n kaliti qaytariladi                                             |
 | `rootPath`         | property nomi             | Xato yo'lining ildizi (`filter[0].operation`)                                              |
 
-`@IsQuerySort(options)` — `allowedKeys`, `messageStyle`, `rootPath`.
+`@IsQuerySort(options)` — `allowedKeys`, `maxSortFields` (`3`), `messageStyle`, `rootPath`.
+
+`@IsWithinMaxOffset({ mode, maxOffset? })` — `mode: "page"` (`(page - 1) × perPage`) yoki `"offset"`; `maxOffset` default `10 000`.
+
+## Limits
+
+Har DTO va `validateFilter` / `validateSort` core so'rov limitlarini qo'llaydi — `@querykitjs/zod` bilan bir xil qiymatlar (`DEFAULT_QUERY_LIMITS`).
+
+| Limit             | Default  | Nima sanaladi                                                         | Qayerda                                            |
+| ----------------- | -------- | --------------------------------------------------------------------- | -------------------------------------------------- |
+| `maxDepth`        | `5`      | ildizdan bargacha tugunlar: ildiz 1, har `and`/`or`/`not` va shart +1 | `@IsQueryFilter` / `validateFilter`                |
+| `maxConditions`   | `30`     | barcha guruhlardagi shartlar (barglar)                                | `@IsQueryFilter` / `validateFilter`                |
+| `maxInItems`      | `200`    | bitta massiv qiymatdagi elementlar                                    | `@IsQueryFilter` / `validateFilter`                |
+| `maxStringLength` | `256`    | bitta satr qiymatdagi belgilar (massiv ichida ham)                    | `@IsQueryFilter` / `validateFilter`                |
+| `maxSortFields`   | `3`      | `sort` massividagi maydonlar                                          | `@IsQuerySort` / `validateSort`                    |
+| `maxOffset`       | `10 000` | `(page - 1) × perPage` (`perPage` yo'q bo'lsa 20); infinite `offset`  | `@IsWithinMaxOffset` (DTO'larda `page` / `offset`) |
+
+```ts
+// bitta endpoint uchun limitni oshirish — qolganlari default
+const ImportDto = makeOffsetParamsDto({ limits: { maxInItems: 500 } });
+
+// alohida opsiya `limits`dan ustun
+const DeepDto = makeOffsetParamsDto({ limits: { maxDepth: 6 }, filter: { maxDepth: 8 } }); // 8
+```
+
+- Filtr hajmi iterativ, shakl tekshiruvidan **oldin** tekshiriladi: 10 000 darajali `not` zanjiri stekni to'ldirmaydi.
+- Xato matni limit nomi va qiymatini aytadi (`filter[0].value exceeds maxInItems (200)`). Kalitlar: chuqurlik uchun `querykit.filter.max_depth`, qolgan beshtasi uchun `querykit.limit.exceeded` (args `limit`, `max`) — en/uz/ru kataloglarda.
+- `maxOffset`dan chuqur sahifalar — cursor paginatsiya (`makeCursorParamsDto`).
+- `Infinity` limitni o'chiradi — ⚠️ DoS yuzasi.
+
+## Migrating (DTO limitlari)
+
+- Limitdan oshgan payload endi rad etiladi — static DTO'larda ham, factory'larda ham: `in` 201 element, 257 belgili satr, 31 shart, 4 sort maydoni, `page=502, perPage=20` yoki `offset=10001` endi 400 beradi. Kerak bo'lsa `limits` bilan oshiring.
+- `page` endi `@IsWithinMaxOffset({ mode: "page" })` bilan; o'z DTO'ngizda `page`ni qayta e'lon qilsangiz, shu dekoratorni ham qo'ying.
+- `querykit.filter.max_depth` matni o'zgardi (endi `maxDepth (5)` deydi); matnga emas, kalitga tayaning.
+- `DEFAULT_MAX_FILTER_DEPTH` endi `@querykitjs/core`dan qayta eksport (qiymat o'sha — 5).
 
 ## i18n (bir nechta til)
 
@@ -192,7 +232,7 @@ if (issues.length > 0) {
 | Kontrakt, operatorlar          | core'dan          | **aynan o'sha**                                |
 | Noma'lum maydonni strip qilish | avtomatik         | `ValidationPipe({ whitelist: true })` orqali   |
 | Field allowlist                | yo'q              | `allowedKeys`                                  |
-| Chuqurlik limiti               | yo'q              | `maxDepth` (default 5)                         |
+| So'rov limitlari               | bir xil (core)    | bir xil (core) — `limits`                      |
 | `NaN` / `Infinity`             | `Infinity` o'tadi | ikkalasi ham rad etiladi (JSON'da mavjud emas) |
 | i18n                           | —                 | `querykit.*` kalitlari + en/uz/ru kataloglar   |
 

@@ -17,8 +17,30 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle
 - **`FilterScalar` / `FilterValue`**, **`SortDirection`**.
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomik builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server javobi, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
+- **So'rov limitlari** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` va alohida konstantalar (pastdagi jadval).
 
-- **`@querykitjs/core/internal`** — **faqat adapter yozuvchilar uchun**: cursor tokenlari, skip diagnostikasi, har chaqiruv uchun repository konteksti, sort normalizatsiyasi va pagination meta'lari — hamma querykit adapterlari uchun umumiy. Ilova API'si emas; minor relizda o'zgarishi mumkin.
+- **`@querykitjs/core/internal`** — **faqat adapter va validator yozuvchilar uchun**: cursor tokenlari, skip diagnostikasi, har chaqiruv uchun repository konteksti, sort normalizatsiyasi, pagination meta'lari va limit tekshiruvi (`findFilterLimitViolation`) — hamma querykit paketlari uchun umumiy. Ilova API'si emas; minor relizda o'zgarishi mumkin.
+
+## Limits
+
+Har filtr va paginatsiya so'rovi parse paytida hajm bo'yicha chegaralanadi. `@querykitjs/zod` va `@querykitjs/class-validator` limitdan oshgan payload'ni rad etadi; `@querykitjs/web` offset va sort limitidan oshgan payload'ni yasamaydi.
+
+| Limit             | Konstanta                   | Default  | Nima sanaladi                                                            |
+| ----------------- | --------------------------- | -------- | ------------------------------------------------------------------------ |
+| `maxDepth`        | `DEFAULT_MAX_FILTER_DEPTH`  | `5`      | ildizdan bargacha tugunlar: ildiz 1, har `and`/`or`/`not` va shart +1    |
+| `maxConditions`   | `DEFAULT_MAX_CONDITIONS`    | `30`     | barcha guruhlardagi `FieldCondition` barglari                            |
+| `maxInItems`      | `DEFAULT_MAX_IN_ITEMS`      | `200`    | bitta massiv qiymatdagi elementlar (`in`, `notIn`, …)                    |
+| `maxStringLength` | `DEFAULT_MAX_STRING_LENGTH` | `256`    | bitta satr qiymatdagi belgilar (massiv ichida ham)                       |
+| `maxOffset`       | `DEFAULT_MAX_OFFSET`        | `10 000` | offset: `(page - 1) × perPage`; infinite: `offset`. Chuqurrog'i — cursor |
+| `maxSortFields`   | `DEFAULT_MAX_SORT_FIELDS`   | `3`      | `sort` massividagi maydonlar                                             |
+
+```ts
+import { resolveLimits } from "@querykitjs/core";
+
+resolveLimits({ maxInItems: 500 }); // qolgan beshtasi — default
+```
+
+Limitni bitta schema/DTO uchun `limits` opsiyasi bilan oshiring; `Infinity` limitni o'chiradi (⚠️ DoS yuzasi).
 
 ## Foydalanish (adapter ichida)
 

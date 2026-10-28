@@ -7,13 +7,14 @@
  * Kontrakt manbasi — `@querykitjs/core`: operatorlar `FILTER_OPERATORS`dan,
  * daraxt shakli esa `Filter`/`FilterNode`/`FieldCondition` tiplaridan.
  */
-import { FILTER_OPERATORS } from "@querykitjs/core";
+import { DEFAULT_MAX_FILTER_DEPTH, FILTER_OPERATORS, resolveLimits } from "@querykitjs/core";
 import type { FilterOperator } from "@querykitjs/core";
+import { findFilterLimitViolation, type LimitPath } from "@querykitjs/core/internal";
 import { formatMessage, type MessageArgs } from "./messages";
 import type { QueryKitMessageKey } from "./locales";
 
-/** Filter daraxti chuqurligi default limiti — cheklovsiz rekursiya DoS yuzasi. */
-export const DEFAULT_MAX_FILTER_DEPTH = 5;
+/** Filter daraxti chuqurligi default limiti — core'dan (yagona manba, R7). */
+export { DEFAULT_MAX_FILTER_DEPTH };
 
 export interface QueryFilterOptions {
   /**
@@ -25,8 +26,14 @@ export interface QueryFilterOptions {
   allowedKeys?: readonly string[];
   /** Ruxsat etilgan operatorlar. Default — core `FILTER_OPERATORS`ning hammasi. */
   allowedOperators?: readonly FilterOperator[];
-  /** `and`/`or`/`not` tugunlarining chuqurlik limiti. Default — {@link DEFAULT_MAX_FILTER_DEPTH}. */
+  /** Ildizdan bargacha tugunlar soni (ildiz 1, har `and`/`or`/`not` va shart +1). Default — core `DEFAULT_MAX_FILTER_DEPTH` (5). */
   maxDepth?: number;
+  /** Barcha guruhlardagi shartlar (barglar) soni. Default — core `DEFAULT_MAX_CONDITIONS` (30). */
+  maxConditions?: number;
+  /** Bitta massiv qiymatdagi elementlar (`in`, `notIn`, …). Default — core `DEFAULT_MAX_IN_ITEMS` (200). */
+  maxInItems?: number;
+  /** Bitta satr qiymatdagi belgilar (massiv ichida ham). Default — core `DEFAULT_MAX_STRING_LENGTH` (256). */
+  maxStringLength?: number;
   /**
    * Operator↔qiymat shakli tekshiruvi (opt-in): `in`/`notIn` massiv talab qiladi,
    * `between`/`notBetween` — aynan ikki element, `isNull`/`isNotNull` — qiymatsiz.
@@ -44,6 +51,8 @@ export interface QueryFilterOptions {
 export interface QuerySortOptions {
   /** Berilsa — faqat shu kalitlar bo'yicha saralashga ruxsat. */
   allowedKeys?: readonly string[];
+  /** `sort` massividagi maydonlar soni. Default — core `DEFAULT_MAX_SORT_FIELDS` (3). */
+  maxSortFields?: number;
   /** `path`ning ildizi. Default `"sort"`. Qarang: {@link QueryFilterOptions.rootPath}. */
   rootPath?: string;
 }
@@ -90,6 +99,10 @@ const label = (value: unknown): string => {
     return Object.prototype.toString.call(value);
   }
 };
+
+/** Core walk'ining yo'li → `filter.and[1].or[0].value` shakli. */
+const joinPath = (root: string, path: LimitPath): string =>
+  path.reduce<string>((joined, part) => (typeof part === "number" ? `${joined}[${part}]` : `${joined}.${part}`), root);
 
 const issue = (key: QueryKitMessageKey, path: string, extra: MessageArgs = {}): ValidationIssue => {
   const args: MessageArgs = { path, ...extra };
@@ -219,11 +232,20 @@ export function validateFilter(value: unknown, options: QueryFilterOptions = {})
   if (value === undefined) return [];
 
   const root = options.rootPath ?? "filter";
+  const limits = resolveLimits(options);
+
+  /* Hajm birinchi, iterativ: limitdan oshgan payload shakl tekshiruviga yetib bormaydi. */
+  const violation = findFilterLimitViolation(value, limits);
+  if (violation) {
+    const key = violation.limit === "maxDepth" ? "querykit.filter.max_depth" : "querykit.limit.exceeded";
+    return [issue(key, joinPath(root, violation.path), { limit: violation.limit, max: violation.max })];
+  }
+
   const ctx: FilterContext = {
     issues: [],
     allowedKeys: options.allowedKeys ? new Set(options.allowedKeys) : undefined,
     operators: options.allowedOperators ? new Set<string>(options.allowedOperators) : ALL_OPERATORS,
-    maxDepth: options.maxDepth ?? DEFAULT_MAX_FILTER_DEPTH,
+    maxDepth: limits.maxDepth,
     strictValue: options.strictValue ?? false,
   };
 
@@ -246,6 +268,9 @@ export function validateSort(value: unknown, options: QuerySortOptions = {}): Va
 
   const root = options.rootPath ?? "sort";
   if (!Array.isArray(value)) return [issue("querykit.sort.not_array", root)];
+
+  const { maxSortFields } = resolveLimits(options);
+  if (value.length > maxSortFields) return [issue("querykit.limit.exceeded", root, { limit: "maxSortFields", max: maxSortFields })];
 
   const allowedKeys = options.allowedKeys ? new Set(options.allowedKeys) : undefined;
   const issues: ValidationIssue[] = [];

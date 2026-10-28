@@ -477,6 +477,30 @@ createRegistry({ adapter: "drizzle-pg", defaults: { maxPerPage: 50, maxLimit: 25
 createQuery({ maxPerPage: Infinity });
 ```
 
+## Limits
+
+`perPage`/`limit` are clamped (above), but **page depth** and the **number of sort fields** are not — the builder throws an `Error`, because silently cutting them would change what the request means (another page, another order). The values come from `@querykitjs/core`, the same as in zod and class-validator.
+
+| Limit           | Default  | What counts                                          | Past it                                                               |
+| --------------- | -------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| `maxOffset`     | `10 000` | `list`: `(page - 1) × perPage`; `infinite`: `offset` | `Error: querykit: page 502 × perPage 20 exceeds maxOffset (10000); …` |
+| `maxSortFields` | `3`      | `sort` fields after normalization                    | `Error: querykit: sort with 4 fields exceeds maxSortFields (3)`       |
+
+```ts
+buildListParams({ page: 501, perPage: 20 }); // ✅ offset 10 000
+buildListParams({ page: 502, perPage: 20 }); // ❌ Error — use buildCursorParams for deeper pages
+
+createQuery({ maxOffset: 50_000, maxSortFields: 4 });
+createRegistry({ adapter: "drizzle-pg", defaults: { maxOffset: 50_000 } });
+```
+
+- Filter limits (depth, conditions, `in` items, string length) are **not** checked in web — the server (zod / class-validator) rejects them with a 400.
+- ⚠️ A `page` read from the URL (`useListParams`, `fromSearchParams`, `searchParamsToPayload`) is in the user's hands: `?page=9999` makes the builder throw. Wrap the page in an error boundary or check `page` before the hook.
+
+## Migrating (limits)
+
+- `buildListParams` / `buildInfiniteParams` / `createQuery` / registry `list`/`infinite` now throw for an offset deeper than 10 000 or more than 3 sort fields (they used to build the payload and the server accepted it). Use a cursor for deep pages; raise `maxOffset` / `maxSortFields` where you must (and raise the same limit on the server).
+
 ## You send the request yourself
 
 The library works only **up to the request**. No transport:

@@ -12,6 +12,7 @@ import {
   makeOffsetParamsSchema,
   offsetParamsSchema,
 } from "../src/index";
+import "./limits";
 
 let passed = 0;
 let failed = 0;
@@ -149,7 +150,8 @@ check("factory: invalid operator rejected", !listSchema.safeParse({ filter: [{ k
 check("factory: sort string rejected", !listSchema.safeParse({ sort: "-createdAt" }).success);
 check("factory: realistic payload valid", listSchema.safeParse({ ...payload, with: undefined }).success);
 
-/* 16. REGRESSIYA: mavjud konstantalar ataylab o'zgarmagan (legacy parity) */
+/* 16. REGRESSIYA: konstantalarning cap'lari va server-owned maydonlari ataylab o'zgarmagan
+ * (legacy parity); so'rov limitlarini ular ham oladi — `limits.ts` tekshiradi. */
 check("legacy: offsetParamsSchema has NO cap", offsetParamsSchema.safeParse({ perPage: 1_000_000 }).success);
 const legacy = offsetParamsSchema.safeParse({ columns: { a: true }, with: { b: true }, withDeleted: true });
 check(
@@ -158,6 +160,17 @@ check(
 );
 check("legacy: infiniteParamsSchema has NO cap", infiniteParamsSchema.safeParse({ limit: 1_000_000 }).success);
 check("legacy: cursorParamsSchema has NO cap", cursorParamsSchema.safeParse({ limit: 1_000_000 }).success);
+
+/* 17. Offset schema'lari obyekt darajasidagi tekshiruv bilan: `.extend` uni saqlaydi (README «Migrating»). */
+const extended = makeOffsetParamsSchema().extend({ q: fieldConditionSchema.shape.key.optional() });
+check("factory .extend keeps the offset-depth check", !extended.safeParse({ page: 502 }).success && extended.safeParse({ page: 501, q: "x" }).success);
+const offsetIssue = makeOffsetParamsSchema().safeParse({ page: 502, perPage: 20 });
+check(
+  "offset-depth issue sits on `page` and names `maxOffset (10000)`",
+  !offsetIssue.success && offsetIssue.error.issues[0]?.path.join(".") === "page" && offsetIssue.error.issues[0].message.includes("maxOffset (10000)"),
+);
+const deepIssue = filterSchema.safeParse({ and: [{ key: "id", operation: "in", value: Array.from({ length: 201 }, (_, i) => i) }] });
+check("filter limit issue path points at the value", !deepIssue.success && deepIssue.error.issues[0]?.path.join(".") === "and.0.value");
 
 console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
