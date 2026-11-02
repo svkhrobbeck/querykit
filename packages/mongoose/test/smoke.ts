@@ -391,8 +391,13 @@ async function main() {
     check("A1 tied createdAt with columns { n }: 25 distinct n, no _id in rows", ns.size === 25 && !("_id" in (colPage.data[0] ?? {})), `${ns.size}`);
     check("A1 tied createdAt: walking back reaches the other 20 _id", backIds.size === 20 && [...backIds].every(id => tieSeen.has(id)), `${backIds.size}`);
     // Task 014 P2: registry timestamps name snake_case paths — default sort, soft delete, restore.
-    const Snake =
-      mongoose.models.Snake ?? mongoose.model("Snake", new mongoose.Schema({ title: String, created_at: Date, deleted_at: { type: Date, default: null } }));
+    // One Model type: mongoose 8 cannot call create on the `models.X ?? model()` union.
+    const Snake = (mongoose.models.Snake ??
+      mongoose.model("Snake", new mongoose.Schema({ title: String, created_at: Date, deleted_at: { type: Date, default: null } }))) as mongoose.Model<{
+      title: string;
+      created_at: Date;
+      deleted_at: Date | null;
+    }>;
     await Snake.deleteMany({});
     const [older] = await Snake.create([
       { title: "older", created_at: new Date("2026-01-01T00:00:00.000Z") },
