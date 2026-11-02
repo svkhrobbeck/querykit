@@ -90,6 +90,7 @@ require(CASES.some(c => c.expect.error?.reason === "forbidden-operator"), "polic
 require(CASES.some(c => c.expect.error?.site === "sort" && c.expect.error.reason === "forbidden-key"), "policy: forbidden sort key case (Y5)");
 require(CASES.some(c => c.expect.error?.reason === "limit-exceeded" && c.expect.error.site === "page"), "policy: offset limit case (Y4)");
 require(CASES.some(c => c.options?.policy === "default" && c.expect.names), "policy: safe default lets the primary key through");
+require(CASES.some(c => c.name.startsWith("R19") && c.expect.error?.reason === "forbidden-key"), "policy: unbranded raw object refused (R19)");
 
 /* Request-limit table (task 008): every limit has a case inside and a case outside it, and an override. */
 for (const limit of LIMIT_NAMES) {

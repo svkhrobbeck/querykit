@@ -32,6 +32,13 @@ export interface RegistryOptions {
    * path: watch with the hook first, flip `strict: true` once the log is clean.
    */
   onSkippedCondition?: (info: Core.SkippedCondition) => void;
+  /**
+   * Server-side request limits (core `DEFAULT_QUERY_LIMITS`: depth 5, conditions 30,
+   * array 200, string 256, offset 10 000, sort 3) — enforced even when validation was
+   * bypassed. Past one ⇒ `QueryKitError` (`reason: "limit-exceeded"`). A repository's
+   * own `limits` win.
+   */
+  limits?: Partial<Core.QueryLimits>;
 }
 
 /**
@@ -68,6 +75,23 @@ export interface RepositoryOptions<TDelegate = AnyDelegate> {
    * `delegate.fields`) — e.g. behind an unusual client wrapper.
    */
   fields?: readonly FieldMeta[];
+  /**
+   * Fields a client may filter by, and the operators for each (`"*"` — all). A
+   * relation field is `"relation.field"` (`"posts.title": ["="]`). A field not
+   * listed ⇒ `reason: "forbidden-key"`, an operator not listed ⇒ `"forbidden-operator"`
+   * — a `QueryKitError` whatever `strict` says, before Prisma is called.
+   * **When not given** — `allowedColumns` (else the `forcedColumns` keys, else only
+   * the `@id` field) with `"="` and `"in"` only. `aggregate` fields come from this list too.
+   */
+  filterable?: Core.Filterable<FieldKey<TDelegate> | `${string}.${string}`>;
+  /**
+   * Fields a client may sort (and use as `cursorKey`) by. When not given — the
+   * `@id` field and `createdAt` (when the model has it). Anything else ⇒
+   * `reason: "forbidden-key"`.
+   */
+  sortable?: readonly FieldKey<TDelegate>[];
+  /** Request limits for this repository — over the registry's `limits`. */
+  limits?: Partial<Core.QueryLimits>;
 }
 
 /** DB registry: created once, yields model repositories. */

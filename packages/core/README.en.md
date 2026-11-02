@@ -18,6 +18,7 @@ You usually **don't install this directly** — it's the shared foundation used 
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomic builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server response, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
 - **`Filterable`** and the skip / refusal reasons (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`; `SkipSite` + `page`) — policy reasons are never dropped silently, always a `QueryKitError`.
+- **`raw(value)`** — the brand for a driver's own filter object (a Prisma `where`, a Mongo filter) (R19). An adapter accepts a raw node only when it is branded with `raw()`; an unbranded plain object (it can come from a JSON body) → `QueryKitError` `forbidden-key`. ⚠️ A raw node is server code — `filterable` does not look inside it; never build one from request data.
 - **Request limits** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` and one constant per limit (table below).
 
 - **`@querykitjs/core/internal`** — **adapter and validator authors only**: cursor tokens, skip diagnostics, the per-call repository context, sort normalization, pagination metas, the limit walk (`findFilterLimitViolation`) and the request policy (`resolvePolicy`: `filterable` / `sortable` / `limits`) shared by every querykit package. Not application API; it may change in a minor release.

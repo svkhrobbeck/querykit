@@ -12,3 +12,4 @@ export { normalizeSort, type NormalizedSortItem } from "./sort";
 export { clampOffset, clampPage, clampPageSize, cursorPage, infinitePage, offsetMeta, type CursorPageOptions } from "./pagination";
 export { findFilterLimitViolation, formatLimit, offsetOf, type FilterLimits, type LimitPath, type LimitViolation } from "./limits";
 export { resolvePolicy, type Policy, type PolicyOptions } from "./policy";
+export { isRaw } from "../raw";

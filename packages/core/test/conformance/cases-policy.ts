@@ -3,14 +3,13 @@
  * `limits` on the repository. A case without `options.policy` runs under the
  * open 3.x policy (every field, every operator, every sort field); these set it.
  *
- * Only drizzle-pg has the policy so far — prisma-pg (010) and mongoose (011)
- * carry a `knownDifference` until their task lands.
+ * drizzle-pg (009) and prisma-pg (010) have the policy; mongoose carries a
+ * `knownDifference` until task 011 lands.
  */
 import type { ConformanceCase } from "./case-types";
 
-const PRISMA = "request policy arrives in task 010";
 const MONGOOSE = "request policy arrives in task 011";
-const pending = { "prisma-pg": PRISMA, mongoose: MONGOOSE } as const;
+const pending = { mongoose: MONGOOSE } as const;
 
 const nameOnly = { filterable: { name: ["="] as const } };
 
@@ -69,5 +68,14 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     options: { policy: "default" },
     expect: { names: ["Bob"] },
     knownDifference: { mongoose: "the fixture id maps to `_id` (an ObjectId), so `id = 2` fails to cast; the policy and its primary key arrive in task 011" },
+  },
+  {
+    name: "R19: a JSON-shaped driver object is refused (no raw() brand)",
+    group: "policy",
+    call: { method: "findAll", params: { filter: [{ name: { startsWith: "A" } }] as never } },
+    options: { policy: { filterable: { name: "*" } } },
+    expect: { error: { site: "filter", key: "name", reason: "forbidden-key" } },
+    knownDifference: pending,
+    notBuiltByWeb: "the web builders drop a node without a key, so this payload only reaches a repository directly",
   },
 ];

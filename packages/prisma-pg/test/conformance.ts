@@ -28,13 +28,18 @@ const fakeClient = {
   },
 };
 
+/** The 1.x behaviour for the cases that predate the policy: every fixture field, every operator, every sort field. */
+const FIELDS = ["id", "name", "email", "age", "createdAt"];
+const OPEN_POLICY = { filterable: Object.fromEntries(FIELDS.map(key => [key, "*"])), sortable: FIELDS };
+const policyOptions = (policy: CaseOptions["policy"]) => (policy === undefined ? OPEN_POLICY : policy === "default" ? {} : policy);
+
 export const prismaHarness: Harness = {
   name: "prisma-pg",
   async run(call: Call, options: CaseOptions, onSkipped) {
     const registry = createRegistry(fakeClient as never, { strict: options.strict, onSkippedCondition: onSkipped });
     const repository = registry.repository(
       "user" as never,
-      { forcedColumns: options.forcedColumns, allowedColumns: options.allowedColumns } as never,
+      { ...policyOptions(options.policy), forcedColumns: options.forcedColumns, allowedColumns: options.allowedColumns } as never,
     ) as unknown as Record<string, (params: unknown) => Promise<unknown>>;
     const result = (await repository[call.method]!(call.params)) as
       Record<string, unknown>[] | { data: Record<string, unknown>[]; meta: Record<string, unknown> };

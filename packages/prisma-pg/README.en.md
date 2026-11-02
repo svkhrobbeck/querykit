@@ -149,6 +149,39 @@ export class UsersController {
 
 A validated payload goes into the repository params with **no cast** — the contract is closed through `@querykitjs/core`.
 
+## Safe by default — `filterable`, `sortable`, `limits`
+
+A client filters and sorts only by the fields the server allows, and only with the operators it allows. A refused request stops with a `QueryKitError` before Prisma is called — whatever `strict` and `onSkippedCondition` say (it is never dropped silently). Option names, defaults and `reason`/`site` are the same as drizzle-pg's.
+
+```ts
+const usersRepository = registry.repository(prisma.user, {
+  forcedColumns: { id: true, name: true, email: true, createdAt: true },
+  filterable: {
+    email: ["=", "in"],
+    createdAt: ["between", ">=", "<="],
+    name: ["contains"], // "contains" and its token "%_%" are one operator
+    "posts.title": ["="], // a relation field — "relation.field"
+  },
+  sortable: ["id", "createdAt", "name"],
+  limits: { maxInItems: 500 }, // over the registry's createRegistry(..., { limits })
+});
+```
+
+| Option       | When not given (default)                                                                                | When refused                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `filterable` | `allowedColumns` (else the `forcedColumns` keys, else only the primary key), with `"="` and `"in"` only | `reason: "forbidden-key"` / `"forbidden-operator"`, `site: "filter"` |
+| `sortable`   | the primary key and `createdAt` (when the table has it); a client-sent `cursorKey` too                  | `reason: "forbidden-key"`, `site: "sort"` / `"cursorKey"`            |
+| `limits`     | core `DEFAULT_QUERY_LIMITS` (depth 5, conditions 30, array 200, string 256, offset 10 000, sort 3)      | `reason: "limit-exceeded"`, `site: "filter"` / `"sort"` / `"page"`   |
+
+- `aggregate`: the `filter` and every `groupBy`/`sum`/`avg`/`min`/`max` column must be in `filterable` (`site: "aggregate"`).
+- `findById`: only the client `filter` is checked; `idKey` is the server's choice.
+- A key the table does **not** have (`nope`) stays `unknown-key` — skipped, or an error under `strict`.
+- Mutation filters (`updateMany`, `deleteMany`, …) count as server code and are not checked.
+- Operator aliases are one: `["="]` also admits `eq`, `["contains"]` also `%_%`. `"*"` admits every operator.
+- The policy applies to **every** read call on the repository — the server's own filters in custom methods too (`findBySlug` needs `slug` in `filterable`). For internal queries on fields you do not open to clients, build a separate, wider repository and never hand it to a route.
+- A relation field is opened or kept closed with a `"relation.field"` key (`posts.secret` not listed ⇒ `forbidden-key`). The adapter does not compile such a key into a filter (it stays `unknown-key`); use `raw()` for a relation predicate.
+- An unbranded raw Prisma `where` object (`{ secret: { startsWith: "a" } }`) can come from a JSON body — `forbidden-key` (R19). Server code brands it with `raw({...})`; ⚠️ a `raw()` node is not checked by `filterable`, never build one from request data.
+
 ## Advanced filters
 
 A filter is a tree of field conditions and logical groups (`and`/`or`/`not`). A flat array is implicit `AND`.
@@ -185,13 +218,15 @@ await usersRepository.findAll({
 
 ### Raw `where` escape hatch
 
-For anything the DSL cannot express (relation predicates, JSON filters), pass a Prisma `where` object as a filter node:
+For anything the DSL cannot express (relation predicates, JSON filters), pass a Prisma `where` object branded with `raw()` as a filter node (R19 — an unbranded object is `forbidden-key`; ⚠️ `raw()` is not checked by `filterable`):
 
 ```ts
-await usersRepository.findAll({ filter: { posts: { some: { title: { contains: "querykit" } } } } });
+import { raw } from "@querykitjs/core";
+
+await usersRepository.findAll({ filter: raw({ posts: { some: { title: { contains: "querykit" } } } }) });
 
 await usersRepository.findAll({
-  filter: f.or(f.eq("role", "admin"), { posts: { some: { published: true } } }),
+  filter: f.or(f.eq("role", "admin"), raw({ posts: { some: { published: true } } })),
 });
 ```
 
@@ -337,6 +372,33 @@ await ordersRepository.aggregate({ sum: "amount", avg: "amount", groupBy: "regio
 > **Compound unique.** A multi-field `target` uses Prisma's generated name: `{ target: ["a", "b"] }` → `where: { a_b: { a, b } }`. For a constraint declared with `@@unique(name: "...")`, use the raw client.
 >
 > **Bulk.** Prisma has no bulk upsert, so `upsertMany` issues sequential `upsert`s (input order preserved). Wrap large imports in `registry.transaction()`.
+
+## Migrating to 2.0
+
+In 2.0 a repository without a policy is **narrow**: `=` and `in` on `allowedColumns` / `forcedColumns` / the `@id` field only, sorting by `@id` and `createdAt`. To bring back the 1.x behaviour for one repository on purpose:
+
+```ts
+const open = registry.repository(prisma.user, {
+  filterable: { id: "*", name: "*", email: "*", age: "*", createdAt: "*" },
+  sortable: ["id", "name", "email", "age", "createdAt"],
+});
+```
+
+A raw `where` now needs `raw()` (R19):
+
+```ts
+import { raw } from "@querykitjs/core";
+
+// 1.x — forbidden-key in 2.0:
+// await usersRepository.findAll({ filter: { posts: { some: { published: true } } } });
+
+// 2.0:
+await usersRepository.findAll({ filter: raw({ posts: { some: { published: true } } }) });
+```
+
+- First collect from `onSkippedCondition` logs which fields and operators are in use, then narrow `filterable` to exactly those — `"*"` is a stopgap.
+- New `QueryKitError` reasons: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; new site: `page`. Return them as 400.
+- Pages deeper than offset 10 000 are now refused — use `findCursor`, or raise it with `limits: { maxOffset }`.
 
 ## Limitations
 

@@ -25,7 +25,7 @@ registry.repository("$connect");
 
 /* --- Row / Insert / WhereInput come from the delegate --- */
 type UserRow = Row<typeof prisma.user>;
-const _row: UserRow = { id: 1, name: "a", email: "b", age: null, createdAt: new Date() };
+const _row: UserRow = { id: 1, name: "a", email: "b", age: null, secret: null, createdAt: new Date() };
 const _age: number | null = _row.age;
 // @ts-expect-error `title` belongs to Post, not User
 const _wrongField: string = _row.title;

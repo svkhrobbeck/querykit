@@ -52,6 +52,8 @@ export interface ConformanceCase {
   options?: CaseOptions;
   expect: Expectation;
   knownDifference?: Partial<Record<AdapterName, string>>;
+  /** A payload the `@querykitjs/web` builders never produce (they normalize it away), so the web runner skips it. */
+  notBuiltByWeb?: string;
 }
 
 /** The cursor token every adapter emits: base64url of `{"v": <value>}` (dates as ISO strings). */

@@ -18,6 +18,7 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomik builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server javobi, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
 - **`Filterable`** va skip/rad etish sabablari (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`; `SkipSite` + `page`) — siyosat sabablari hech qachon jim tashlanmaydi, har doim `QueryKitError`.
+- **`raw(value)`** — drayverning o'z filtr obyekti (Prisma `where`, Mongo filtri) uchun brend (R19). Adapter raw tugunni faqat `raw()` bilan belgilangan bo'lsa qabul qiladi; brendsiz oddiy obyekt (JSON body'dan kelishi mumkin) → `QueryKitError` `forbidden-key`. ⚠️ Raw tugun — server kodi, `filterable` uni tekshirmaydi; uni hech qachon so'rov ma'lumotidan qurmang.
 - **So'rov limitlari** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` va alohida konstantalar (pastdagi jadval).
 
 - **`@querykitjs/core/internal`** — **faqat adapter va validator yozuvchilar uchun**: cursor tokenlari, skip diagnostikasi, har chaqiruv uchun repository konteksti, sort normalizatsiyasi, pagination meta'lari, limit tekshiruvi (`findFilterLimitViolation`) va so'rov siyosati (`resolvePolicy`: `filterable` / `sortable` / `limits`) — hamma querykit paketlari uchun umumiy. Ilova API'si emas; minor relizda o'zgarishi mumkin.

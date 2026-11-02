@@ -1,5 +1,5 @@
-import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
-import type { Diagnostics } from "@querykitjs/core/internal";
+import { QueryKitError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
+import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
 
 import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions } from "../types";
 import type { AnyExecutor } from "../internal/executor";
@@ -25,6 +25,8 @@ export interface RepoRuntime {
   strict: boolean;
   /** Called for every dropped condition (also when `strict` is off). */
   onSkippedCondition?: (info: SkippedCondition) => void;
+  /** Registry-level request limits; a repository's own `limits` win. */
+  limits?: Partial<QueryLimits>;
 }
 
 /** The delegate methods this adapter drives, kept structural on purpose. */
@@ -61,6 +63,8 @@ export interface RepoContext<TDelegate> {
   /** Whether a field may appear in a result at all. */
   permits: (key: string) => boolean;
   projection: (columns?: QueryParams<TDelegate>["columns"], withRelations?: QueryParams<TDelegate>["with"], forceKeys?: string[]) => Projection;
+  /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
+  policy: Policy;
   /** User filter + scope + soft-delete guard as one `where`. */
   composeWhere: (userFilter?: Filter<TDelegate>, withDeleted?: boolean) => Where | undefined;
   /** `filter AND idKey = id`; an unresolvable `idKey` throws. */
@@ -80,6 +84,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
   };
 
   const scopeWhere = buildScopeWhere(meta, config);
+  const policy = buildPolicy(meta, config, runtime.limits);
 
   const composeWhere = (userFilter?: Filter<TDelegate>, withDeleted?: boolean): Where | undefined =>
     andWhere([buildWhere(meta, userFilter as Filter, diag), scopeWhere, meta.hasDeletedAt && !withDeleted ? { deletedAt: null } : undefined]);
@@ -115,6 +120,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
     diag,
     delegate,
     guard,
+    policy,
     guarded: Boolean(forcedKeys ?? allowed),
     permits,
     projection,
@@ -163,4 +169,28 @@ function buildGuard<TDelegate>(config: RepositoryOptions<TDelegate>): Projection
   }
 
   return { forcedKeys, allowed };
+}
+
+/**
+ * The model's request policy. A scalar field resolves like a filter key (an
+ * `@map`ped column name maps to the field); `relation.field` is a field of its own
+ * when `relation` is a relation field, so it can be opened or kept closed.
+ */
+function buildPolicy<TDelegate>(meta: ModelMeta, config: RepositoryOptions<TDelegate>, registryLimits?: Partial<QueryLimits>): Policy {
+  const fieldOf = (key: string): string | undefined => {
+    const dot = key.indexOf(".");
+    if (dot < 0) return resolveField(meta, key);
+    return meta.fields.get(key.slice(0, dot))?.kind === "object" ? key : undefined;
+  };
+  return resolvePolicy({
+    source: meta.name,
+    fieldOf,
+    primaryKey: meta.idField ?? "id",
+    createdAt: resolveField(meta, "createdAt"),
+    filterable: config.filterable,
+    sortable: config.sortable,
+    allowedColumns: config.allowedColumns as readonly string[] | undefined,
+    forcedColumns: config.forcedColumns as Record<string, unknown> | undefined,
+    limits: { ...registryLimits, ...config.limits },
+  });
 }

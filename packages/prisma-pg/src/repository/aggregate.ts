@@ -26,7 +26,7 @@ function flatten(row: Record<string, unknown>): AggregateRow {
 
 /** `aggregate` — `_count`/`_sum`/`_avg`/`_min`/`_max`, optionally `groupBy`. */
 export function aggregateMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
-  const { meta, diag, delegate, permits, composeWhere } = ctx;
+  const { meta, diag, delegate, permits, policy, composeWhere } = ctx;
 
   // An aggregate spec can also come from a request, and `min(password)` or a
   // `groupBy` on a hidden field leaks just as much as a projection — so the
@@ -48,6 +48,10 @@ export function aggregateMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
 
   return {
     async aggregate(spec: AggregateSpec<TDelegate>): Promise<AggregateRow[]> {
+      // `groupBy` or `max(secret)` reads a field as surely as a filter does.
+      policy.checkFilter(spec.filter);
+      for (const key of [spec.groupBy, spec.sum, spec.avg, spec.min, spec.max].flatMap(value => toArray(value as string | string[] | undefined)))
+        policy.checkAggregateKey(key);
       const groupFields = toArray(spec.groupBy as string | string[] | undefined)
         .map(aggregable)
         .filter((field): field is string => Boolean(field));

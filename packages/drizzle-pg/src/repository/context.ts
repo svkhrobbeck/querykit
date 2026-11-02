@@ -1,4 +1,4 @@
-import { and, getTableName, isNull, sql, type SQL } from "drizzle-orm";
+import { and, getTableName, isNull, isSQLWrapper, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
@@ -133,6 +133,8 @@ function buildPolicy<TTable extends AnyPgTable>(table: TTable, config: Repositor
     allowedColumns: config.allowedColumns,
     forcedColumns: config.forcedColumns,
     limits: { ...registryLimits, ...config.limits },
+    // A drizzle `SQL` fragment is server code by construction: JSON cannot build one.
+    isNative: isSQLWrapper,
   });
 }
 
