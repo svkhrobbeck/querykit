@@ -49,6 +49,11 @@ export interface RegistryOptions {
    * issued by this server — or was changed — is `invalid-value`.
    */
   cursorSecret?: string;
+  /**
+   * The createdAt / deletedAt field names (task 014; default `createdAt`, `deletedAt`): the default
+   * sort and the default `sortable` use `createdAt`, soft delete uses `deletedAt`.
+   */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 /** Extends a base repository with custom, model-specific methods (drizzle-pg style). */

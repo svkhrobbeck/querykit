@@ -146,8 +146,11 @@ export interface WireCursorParams extends Omit<WireBaseParams, "sort"> {
  */
 export type SkipReason = "unknown-key" | "invalid-value" | "forbidden-key" | "forbidden-operator" | "limit-exceeded" | "empty-filter";
 
-/** Shart qayerda tashlab yuborilgani (`page` — offset chuqurligi, `mutation` — `updateWhere` / `deleteWhere` filtri). */
-export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate" | "page" | "mutation";
+/**
+ * Shart qayerda tashlab yuborilgani (`page` — offset chuqurligi, `mutation` — `updateWhere` / `deleteWhere` filtri,
+ * `with` — `relations` ro'yxatida yo'q relation, ustun yoki filtr).
+ */
+export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate" | "page" | "mutation" | "with";
 
 /**
  * Server siyosati: maydon → ruxsat etilgan operatorlar, yoki `"*"` (hammasi — faqat aniq

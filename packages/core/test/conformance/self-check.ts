@@ -23,6 +23,8 @@ const problems: string[] = [];
 function referenceNames(testCase: ConformanceCase): string[] | undefined {
   const { call, expect } = testCase;
   if (expect.error || (expect.skipped?.length ?? 0) > 0) return undefined;
+  // Repository options (task 014 scope / timestamps) are not modelled by the reference.
+  if (testCase.options?.scope || testCase.options?.timestamps) return undefined;
   const filtered = referenceFilter<Row>(ROWS, call.params.filter as Filter | undefined);
   const names = (rows: Row[]) => rows.map(row => row.name);
   switch (call.method) {

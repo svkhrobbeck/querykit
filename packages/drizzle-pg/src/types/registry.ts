@@ -47,6 +47,11 @@ export interface RegistryOptions {
    * are unsigned but still checked (scalar values, v2 shape).
    */
   cursorSecret?: string;
+  /**
+   * The createdAt / deletedAt field names (task 014; default `createdAt`, `deletedAt`): the default
+   * sort and the default `sortable` use `createdAt`, soft delete uses `deletedAt`.
+   */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 /**

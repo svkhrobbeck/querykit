@@ -94,7 +94,12 @@ const policyOptions = (policy: CaseOptions["policy"]) => (policy === undefined ?
 export const mongooseHarness: Harness = {
   name: "mongoose",
   async run(call: Call, options: CaseOptions, onSkipped) {
-    const registry = createRegistry(mongoose.connection, { strict: options.strict, onSkippedCondition: onSkipped, cursorSecret: options.cursorSecret });
+    const registry = createRegistry(mongoose.connection, {
+      strict: options.strict,
+      onSkippedCondition: onSkipped,
+      cursorSecret: options.cursorSecret,
+      timestamps: options.timestamps,
+    });
     const repository = registry.repository(ConformanceUser, {
       ...policyOptions(options.policy),
       forcedColumns: options.forcedColumns,

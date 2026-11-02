@@ -7,7 +7,7 @@ import type { Filterable, SkipReason, SkipSite, WireBaseParams, WireCursorParams
 
 export type AdapterName = "drizzle-pg" | "prisma-pg" | "mongoose";
 
-export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection" | "policy" | "mutation";
+export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection" | "policy" | "mutation" | "scope";
 
 /** Repository request policy (task 009). `"default"` — none given, the adapter's safe default applies. */
 export type CasePolicy = "default" | { filterable?: Filterable; sortable?: readonly string[]; limits?: Partial<QueryLimits> };
@@ -32,6 +32,8 @@ export interface CaseOptions {
   cursorSecret?: string;
   /** Repository `scope` (RBAC / tenancy filter, task 013). */
   scope?: Record<string, unknown>;
+  /** Registry `timestamps` (task 014): the createdAt / deletedAt field names. */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 export interface SkipExpectation {
