@@ -17,24 +17,15 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { isPublished, publishablePackages } from "./lib/registry.mjs";
+import { planPublish, publishablePackages } from "./lib/registry.mjs";
 
 if (process.env.CI !== "true") {
   console.log("[ci-publish] not CI — skipping (publishing happens in CI via OIDC).");
   process.exit(0);
 }
 
-const pkgs = publishablePackages();
-
-const toPublish = [];
-for (const p of pkgs) {
-  if (await isPublished(p.name, p.version)) {
-    console.log(`✓ ${p.name}@${p.version} already on npm — skip`);
-  } else {
-    console.log(`→ ${p.name}@${p.version} not on npm — will publish`);
-    toPublish.push(p);
-  }
-}
+// A 0.0.0 placeholder is skipped before the registry is asked (lib/registry.mjs planPublish).
+const toPublish = await planPublish(publishablePackages());
 
 if (toPublish.length === 0) {
   console.log("Nothing new to publish — release is a no-op.");

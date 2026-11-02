@@ -28,6 +28,7 @@
     "release:check": "node scripts/release-check.mjs",
     "release:pending": "node scripts/release-check.mjs --pending",
     "release:wait": "node scripts/release-wait.mjs",
+    "test:publish-plan": "node scripts/test-publish-plan.mjs",
     "release": "bun run build && node scripts/pin-workspace-deps.mjs && node scripts/ci-publish.mjs",
     "prepare": "husky"
   },

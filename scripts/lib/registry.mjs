@@ -30,6 +30,31 @@ async function getPackageJson(name, suffix) {
   throw new Error(`Unexpected ${res.status} from npm registry for ${name}/${suffix}`);
 }
 
+/**
+ * `0.0.0` (or no version) marks a package that was never released: its first version comes
+ * from the changeset bump. Publishing it would burn a version npm never lets you reuse.
+ */
+export function isPlaceholderVersion(version) {
+  return version === undefined || version === "0.0.0";
+}
+
+/**
+ * The packages `ci-publish.mjs` publishes: not a placeholder and not on npm yet.
+ * `isPublished` and `log` are injected so the plan can be tested offline.
+ */
+export async function planPublish(pkgs, { isPublished: published = isPublished, log = console.log } = {}) {
+  const toPublish = [];
+  for (const pkg of pkgs) {
+    if (isPlaceholderVersion(pkg.version)) log(`⚠ ${pkg.name}@${pkg.version ?? "—"} is an unreleased placeholder — skip`);
+    else if (await published(pkg.name, pkg.version)) log(`✓ ${pkg.name}@${pkg.version} already on npm — skip`);
+    else {
+      log(`→ ${pkg.name}@${pkg.version} not on npm — will publish`);
+      toPublish.push(pkg);
+    }
+  }
+  return toPublish;
+}
+
 /** Whether `name@version` is on the registry. */
 export async function isPublished(name, version) {
   return (await getPackageJson(name, version)) !== undefined;

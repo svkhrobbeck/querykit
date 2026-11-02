@@ -7,7 +7,7 @@
  */
 import { writeSync } from "node:fs";
 
-import { latestVersion, publishablePackages, REGISTRY } from "./lib/registry.mjs";
+import { isPlaceholderVersion, latestVersion, publishablePackages, REGISTRY } from "./lib/registry.mjs";
 
 // `process.exit` right after a write can lose output on Windows pipes; write synchronously.
 const print = text => writeSync(1, `${text}\n`);
@@ -35,16 +35,18 @@ function table(rows, status) {
 
 async function check() {
   const rows = await versions();
-  table(rows, row => (row.npm === row.local ? "ok" : "not ok"));
+  table(rows, row => (row.npm === row.local ? "ok" : isPlaceholderVersion(row.local) ? "not ok — placeholder, waiting for the version bump" : "not ok"));
   const bad = rows.filter(row => row.npm !== row.local).length;
   print(bad === 0 ? `\nrelease-check: all ${rows.length} packages match npm` : `\nrelease-check: ${bad}/${rows.length} packages differ from npm`);
   return bad === 0 ? 0 : 1;
 }
 
+/** Waiting packages; a 0.0.0 placeholder is listed apart — CI never publishes it (ci-publish). */
 async function pending() {
-  const rows = (await versions()).filter(row => row.npm === undefined || isNewer(row.local, row.npm));
-  if (rows.length === 0) print("release-check --pending: nothing waiting for a publish");
-  else table(rows, () => "pending");
+  const rows = (await versions()).filter(row => isPlaceholderVersion(row.local) || row.npm === undefined || isNewer(row.local, row.npm));
+  const publishable = rows.filter(row => !isPlaceholderVersion(row.local));
+  if (rows.length > 0) table(rows, row => (isPlaceholderVersion(row.local) ? "placeholder" : "pending"));
+  if (publishable.length === 0) print(`${rows.length > 0 ? "\n" : ""}release-check --pending: nothing waiting for a publish`);
   return 0;
 }
 
