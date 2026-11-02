@@ -77,12 +77,16 @@ export async function encodeCursorToken(payload: { k: unknown; id: unknown }, se
 /**
  * The `{ k, id }` of a v2 token, `undefined` for no token. A v1 token, a
  * non-scalar `k` / `id`, a missing or wrong signature (with `secret`) or
- * anything undecodable throws `QueryKitError` — invalid-value, site cursorKey.
+ * anything undecodable throws `QueryKitError` — invalid-value, site cursorKey,
+ * `key` the cursor key in use (the same key as an adapter's cast error).
  */
-export async function decodeCursorToken(token: string | null | undefined, options: { source: string; secret?: string }): Promise<CursorToken | undefined> {
+export async function decodeCursorToken(
+  token: string | null | undefined,
+  options: { source: string; secret?: string; key?: string },
+): Promise<CursorToken | undefined> {
   if (!token) return undefined;
   const refuse = (): never => {
-    throw new QueryKitError({ source: options.source, site: "cursorKey", key: "cursor", reason: "invalid-value" });
+    throw new QueryKitError({ source: options.source, site: "cursorKey", key: options.key ?? "cursor", reason: "invalid-value" });
   };
   let payload: Record<string, unknown>;
   try {

@@ -79,7 +79,7 @@ const policyOptions = (policy: CaseOptions["policy"]) => (policy === undefined ?
 export const drizzleHarness: Harness = {
   name: "drizzle-pg",
   async run(call: Call, options: CaseOptions, onSkipped) {
-    const registry = createRegistry(fakeDb, schema, { strict: options.strict, onSkippedCondition: onSkipped });
+    const registry = createRegistry(fakeDb, schema, { strict: options.strict, onSkippedCondition: onSkipped, cursorSecret: options.cursorSecret });
     const repository = registry.repository(users, {
       ...policyOptions(options.policy),
       forcedColumns: options.forcedColumns,

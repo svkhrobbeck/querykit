@@ -46,6 +46,11 @@ check(
   (await reason(b64({ v: 2, k: { $ne: null }, id: 1 }))) === "invalid-value/cursorKey",
   await reason(b64({ v: 2, k: { $ne: null }, id: 1 })),
 );
+check(
+  "A5 a token of another version with k and id → invalid-value",
+  (await reason(b64({ v: 1, k: 1, id: 1 }))) === "invalid-value/cursorKey",
+  await reason(b64({ v: 1, k: 1, id: 1 })),
+);
 check("A5 a v1 token { v: <value> } → invalid-value / cursorKey", (await reason(b64({ v: 5 }))) === "invalid-value/cursorKey", await reason(b64({ v: 5 })));
 const signed = codec.encodeCursorToken ? await codec.encodeCursorToken({ k: 1, id: 1 }, "s") : "";
 const tampered = signed ? signed.slice(0, -1) + (signed.endsWith("A") ? "B" : "A") : "";

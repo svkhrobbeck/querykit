@@ -35,7 +35,7 @@ export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       // Task 012: the token carries the cursor value and the primary key (tie-break),
       // both re-cast to their field's type; a token that does not fit is invalid-value.
       const idField = meta.idField ?? "id";
-      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret });
+      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret, key: cursorKey });
       const cursorValue = token === undefined ? undefined : castForField(meta, field, token.k);
       const idValue = token === undefined ? undefined : castForField(meta, idField, token.id);
       if (cursorValue === INVALID_VALUE || idValue === INVALID_VALUE) {

@@ -29,7 +29,7 @@ export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
 
       // Task 012: the token carries the cursor value and _id (tie-break), both cast
       // to their path's type; a token that does not fit is invalid-value.
-      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret });
+      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret, key: cursorKey });
       const cursorValue = token === undefined ? undefined : castForPath(m, field, token.k);
       const idValue = token === undefined ? undefined : castForPath(m, "_id", token.id);
       if (cursorValue === INVALID_VALUE || idValue === INVALID_VALUE) {

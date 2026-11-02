@@ -33,7 +33,7 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       // Task 012: the token carries the cursor value and the primary key (tie-break),
       // both re-cast to their column's type; a token that does not fit is invalid-value.
       const [idKey, idColumn] = primaryKeyOf(table);
-      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret });
+      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret, key: cursorKey });
       const cursorValue = token === undefined ? undefined : castForColumn(column, token.k);
       const idValue = token === undefined ? undefined : castForColumn(idColumn, token.id);
       if (cursorValue === INVALID_VALUE || idValue === INVALID_VALUE) {

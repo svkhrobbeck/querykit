@@ -26,6 +26,8 @@ export interface CaseOptions {
   rows?: readonly import("./fixtures").ConformanceRow[];
   /** Absent ⇒ the open 3.x policy (every field and operator, every sort field), so the older cases keep their meaning. */
   policy?: CasePolicy;
+  /** Registry `cursorSecret` (task 012): tokens are signed and an unsigned one is refused. */
+  cursorSecret?: string;
 }
 
 export interface SkipExpectation {
