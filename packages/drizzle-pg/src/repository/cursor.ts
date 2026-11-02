@@ -60,9 +60,13 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       // strip it from the rows we hand back.
       const selected = pickColumns(params.columns);
       const columns = selected ? { ...selected, [cursorKey]: true, [idKey]: true } : undefined;
-      // The cursor and tie-break columns are queried for the tokens; under a projection guard
-      // the ones the caller may not see are stripped from the rows afterwards.
-      const hidden = guarded && selected !== undefined ? [cursorKey, idKey].filter(key => !permits(key) || !selected[key as keyof typeof selected]) : [];
+      // Stripped from the rows afterwards: under a projection guard the cursor / tie-break
+      // keys the caller may not see; always the tie-break key added only for the token.
+      const picked = (key: string) => selected !== undefined && Boolean(selected[key as keyof typeof selected]);
+      const hidden =
+        selected === undefined
+          ? []
+          : [cursorKey, idKey].filter(key => (guarded && (!permits(key) || !picked(key))) || (key === idKey && key !== cursorKey && !picked(key)));
 
       const rows = (await handle().findMany({
         where,

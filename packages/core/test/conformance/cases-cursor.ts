@@ -38,6 +38,12 @@ export const CURSOR_CASES: readonly ConformanceCase[] = [
     notBuiltByWeb: "a multi-page walk is a repository-level check",
   },
   {
+    name: "columns without id: page 2 still seeks on (createdAt, id), the id is not added to the rows",
+    group: "pagination",
+    call: { method: "findCursor", params: { cursorKey: "createdAt", limit: 3, order: "asc", columns: { name: true } }, followNext: true },
+    expect: { names: ["dave", "Eve_Ann", "Frank"], ordered: true, keys: ["createdAt", "name"] },
+  },
+  {
     name: "A3: a token value that is an object ({ $ne: null }) → invalid-value, cursorKey",
     group: "pagination",
     call: { method: "findCursor", params: { limit: 10, cursorKey: "createdAt", cursor: rawToken({ v: 2, k: { $ne: null }, id: 1 }) } },

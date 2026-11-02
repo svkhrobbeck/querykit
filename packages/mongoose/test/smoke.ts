@@ -365,6 +365,15 @@ async function main() {
       if (!backPage.meta.prev_cursor) break;
       backPage = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", cursor: backPage.meta.prev_cursor, direction: "backward" });
     }
+    // …and with a selection that leaves _id out (projection `_id: 0`): the tie-break still has its _id, the rows do not.
+    const ns = new Set<number>();
+    let colPage = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", columns: { n: true } });
+    for (let guard = 0; guard < 5; guard++) {
+      for (const doc of colPage.data as unknown as { n: number }[]) ns.add(doc.n);
+      if (!colPage.meta.next_cursor) break;
+      colPage = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", columns: { n: true }, cursor: colPage.meta.next_cursor });
+    }
+    check("A1 tied createdAt with columns { n }: 25 distinct n, no _id in rows", ns.size === 25 && !("_id" in (colPage.data[0] ?? {})), `${ns.size}`);
     check("A1 tied createdAt: walking back reaches the other 20 _id", backIds.size === 20 && [...backIds].every(id => tieSeen.has(id)), `${backIds.size}`);
 
     /* --------------------------- projection guards -------------------------- */

@@ -28,12 +28,9 @@ export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       // 400 the same way as any other bad condition (all three adapters agree).
       if (!field) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
-      // A cursor token carries dates as ISO strings, so re-cast to the field's
-      // type — otherwise Prisma rejects `gt(dateTimeField, "2026-…")` and page 2
-      // of a date-keyed feed 500s. A token that does not fit is treated as "no
-      // cursor" (like an undecodable one).
       // Task 012: the token carries the cursor value and the primary key (tie-break),
-      // both re-cast to their field's type; a token that does not fit is invalid-value.
+      // both re-cast to their field's type (ISO string → Date, else Prisma rejects
+      // `gt(dateTimeField, "2026-…")`); a token that does not fit is invalid-value.
       const idField = meta.idField ?? "id";
       const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret, key: cursorKey });
       const cursorValue = token === undefined ? undefined : castForField(meta, field, token.k);
@@ -63,7 +60,14 @@ export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       // a forbidden field: keep it in the query (pagination needs it) but strip
       // it from the rows we hand back.
       const selected = pickColumns(guard, params.columns as Record<string, boolean> | undefined);
-      const hidden = guarded && selected !== undefined ? [field, idField].filter(key => !permits(key) || !selected.includes(key)) : [];
+      // Stripped from the rows afterwards: under a projection guard the cursor / tie-break
+      // keys the caller may not see; always the tie-break key added only for the token.
+      const hidden =
+        selected === undefined
+          ? []
+          : [field, idField].filter(
+              key => (guarded && (!permits(key) || !selected.includes(key))) || (key === idField && key !== field && !selected.includes(key)),
+            );
 
       const rows = await delegate().findMany({
         where,

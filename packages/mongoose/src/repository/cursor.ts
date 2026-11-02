@@ -54,8 +54,15 @@ export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
       // a way to read a forbidden field: keep it in the query (pagination needs
       // it) but strip it from the documents we hand back.
       const selected = projection(params.columns);
-      const proj = selected ? { ...selected, [field]: 1 } : undefined;
-      const hidden = guarded && selected !== undefined ? [field, "_id"].filter(key => !permits(key) || !(selected as Record<string, unknown>)[key]) : [];
+      // `_id` too: an exact selection carries `_id: 0`, and the token needs it for the tie-break.
+      const proj = selected ? { ...selected, [field]: 1, _id: 1 } : undefined;
+      // Stripped from the rows afterwards: under a projection guard the cursor / tie-break
+      // keys the caller may not see; always the tie-break key added only for the token.
+      const picked = (key: string) => selected !== undefined && Boolean((selected as Record<string, unknown>)[key]);
+      const hidden =
+        selected === undefined
+          ? []
+          : [field, "_id"].filter(key => (guarded && (!permits(key) || !picked(key))) || (key === "_id" && key !== field && !picked(key)));
 
       let q: AnyQuery = m
         .find(where, proj)
