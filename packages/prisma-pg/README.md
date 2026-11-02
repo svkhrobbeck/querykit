@@ -149,6 +149,39 @@ export class UsersController {
 
 Validatsiyalangan payload repository params'iga **cast'siz** tushadi — kontrakt `@querykitjs/core` orqali yopilgan.
 
+## Safe by default — `filterable`, `sortable`, `limits`
+
+Mijoz faqat server ruxsat bergan maydon bo'yicha, faqat ruxsat bergan operator bilan filtrlaydi va saralaydi. Ruxsatsiz so'rov Prisma'ga yetmasdan `QueryKitError` bilan to'xtaydi — `strict` va `onSkippedCondition`dan qat'i nazar (jim tashlanmaydi). Opsiya nomlari, default'lar, `reason`/`site` — drizzle-pg bilan bir xil.
+
+```ts
+const usersRepository = registry.repository(prisma.user, {
+  forcedColumns: { id: true, name: true, email: true, createdAt: true },
+  filterable: {
+    email: ["=", "in"],
+    createdAt: ["between", ">=", "<="],
+    name: ["contains"], // "contains" va uning tokeni "%_%" — bitta operator
+    "posts.title": ["="], // relation maydoni — "relation.field"
+  },
+  sortable: ["id", "createdAt", "name"],
+  limits: { maxInItems: 500 }, // registry createRegistry(..., { limits }) ustidan
+});
+```
+
+| Opsiya       | Berilmasa (default)                                                                                                  | Rad etilsa                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `filterable` | `allowedColumns` (yo'q bo'lsa `forcedColumns` kalitlari, u ham yo'q bo'lsa faqat primary key), faqat `"="` va `"in"` | `reason: "forbidden-key"` / `"forbidden-operator"`, `site: "filter"` |
+| `sortable`   | primary key va `createdAt` (jadvalda bo'lsa); mijoz yuborgan `cursorKey` ham shu ro'yxatdan                          | `reason: "forbidden-key"`, `site: "sort"` / `"cursorKey"`            |
+| `limits`     | core `DEFAULT_QUERY_LIMITS` (chuqurlik 5, shartlar 30, massiv 200, satr 256, offset 10 000, sort 3)                  | `reason: "limit-exceeded"`, `site: "filter"` / `"sort"` / `"page"`   |
+
+- `aggregate`: `filter` va har `groupBy`/`sum`/`avg`/`min`/`max` ustuni `filterable` ichida bo'lishi shart (`site: "aggregate"`).
+- `findById`: faqat mijoz `filter`i tekshiriladi; `idKey` — server tanlovi.
+- Jadvalda **yo'q** kalit (`nope`) avvalgidek `unknown-key` — skip yoki `strict`da xato.
+- Mutatsiya metodlari (`updateMany`, `deleteMany`, …) filtri server kodi deb hisoblanadi va tekshirilmaydi.
+- Operator aliaslari bitta: `["="]` `eq`ni ham, `["contains"]` `%_%`ni ham ochadi. `"*"` — barcha operatorlar.
+- Siyosat repository'ning **har** o'qish chaqiruviga qo'llanadi — custom metodlardagi server filtrlari ham (`findBySlug` uchun `slug` `filterable`da). Mijozga ochilmaydigan maydon bo'yicha ichki so'rov uchun alohida, kengroq repository yarating va uni route'ga bermang.
+- Relation maydoni `"relation.field"` kaliti bilan yopiladi yoki ochiladi (`posts.secret` — ro'yxatda bo'lmasa `forbidden-key`). Adapter bunday kalitni filtr sifatida kompilyatsiya qilmaydi (avvalgidek `unknown-key`); relation predikati uchun `raw()` ishlating.
+- Brendsiz xom Prisma `where` obyekti (`{ secret: { startsWith: "a" } }`) JSON'dan kelishi mumkin — `forbidden-key` (R19). Server kodi `raw({...})` bilan belgilaydi; ⚠️ `raw()` tuguni `filterable` bilan tekshirilmaydi, uni so'rov ma'lumotidan qurmang.
+
 ## Advanced filterlar
 
 Filter — field shartlari va mantiqiy guruhlar (`and`/`or`/`not`) daraxti. Flat massiv implicit `AND`.
@@ -185,13 +218,15 @@ await usersRepository.findAll({
 
 ### Xom `where` escape-hatch
 
-DSL ifodalay olmaydigan narsalar (relation predikatlari, `mode`, JSON filtrlari) uchun to'g'ridan-to'g'ri Prisma `where` obyekti tugun sifatida beriladi:
+DSL ifodalay olmaydigan narsalar (relation predikatlari, `mode`, JSON filtrlari) uchun Prisma `where` obyekti `raw()` bilan belgilanib tugun sifatida beriladi (R19 — brendsiz obyekt `forbidden-key`; ⚠️ `raw()` `filterable`dan o'tmaydi):
 
 ```ts
-await usersRepository.findAll({ filter: { posts: { some: { title: { contains: "querykit" } } } } });
+import { raw } from "@querykitjs/core";
+
+await usersRepository.findAll({ filter: raw({ posts: { some: { title: { contains: "querykit" } } } }) });
 
 await usersRepository.findAll({
-  filter: f.or(f.eq("role", "admin"), { posts: { some: { published: true } } }),
+  filter: f.or(f.eq("role", "admin"), raw({ posts: { some: { published: true } } })),
 });
 ```
 
@@ -337,6 +372,33 @@ await ordersRepository.aggregate({ sum: "amount", avg: "amount", groupBy: "regio
 > **Compound unique.** Ko'p maydonli `target` Prisma'ning generatsiya qilingan nomi bilan ishlaydi: `{ target: ["a", "b"] }` → `where: { a_b: { a, b } }`. `@@unique(name: "...")` bilan nomlangan constraint uchun xom client'dan foydalaning.
 >
 > **Bulk.** Prisma'da bulk upsert yo'q — `upsertMany` ketma-ket `upsert` qiladi (kirish tartibi saqlanadi). Katta importlar uchun `registry.transaction()` ichida chaqiring.
+
+## Migrating to 2.0
+
+2.0 da siyosatsiz repository **tor**: faqat `allowedColumns` / `forcedColumns` / `@id` maydoni bo'yicha `=` va `in`, sort — `@id` va `createdAt`. 1.x xulqini bitta repository uchun ataylab qaytarish:
+
+```ts
+const open = registry.repository(prisma.user, {
+  filterable: { id: "*", name: "*", email: "*", age: "*", createdAt: "*" },
+  sortable: ["id", "name", "email", "age", "createdAt"],
+});
+```
+
+Xom `where` endi `raw()` bilan (R19):
+
+```ts
+import { raw } from "@querykitjs/core";
+
+// 1.x — 2.0 da forbidden-key:
+// await usersRepository.findAll({ filter: { posts: { some: { published: true } } } });
+
+// 2.0:
+await usersRepository.findAll({ filter: raw({ posts: { some: { published: true } } }) });
+```
+
+- Avval `onSkippedCondition` loglaridan ishlatilayotgan maydon/operatorlarni yig'ing, keyin `filterable`ni aynan shularga toraytiring — `"*"` vaqtinchalik yo'l.
+- `QueryKitError`ning yangi `reason`lari: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; yangi `site`: `page`. Ularni 400 qilib qaytaring.
+- Offset 10 000 dan chuqur sahifalar endi rad etiladi — `findCursor` ishlating yoki `limits: { maxOffset }` bilan oshiring.
 
 ## Cheklovlar
 
