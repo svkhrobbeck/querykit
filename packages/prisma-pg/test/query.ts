@@ -194,14 +194,28 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
     eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }]), { AND: [{ name: { startsWith: "a%b" } }, { name: { endsWith: "b" } }] }),
     show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }])),
   );
-  // `LIKE 'a_b'` ≡ `LIKE 'a_b%' AND NOT LIKE 'a_b_%'` — pins the length exactly.
-  check(
-    "_ wildcard → exact length-pinned construction",
-    eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }]), {
-      AND: [{ name: { startsWith: "a_b" } }, { NOT: { name: { startsWith: "a_b_" } } }],
-    }),
-    show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }])),
-  );
+  // Task 021 B9: an unescaped `_` cannot be relied on in Prisma — refused as invalid-value.
+  {
+    const { diag: underscoreDiag, seen: underscoreSeen } = spy();
+    const refused = buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }], underscoreDiag);
+    check(
+      "unescaped _ in like → dropped and reported invalid-value (B9)",
+      refused === undefined && underscoreSeen[0] === "filter:name:invalid-value",
+      show(underscoreSeen),
+    );
+    let strictReason = "";
+    try {
+      buildWhere(userMeta, [{ key: "name", operation: "like", value: "A_i%" }], { source: "User", strict: true });
+    } catch (err) {
+      strictReason = err instanceof QueryKitError ? err.info.reason : String(err);
+    }
+    check("strict: like 'A_i%' → QueryKitError invalid-value (B9)", strictReason === "invalid-value", strictReason);
+    check(
+      "escaped \\_ is a literal underscore",
+      eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "A\\_i%" }]), { name: { startsWith: "A\\_i" } }),
+      show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "A\\_i%" }])),
+    );
+  }
   check(
     "a pattern already ending in % needs a single filter",
     eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b%" }]), { name: { startsWith: "a%b" } }),
@@ -293,8 +307,16 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
   ];
   const subjects = ["", "a", "ab", "aba", "abab", "ali", "Ali", "aXb", "aXbXc", "a_b", "a%b", "%50", "50%", "vali ali", "abba", "aXbba", "ali_", "_ali", "aab"];
 
+  /** Patterns with an unescaped `_` are refused (B9), so only the rest must translate exactly. */
+  const hasWildcardUnderscore = (pattern: string) => /(^|[^\\])_/.test(pattern);
+  const refusedPatterns = patterns.filter(hasWildcardUnderscore);
+  check(
+    `every pattern with an unescaped _ is refused (${refusedPatterns.length})`,
+    refusedPatterns.every(pattern => buildWhere(userMeta, [{ key: "name", operation: "like", value: pattern }]) === undefined),
+  );
+
   let mismatches: string[] = [];
-  for (const pattern of patterns) {
+  for (const pattern of patterns.filter(pattern => !hasWildcardUnderscore(pattern))) {
     const node = buildWhere(userMeta, [{ key: "name", operation: "like", value: pattern }]);
     for (const subject of subjects) {
       const expected = likeMatches(pattern, subject);
@@ -310,7 +332,7 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
 
   // The same proof for notLike, which must also exclude NULLs (SQL NOT LIKE).
   mismatches = [];
-  for (const pattern of patterns) {
+  for (const pattern of patterns.filter(pattern => !hasWildcardUnderscore(pattern))) {
     const node = buildWhere(userMeta, [{ key: "name", operation: "notLike", value: pattern }]);
     for (const subject of subjects) {
       const expected = !likeMatches(pattern, subject);

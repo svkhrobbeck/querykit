@@ -15,6 +15,12 @@ const text = (value: FilterValue | undefined): string => String(value ?? "");
 const asTuple = (value: FilterValue | undefined): [unknown, unknown] | undefined =>
   Array.isArray(value) && value.length === 2 ? [value[0], value[1]] : undefined;
 
+/**
+ * A value operator (`contains` / `startsWith` / `endsWith`) matches its value **literally** (task 021 B7):
+ * `%`, `_` and `\` are escaped with PostgreSQL's default LIKE escape (`\`). Wildcards belong to `like` / `ilike` only.
+ */
+const literal = (v: FilterValue | undefined): string => text(v).replace(/[\\%_]/g, "\\$&");
+
 /** Registry mapping every operator (and its aliases) to a condition builder. */
 export const operators: Record<FilterOperator, OperatorBuilder> = {
   "=": (c, v) => eq(c, v),
@@ -33,12 +39,12 @@ export const operators: Record<FilterOperator, OperatorBuilder> = {
   like: (c, v) => like(c, text(v)),
   ilike: (c, v) => ilike(c, text(v)),
   notLike: (c, v) => notLike(c, text(v)),
-  contains: (c, v) => ilike(c, `%${text(v)}%`),
-  startsWith: (c, v) => ilike(c, `${text(v)}%`),
-  endsWith: (c, v) => ilike(c, `%${text(v)}`),
-  "%_%": (c, v) => ilike(c, `%${text(v)}%`),
-  "%_": (c, v) => ilike(c, `${text(v)}%`),
-  "_%": (c, v) => ilike(c, `%${text(v)}`),
+  contains: (c, v) => ilike(c, `%${literal(v)}%`),
+  startsWith: (c, v) => ilike(c, `${literal(v)}%`),
+  endsWith: (c, v) => ilike(c, `%${literal(v)}`),
+  "%_%": (c, v) => ilike(c, `%${literal(v)}%`),
+  "%_": (c, v) => ilike(c, `${literal(v)}%`),
+  "_%": (c, v) => ilike(c, `%${literal(v)}`),
 
   in: (c, v) => (Array.isArray(v) ? inArray(c, v) : undefined),
   notIn: (c, v) => (Array.isArray(v) ? notInArray(c, v) : undefined),

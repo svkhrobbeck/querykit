@@ -17,18 +17,15 @@ export const OPERATOR_CASES: ConformanceCase[] = [
   op("like is case-sensitive", "name", "like", "A%", ["Alice", "Alina"]),
   op("like with a lowercase pattern", "name", "like", "%a%", ["Carol", "dave", "Frank", "Alina"]),
   op("like _ is a one-character wildcard", "name", "like", "A_i%", ["Alice", "Alina"], {
-    knownDifference: { "prisma-pg": "B9 (021 p2): an unescaped `_` in a Prisma LIKE becomes invalid-value; this row moves to a per-adapter expectation" },
+    // B9: Prisma cannot express a one-character wildcard, so the condition is dropped and reported (README Limitations).
+    expectFor: { "prisma-pg": { names: ALL, skipped: [{ site: "filter", key: "name", reason: "invalid-value" }] } },
   }),
-  op("startsWith treats % literally (B7)", "name", "startsWith", "%", [], {
-    knownDifference: { "drizzle-pg": "B7 (021 p2): the value is not LIKE-escaped yet, so `%` matches every row" },
-  }),
+  op("startsWith treats % literally (B7)", "name", "startsWith", "%", []),
   op("ilike is case-insensitive", "name", "ilike", "%A%", ["Alice", "Carol", "dave", "Eve_Ann", "Frank", "Alina"]),
   op("notLike drops matches", "name", "notLike", "%a%", ["Alice", "Bob", "Eve_Ann"]),
   op("contains is case-insensitive", "name", "contains", "AL", ["Alice", "Alina"]),
   op("%_% token = contains", "name", "%_%", "ar", ["Carol"]),
-  op("contains treats _ literally", "name", "contains", "_", ["Eve_Ann"], {
-    knownDifference: { "drizzle-pg": "the value is not LIKE-escaped, so `_` matches any character" },
-  }),
+  op("contains treats _ literally", "name", "contains", "_", ["Eve_Ann"]),
   op("startsWith is case-insensitive", "name", "startsWith", "a", ["Alice", "Alina"]),
   op("%_ token = startsWith", "name", "%_", "D", ["dave"]),
   op("endsWith is case-insensitive", "name", "endsWith", "E", ["Alice", "dave"]),
