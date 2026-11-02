@@ -158,8 +158,11 @@ function buildPaths() {
     for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
       const linked = join(PACKAGES_DIR, pkg, "node_modules", peer);
       if (!paths[peer] && existsSync(linked)) {
-        paths[peer] = [toPosix(linked)];
-        paths[`${peer}/*`] = [`${toPosix(linked)}/*`]; // subpath entries such as `drizzle-orm/pg-core`
+        // A peer without its own types (react) resolves through the package's `@types/<peer>` first.
+        const types = join(PACKAGES_DIR, pkg, "node_modules", "@types", peer);
+        const roots = existsSync(types) ? [types, linked] : [linked];
+        paths[peer] = roots.map(toPosix);
+        paths[`${peer}/*`] = roots.map(root => `${toPosix(root)}/*`); // subpath entries such as `drizzle-orm/pg-core`
       }
     }
   }
