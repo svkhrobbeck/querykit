@@ -47,7 +47,7 @@ async function main() {
   await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
   await prisma.$executeRawUnsafe(`CREATE SCHEMA ${SCHEMA}`);
   await prisma.$executeRawUnsafe(`CREATE TABLE ${SCHEMA}.users (
-    id serial PRIMARY KEY, name text NOT NULL, email text NOT NULL UNIQUE, age integer,
+    id serial PRIMARY KEY, name text NOT NULL, email text NOT NULL UNIQUE, age integer, secret text,
     created_at timestamptz NOT NULL DEFAULT now())`);
   await prisma.$executeRawUnsafe(`CREATE TABLE ${SCHEMA}.posts (
     id serial PRIMARY KEY, title text NOT NULL,

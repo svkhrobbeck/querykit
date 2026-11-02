@@ -24,6 +24,7 @@ import { createRegistry } from "../src/index";
 
 /* Cross-adapter cursor tokens must be interchangeable: drizzle-pg and mongoose issue theirs with the shared core encoder. */
 import { encodeCursor as drizzleEncode, encodeCursor as mongooseEncode } from "@querykitjs/core/internal";
+import "./policy";
 
 /* -------------------------------- runner ---------------------------------- */
 
@@ -75,7 +76,7 @@ console.log("\n=== 1. model metadata ===");
 {
   check("delegate keys exclude non-delegates", eq(delegateKeys(prisma as never).sort(), ["post", "user"]), show(delegateKeys(prisma as never)));
   check("model name from runtime datamodel", userMeta.name === "User", userMeta.name);
-  check("field list", eq([...userMeta.fields.keys()], ["id", "name", "email", "age", "createdAt", "posts"]));
+  check("field list", eq([...userMeta.fields.keys()], ["id", "name", "email", "age", "secret", "createdAt", "posts"]));
   check("idField detected", userMeta.idField === "id");
   check("hasCreatedAt / hasDeletedAt (users)", userMeta.hasCreatedAt && !userMeta.hasDeletedAt);
   check("hasDeletedAt (posts)", postMeta.hasDeletedAt);
