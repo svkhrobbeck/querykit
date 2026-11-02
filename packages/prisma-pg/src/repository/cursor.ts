@@ -1,8 +1,9 @@
 import { QueryKitError } from "@querykitjs/core";
-import { clampPageSize, cursorPage, decodeCursor } from "@querykitjs/core/internal";
+import { clampPageSize, cursorPage, decodeCursorToken } from "@querykitjs/core/internal";
 
 import type { CursorParams, CursorResult, SortDirection } from "../types";
-import { castValue, resolveField } from "../internal/fields";
+import { resolveField } from "../internal/fields";
+import { castForField, INVALID_VALUE } from "../internal/coerce";
 import { pickColumns } from "../internal/projection";
 import { andWhere, type Where } from "../internal/where";
 import type { RepoContext } from "./context";
@@ -27,18 +28,30 @@ export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       // 400 the same way as any other bad condition (all three adapters agree).
       if (!field) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
-      // A cursor token carries dates as ISO strings, so re-cast to the field's
-      // type — otherwise Prisma rejects `gt(dateTimeField, "2026-…")` and page 2
-      // of a date-keyed feed 500s. A token that does not fit is treated as "no
-      // cursor" (like an undecodable one).
-      const decoded = decodeCursor(params.cursor);
-      const cursorValue = decoded === undefined ? undefined : castValue(meta, field, decoded);
+      // Task 012: the token carries the cursor value and the primary key (tie-break),
+      // both re-cast to their field's type (ISO string → Date, else Prisma rejects
+      // `gt(dateTimeField, "2026-…")`); a token that does not fit is invalid-value.
+      const idField = meta.idField ?? "id";
+      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret, key: cursorKey });
+      const cursorValue = token === undefined ? undefined : castForField(meta, field, token.k);
+      const idValue = token === undefined ? undefined : castForField(meta, idField, token.id);
+      if (cursorValue === INVALID_VALUE || idValue === INVALID_VALUE) {
+        throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "invalid-value" });
+      }
       const baseWhere = composeWhere(params.filter, params.withDeleted);
 
       // Keyset via WHERE (not Prisma's native `cursor`+`skip`) so the token stays
       // interchangeable with the drizzle-pg and mongoose adapters.
       const ascInQuery = direction === "forward" ? order === "asc" : order === "desc";
-      const seek: Where | undefined = cursorValue !== undefined ? { [field]: ascInQuery ? { gt: cursorValue } : { lt: cursorValue } } : undefined;
+      const past = ascInQuery ? "gt" : "lt";
+      // (k > v) OR (k = v AND id > i); a primary-key cursor needs no tie-break.
+      const tieBreak = field !== idField;
+      const seek: Where | undefined =
+        token === undefined
+          ? undefined
+          : tieBreak
+            ? { OR: [{ [field]: { [past]: cursorValue } }, { AND: [{ [field]: { equals: cursorValue } }, { [idField]: { [past]: idValue } }] }] }
+            : { [field]: { [past]: cursorValue } };
       const where = andWhere([baseWhere, seek]);
 
       // Force-include the cursor field when a selection is given — otherwise its
@@ -47,23 +60,27 @@ export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       // a forbidden field: keep it in the query (pagination needs it) but strip
       // it from the rows we hand back.
       const selected = pickColumns(guard, params.columns as Record<string, boolean> | undefined);
-      const leaksCursorField = guarded && selected !== undefined && !permits(cursorKey) && !permits(field);
+      // Stripped from the rows afterwards: under a projection guard the cursor / tie-break
+      // keys the caller may not see; always the tie-break key added only for the token.
+      const hidden =
+        selected === undefined
+          ? []
+          : [field, idField].filter(
+              key => (guarded && (!permits(key) || !selected.includes(key))) || (key === idField && key !== field && !selected.includes(key)),
+            );
 
       const rows = await delegate().findMany({
         where,
-        orderBy: [{ [field]: ascInQuery ? "asc" : "desc" }],
+        orderBy: tieBreak ? [{ [field]: ascInQuery ? "asc" : "desc" }, { [idField]: ascInQuery ? "asc" : "desc" }] : [{ [field]: ascInQuery ? "asc" : "desc" }],
         take: limit + 1,
-        ...projection(params.columns, params.with, [field]),
+        ...projection(params.columns, params.with, [field, idField]),
       });
 
-      const page = cursorPage(rows, { limit, direction, hasCursor: cursorValue !== undefined, cursorField: field });
+      const page = await cursorPage(rows, { limit, direction, hasCursor: token !== undefined, cursorField: field, idField, secret: runtime.cursorSecret });
 
-      // Cursor values are read above, so the field can go now.
-      if (leaksCursorField) {
-        page.data = page.data.map(row => {
-          const { [field]: _cursor, ...rest } = row;
-          return rest;
-        });
+      // Token values are read above, so the hidden fields can go now.
+      if (hidden.length > 0) {
+        page.data = page.data.map(row => Object.fromEntries(Object.entries(row).filter(([key]) => !hidden.includes(key))));
       }
 
       return page as CursorResult<never>;

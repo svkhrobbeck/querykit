@@ -276,8 +276,26 @@ async function main() {
   );
   check("cursor backward on a timestamp key does not crash", allOk(back), firstError(back));
 
-  const idCursor = await capture(() => usersRepo.findCursor({ limit: 1, cursor: page1.meta.next_cursor }));
-  check("cursor on the default id key still works", allOk(idCursor), firstError(idCursor));
+  // Task 012: a createdAt token handed to the id cursor does not fit the column — invalid-value, not a 500.
+  let misfit = "";
+  try {
+    await usersRepo.findCursor({ limit: 1, cursor: page1.meta.next_cursor });
+  } catch (error) {
+    misfit = error instanceof QueryKitError ? `${error.info.reason}/${error.info.site}` : String(error);
+  }
+  check("a token whose value does not fit the cursor column → invalid-value / cursorKey", misfit === "invalid-value/cursorKey", misfit);
+  const idPage = await capture(() => usersRepo.findCursor({ limit: 1 }));
+  check("cursor on the default id key still works", allOk(idPage), firstError(idPage));
+  // Task 012 A2: a primary-key cursor seeks on that one column; another cursorKey adds the id tie-break.
+  const { encodeCursorToken } = await import("@querykitjs/core/internal");
+  const idToken = await encodeCursorToken({ k: 5, id: 5 });
+  const dateToken = await encodeCursorToken({ k: ISO_FROM, id: 5 });
+  const idSeek = await capture(() => usersRepo.findCursor({ limit: 1, cursor: idToken }));
+  const idSql = idSeek[0]?.serialized.ok ? idSeek[0].serialized.sql : "";
+  check("A2 primary-key cursor → one-field seek, no OR", allOk(idSeek) && !/\bor\b/i.test(idSql), idSql);
+  const dateSeek = await capture(() => usersRepo.findCursor({ limit: 1, cursorKey: "createdAt", cursor: dateToken }));
+  const dateSql = dateSeek[0]?.serialized.ok ? dateSeek[0].serialized.sql : "";
+  check("A2 createdAt cursor → (k > v) OR (k = v AND id > i)", allOk(dateSeek) && /\bor\b/i.test(dateSql), dateSql);
   rows = [];
 
   /* 12. count/exists share composeWhere → coercion applies there too */

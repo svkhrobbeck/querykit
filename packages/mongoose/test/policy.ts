@@ -251,5 +251,18 @@ check(
 const unknown = await attempt(() => repositoryOf(statusOnly, { strict: true }).findAll!({ filter: [{ key: "nope", value: 1 }] }));
 check("nope with strict → unknown-key", unknown.error instanceof QueryKitError && unknown.error.info.reason === "unknown-key", describe(unknown));
 
+/* Task 012 A2 — an _id cursor seeks on _id alone; any other cursorKey adds the _id tie-break. */
+{
+  const { encodeCursorToken } = await import("@querykitjs/core/internal");
+  const oid = new mongoose.Types.ObjectId();
+  const idToken = await encodeCursorToken({ k: oid, id: oid });
+  await attempt(() => repositoryOf({ sortable: ["id", "createdAt"] }).findCursor!({ limit: 2, cursor: idToken }));
+  const idFilter = sent[0]?.filter ?? {};
+  check("A2 _id cursor → one-field seek, no $or", !("$or" in idFilter) && "_id" in idFilter, JSON.stringify(idFilter));
+  const dateToken = await encodeCursorToken({ k: new Date("2026-03-01T09:00:00.000Z"), id: oid });
+  await attempt(() => repositoryOf({ sortable: ["id", "createdAt"] }).findCursor!({ limit: 2, cursorKey: "createdAt", cursor: dateToken }));
+  check("A2 createdAt cursor → $or tie-break on _id", Array.isArray(sent[0]?.filter.$or), JSON.stringify(sent[0]?.filter));
+}
+
 console.log(`policy: ${passed} passed, ${failed} failed, ${todo} todo`);
 if (failed > 0) process.exitCode = 1;

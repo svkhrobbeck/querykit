@@ -286,6 +286,16 @@ const p2 = await usersRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 const back = await usersRepository.findCursor({ cursor: p2.meta.prev_cursor, direction: "backward" });
 ```
 
+### Cursor: teng qiymatlar va imzo
+
+- Seek kaliti `(cursorKey, _id)`: `cursorKey` unikal bo'lmasa ham (masalan bir xil `createdAt`) hech bir qator tushib qolmaydi va takrorlanmaydi. `cursorKey` primary key'ning o'zi bo'lsa — bitta maydonli seek.
+- Token (v2) ichida faqat skalyar qiymat (satr, son, boolean, ISO sana) bo'ladi va maydon tipiga cast qilinadi; obyekt, massiv yoki mos kelmaydigan qiymat → `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` (drayver chaqirilmaydi).
+- Registry opsiyasi `cursorSecret` token'ni HMAC-SHA256 bilan imzolaydi; imzosiz yoki o'zgartirilgan token → `invalid-value`. Usiz token imzosiz — mijoz uni o'zi yasay oladi (faqat ruxsat etilgan `sortable` kalit va filter doirasida).
+
+```ts
+export const registry = createRegistry(mongoose.connection, { cursorSecret: process.env.CURSOR_SECRET });
+```
+
 ## Tipli relation'lar va maydon tanlash
 
 O'qish metodlari natija tipini `with` (populate) va `columns`dan chiqaradi — qo'lda generic yo'q:
@@ -361,6 +371,7 @@ await usersRepository.findAll({ filter: raw({ age: { $gt: 18 } }) });
 - Offset 10 000 dan chuqur sahifalar rad etiladi — `findCursor` ishlating yoki `limits: { maxOffset }` bilan oshiring.
 - Har o'qish `maxTimeMS: 2000` bilan; uzoqroq hisobot so'rovlari uchun repository'da `maxTimeMS`ni oshiring. Vaqt tugasa `QueryKitTimeoutError`.
 - LIKE naqshida 2 tadan ko'p wildcard rad etiladi (`maxLikeWildcards`).
+- Cursor token formati v2 (task 012): eski (v1) `next_cursor` / `prev_cursor` endi `invalid-value` bilan rad etiladi — yangilashdan keyin paginatsiyani birinchi sahifadan boshlang.
 
 ## Wire (JSON) qiymatlari va DbService'dan migratsiya
 

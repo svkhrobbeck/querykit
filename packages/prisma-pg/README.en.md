@@ -285,6 +285,16 @@ const p2 = await postsRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 p1.meta; // { limit, has_next, has_prev, next_cursor, prev_cursor }
 ```
 
+### Cursor: ties and signing
+
+- The seek key is `(cursorKey, @id)`: with a non-unique `cursorKey` (for example a shared `createdAt`) no row is skipped or repeated. When `cursorKey` is the primary key itself the seek uses that one field.
+- A token (v2) holds only scalar values (string, number, boolean, ISO date) and they are cast to the field type; an object, an array or a value that does not fit → `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` (the driver is not called).
+- The registry option `cursorSecret` signs tokens with HMAC-SHA256; an unsigned or altered token → `invalid-value`. Without it tokens are unsigned — a client can build one itself (still only within the allowed `sortable` keys and the filter).
+
+```ts
+export const registry = createRegistry(prisma, { cursorSecret: process.env.CURSOR_SECRET });
+```
+
 `perPage`/`limit` are **capped** (`DEFAULT_MAX_PER_PAGE` = 200) — the repository clamps even if validation was bypassed.
 
 > Cursor tokens are **byte-identical** to the drizzle-pg and mongoose adapters', so an old token keeps working if the backend swaps ORMs.
@@ -409,6 +419,7 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 - First collect from `onSkippedCondition` logs which fields and operators are in use, then narrow `filterable` to exactly those — `"*"` is a stopgap.
 - New `QueryKitError` reasons: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; new site: `page`. Return them as 400.
 - Pages deeper than offset 10 000 are now refused — use `findCursor`, or raise it with `limits: { maxOffset }`.
+- Cursor tokens are v2 now (task 012): an old (v1) `next_cursor` / `prev_cursor` is refused with `invalid-value` — after the upgrade start paging from the first page again.
 
 ## Limitations
 

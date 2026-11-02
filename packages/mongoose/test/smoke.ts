@@ -340,6 +340,42 @@ async function main() {
     const tcBack = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc", cursor: tc1.meta.next_cursor, direction: "backward" });
     check("cursor on timestamp key: backward does not crash", Array.isArray(tcBack.data));
 
+    // Task 012 A1: 25 documents with one createdAt — the (createdAt, _id) seek pages 10 + 10 + 5, every _id once.
+    const Tie = mongoose.models.Tie ?? mongoose.model("Tie", new mongoose.Schema({ n: Number, createdAt: Date }));
+    await Tie.deleteMany({});
+    const sameTime = new Date("2026-03-01T09:00:00.000Z");
+    await Tie.insertMany(Array.from({ length: 25 }, (_, n) => ({ n, createdAt: sameTime })));
+    const tieRepo = registry.repository(Tie as never, { sortable: ["id", "createdAt"] } as never) as unknown as {
+      findCursor(params: unknown): Promise<{ data: { _id: unknown }[]; meta: { next_cursor: string | null; prev_cursor: string | null } }>;
+    };
+    const tieSeen = new Set<string>();
+    const pages: number[] = [];
+    let page = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc" });
+    for (;;) {
+      pages.push(page.data.length);
+      for (const doc of page.data) tieSeen.add(String(doc._id));
+      if (!page.meta.next_cursor) break;
+      page = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", cursor: page.meta.next_cursor });
+    }
+    check("A1 tied createdAt: pages 10 + 10 + 5, 25 distinct _id", pages.join() === "10,10,5" && tieSeen.size === 25, `${pages.join()} · ${tieSeen.size}`);
+    const backIds = new Set<string>();
+    let backPage = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", cursor: page.meta.prev_cursor, direction: "backward" });
+    for (;;) {
+      for (const doc of backPage.data) backIds.add(String(doc._id));
+      if (!backPage.meta.prev_cursor) break;
+      backPage = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", cursor: backPage.meta.prev_cursor, direction: "backward" });
+    }
+    // …and with a selection that leaves _id out (projection `_id: 0`): the tie-break still has its _id, the rows do not.
+    const ns = new Set<number>();
+    let colPage = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", columns: { n: true } });
+    for (let guard = 0; guard < 5; guard++) {
+      for (const doc of colPage.data as unknown as { n: number }[]) ns.add(doc.n);
+      if (!colPage.meta.next_cursor) break;
+      colPage = await tieRepo.findCursor({ limit: 10, cursorKey: "createdAt", order: "asc", columns: { n: true }, cursor: colPage.meta.next_cursor });
+    }
+    check("A1 tied createdAt with columns { n }: 25 distinct n, no _id in rows", ns.size === 25 && !("_id" in (colPage.data[0] ?? {})), `${ns.size}`);
+    check("A1 tied createdAt: walking back reaches the other 20 _id", backIds.size === 20 && [...backIds].every(id => tieSeen.has(id)), `${backIds.size}`);
+
     /* --------------------------- projection guards -------------------------- */
     /* Parity with drizzle-pg test/sql.ts §13-§17. `email` stands in for `password`. */
     const keysOf = (doc: unknown) => Object.keys(doc as object).sort();

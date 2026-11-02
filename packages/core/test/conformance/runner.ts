@@ -5,6 +5,7 @@
  */
 import type { SkippedCondition } from "../../src/types";
 
+import { useRows, type ConformanceRow } from "./fixtures";
 import { CASES, type AdapterName, type Call, type CaseOptions, type ConformanceCase, type SkipExpectation } from "./cases";
 
 export interface HarnessResult {
@@ -43,7 +44,9 @@ function asQueryKitError(err: unknown): SkippedCondition | undefined {
 export async function execute(harness: Harness, call: Call, options: CaseOptions = {}): Promise<Outcome> {
   const skipped: SkippedCondition[] = [];
   const onSkipped = (info: SkippedCondition) => skipped.push(info);
+  useRows(options.rows);
   try {
+    if (call.method === "findCursor" && call.walk) return { kind: "ok", result: await walk(harness, call, options, onSkipped), skipped };
     let result = await harness.run(call, options, onSkipped);
     if (call.method === "findCursor" && call.followNext) {
       const cursor = result.meta?.next_cursor as string | null | undefined;
@@ -88,12 +91,19 @@ export function compare(testCase: ConformanceCase, outcome: Outcome, adapter?: A
     const want = expect.ordered ? [...expect.names] : [...expect.names].sort();
     if (canonical(got) !== canonical(want)) problems.push(`rows ${canonical(names)}, expected ${canonical(expect.names)}`);
   }
+  if (expect.walk) {
+    const ids = new Set(rows.map(row => String(row.id)));
+    const pages = (meta?.pages as number[] | undefined) ?? [];
+    if (ids.size !== expect.walk.ids) problems.push(`walk collected ${ids.size} distinct ids, expected ${expect.walk.ids}`);
+    if (canonical(pages) !== canonical(expect.walk.pages)) problems.push(`walk pages ${canonical(pages)}, expected ${canonical(expect.walk.pages)}`);
+  }
   if (expect.keys) {
     const want = canonical([...expect.keys].sort());
     const bad = rows.find(row => canonical(Object.keys(row).sort()) !== want);
     if (bad) problems.push(`row keys ${canonical(Object.keys(bad).sort())}, expected ${want}`);
   }
-  if (expect.meta && canonical(meta) !== canonical(expect.meta)) problems.push(`meta ${canonical(meta)}, expected ${canonical(expect.meta)}`);
+  if (expect.meta && canonical(tokenKeys(meta)) !== canonical(tokenKeys(expect.meta)))
+    problems.push(`meta ${canonical(meta)}, expected ${canonical(expect.meta)}`);
   const gotSkipped = sortedLabels(outcome.skipped);
   const wantSkipped = sortedLabels(expect.skipped ?? []);
   if (canonical(gotSkipped) !== canonical(wantSkipped)) problems.push(`skipped ${canonical(gotSkipped)}, expected ${canonical(wantSkipped)}`);
@@ -127,4 +137,55 @@ export async function runConformance(harness: Harness, cases: readonly Conforman
 export async function runConformanceCli(harness: Harness): Promise<void> {
   const summary = await runConformance(harness);
   if (summary.failed > 0) process.exitCode = 1;
+}
+
+/**
+ * Follow `next_cursor` to the end (task 012), then — for `forward-back` — follow
+ * `prev_cursor` from the last page back to the first. Rows of every page are
+ * collected; `meta.pages` lists the page sizes, forward then back.
+ */
+async function walk(
+  harness: Harness,
+  call: Extract<Call, { method: "findCursor" }>,
+  options: CaseOptions,
+  onSkipped: (info: SkippedCondition) => void,
+): Promise<HarnessResult> {
+  const rows: Record<string, unknown>[] = [];
+  const pages: number[] = [];
+  let cursor: string | null | undefined = call.params.cursor;
+  let last: HarnessResult | undefined;
+  for (let guard = 0; guard < 50; guard++) {
+    last = await harness.run({ method: "findCursor", params: { ...call.params, cursor, direction: "forward" } }, options, onSkipped);
+    rows.push(...last.rows);
+    pages.push(last.rows.length);
+    cursor = last.meta?.next_cursor as string | null | undefined;
+    if (!cursor) break;
+  }
+  if (call.walk === "forward-back") {
+    let back = last?.meta?.prev_cursor as string | null | undefined;
+    for (let guard = 0; back && guard < 50; guard++) {
+      const page = await harness.run({ method: "findCursor", params: { ...call.params, cursor: back, direction: "backward" } }, options, onSkipped);
+      rows.push(...page.rows);
+      pages.push(page.rows.length);
+      back = page.meta?.prev_cursor as string | null | undefined;
+    }
+  }
+  return { rows, meta: { pages } };
+}
+
+/**
+ * Cursor tokens compared by their cursor value `k` only (task 012): the tie-break `id`
+ * is the adapter's own primary key (a number, or a Mongo ObjectId), so it differs by design.
+ */
+function tokenKeys(meta: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!meta) return meta;
+  const k = (token: unknown) => {
+    if (typeof token !== "string") return token;
+    try {
+      return { k: (JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { k?: unknown }).k };
+    } catch {
+      return token;
+    }
+  };
+  return { ...meta, next_cursor: k(meta.next_cursor), prev_cursor: k(meta.prev_cursor) };
 }

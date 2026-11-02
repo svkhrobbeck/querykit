@@ -25,7 +25,14 @@ export const ROWS: readonly ConformanceRow[] = [
   { id: 7, name: "Alina", email: "alina@example.com", age: null, createdAt: new Date("2026-07-04T09:00:00.000Z") },
 ];
 
+let override: readonly ConformanceRow[] | undefined;
+
+/** Run one case on its own rows (`CaseOptions.rows`); `undefined` restores `ROWS`. Set by the runner only. */
+export function useRows(rows: readonly ConformanceRow[] | undefined): void {
+  override = rows;
+}
+
 /** Plain copies, so a fake driver can never mutate the shared table. */
 export function cloneRows(): ConformanceRow[] {
-  return ROWS.map(row => ({ ...row, createdAt: new Date(row.createdAt) }));
+  return (override ?? ROWS).map(row => ({ ...row, createdAt: new Date(row.createdAt) }));
 }

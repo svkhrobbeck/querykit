@@ -16,14 +16,18 @@ export type Call =
   | { method: "findAll"; params: WireBaseParams }
   | { method: "findList"; params: WireOffsetParams }
   | { method: "findInfinite"; params: WireInfiniteParams }
-  | { method: "findCursor"; params: WireCursorParams; followNext?: boolean };
+  | { method: "findCursor"; params: WireCursorParams; followNext?: boolean; walk?: "forward" | "forward-back" };
 
 export interface CaseOptions {
   strict?: boolean;
   forcedColumns?: Record<string, true>;
   allowedColumns?: readonly string[];
+  /** Rows for this case instead of the shared `ROWS` (task 012: 25 rows with one `createdAt`). */
+  rows?: readonly import("./fixtures").ConformanceRow[];
   /** Absent ⇒ the open 3.x policy (every field and operator, every sort field), so the older cases keep their meaning. */
   policy?: CasePolicy;
+  /** Registry `cursorSecret` (task 012): tokens are signed and an unsigned one is refused. */
+  cursorSecret?: string;
 }
 
 export interface SkipExpectation {
@@ -36,6 +40,8 @@ export interface Expectation {
   /** Rows by `name`; compared as a set unless `ordered`. */
   names?: readonly string[];
   ordered?: boolean;
+  /** `walk` cases: the number of distinct ids collected over all pages, and the page sizes. */
+  walk?: { ids: number; pages: readonly number[] };
   /** Every returned row has exactly these keys. */
   keys?: readonly string[];
   meta?: Record<string, unknown>;
@@ -61,8 +67,8 @@ export interface ConformanceCase {
   notBuiltByWeb?: string;
 }
 
-/** The cursor token every adapter emits: base64url of `{"v": <value>}` (dates as ISO strings). */
-export const cursorToken = (value: unknown): string => Buffer.from(JSON.stringify({ v: value }), "utf8").toString("base64url");
+/** A v2 cursor token for an expectation (task 012) — the runner compares tokens by their cursor value `k` only. */
+export const cursorToken = (value: unknown): string => Buffer.from(JSON.stringify({ v: 2, k: value, id: null }), "utf8").toString("base64url");
 
 /** Every fixture name, and the same in `createdAt` order. */
 export const ALL = ["Alice", "Bob", "Carol", "dave", "Eve_Ann", "Frank", "Alina"] as const;

@@ -44,6 +44,11 @@ export interface RegistryOptions {
    * `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`). A repository's own `maxTimeMS` wins.
    */
   maxTimeMS?: number;
+  /**
+   * Signs cursor tokens (HMAC-SHA256, task 012). With it a token that was not
+   * issued by this server — or was changed — is `invalid-value`.
+   */
+  cursorSecret?: string;
 }
 
 /** Extends a base repository with custom, model-specific methods (drizzle-pg style). */

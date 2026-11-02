@@ -259,6 +259,16 @@ const p2 = await usersRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 const back = await usersRepository.findCursor({ cursor: p2.meta.prev_cursor, direction: "backward" });
 ```
 
+### Cursor: ties and signing
+
+- The seek key is `(cursorKey, primary key)`: with a non-unique `cursorKey` (for example a shared `createdAt`) no row is skipped or repeated. When `cursorKey` is the primary key itself the seek uses that one field.
+- A token (v2) holds only scalar values (string, number, boolean, ISO date) and they are cast to the field type; an object, an array or a value that does not fit → `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` (the driver is not called).
+- The registry option `cursorSecret` signs tokens with HMAC-SHA256; an unsigned or altered token → `invalid-value`. Without it tokens are unsigned — a client can build one itself (still only within the allowed `sortable` keys and the filter).
+
+```ts
+export const registry = createRegistry(db, schema, { cursorSecret: process.env.CURSOR_SECRET });
+```
+
 ## Typed relations & column selection
 
 Read methods infer their return type from `with` and `columns` — no manual generics:
@@ -319,6 +329,7 @@ const open = db.repository(users, {
 - First collect from `onSkippedCondition` logs which fields and operators are in use, then narrow `filterable` to exactly those — `"*"` is a stopgap.
 - New `QueryKitError` reasons: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; new site: `page`. Return them as 400.
 - Pages deeper than offset 10 000 are now refused — use `findCursor`, or raise it with `limits: { maxOffset }`.
+- Cursor tokens are v2 now (task 012): an old (v1) `next_cursor` / `prev_cursor` is refused with `invalid-value` — after the upgrade start paging from the first page again.
 
 ## Wire (JSON) values and migrating from DbService
 

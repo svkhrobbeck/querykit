@@ -279,6 +279,16 @@ const p2 = await usersRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 const back = await usersRepository.findCursor({ cursor: p2.meta.prev_cursor, direction: "backward" });
 ```
 
+### Cursor: teng qiymatlar va imzo
+
+- Seek kaliti `(cursorKey, primary key)`: `cursorKey` unikal bo'lmasa ham (masalan bir xil `createdAt`) hech bir qator tushib qolmaydi va takrorlanmaydi. `cursorKey` primary key'ning o'zi bo'lsa — bitta maydonli seek.
+- Token (v2) ichida faqat skalyar qiymat (satr, son, boolean, ISO sana) bo'ladi va maydon tipiga cast qilinadi; obyekt, massiv yoki mos kelmaydigan qiymat → `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` (drayver chaqirilmaydi).
+- Registry opsiyasi `cursorSecret` token'ni HMAC-SHA256 bilan imzolaydi; imzosiz yoki o'zgartirilgan token → `invalid-value`. Usiz token imzosiz — mijoz uni o'zi yasay oladi (faqat ruxsat etilgan `sortable` kalit va filter doirasida).
+
+```ts
+export const registry = createRegistry(db, schema, { cursorSecret: process.env.CURSOR_SECRET });
+```
+
 ## Tipli relation & column tanlash
 
 Read metodlar natija tipini `with` va `columns` argumentidan **avtomatik** chiqaradi — qo'lda generic yo'q:
@@ -343,6 +353,7 @@ const open = db.repository(users, {
 - Avval `onSkippedCondition` loglaridan qaysi maydon/operator ishlatilayotganini yig'ing, keyin `filterable`ni aynan shularga toraytiring — `"*"` vaqtinchalik yo'l.
 - `QueryKitError`ning yangi `reason`lari: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; yangi `site`: `page`. Ularni 400 qilib qaytaring.
 - Offset 10 000 dan chuqur sahifalar endi rad etiladi — `findCursor` ishlating yoki `limits: { maxOffset }` bilan oshiring.
+- Cursor token formati v2 (task 012): eski (v1) `next_cursor` / `prev_cursor` endi `invalid-value` bilan rad etiladi — yangilashdan keyin paginatsiyani birinchi sahifadan boshlang.
 
 ## Wire (JSON) qiymatlari va DbService'dan migratsiya
 

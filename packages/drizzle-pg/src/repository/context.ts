@@ -29,6 +29,8 @@ export interface RepoRuntime {
   onSkippedCondition?: (info: SkippedCondition) => void;
   /** Registry-level request limits; a repository's own `limits` win. */
   limits?: Partial<QueryLimits>;
+  /** Signs cursor tokens (task 012). */
+  cursorSecret?: string;
 }
 
 export interface RelationalHandle {

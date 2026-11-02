@@ -41,6 +41,12 @@ export interface RegistryOptions {
    * `limits` bundan ustun.
    */
   limits?: Partial<Core.QueryLimits>;
+  /**
+   * Signs cursor tokens (HMAC-SHA256, task 012). With it a token that was not
+   * issued by this server — or was changed — is `invalid-value`. Without it tokens
+   * are unsigned but still checked (scalar values, v2 shape).
+   */
+  cursorSecret?: string;
 }
 
 /**

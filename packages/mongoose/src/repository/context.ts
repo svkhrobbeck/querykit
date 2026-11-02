@@ -26,6 +26,8 @@ export interface RepoRuntime {
   limits?: Partial<QueryLimits>;
   /** Read time limit in ms; a repository's own `maxTimeMS` wins. */
   maxTimeMS: number;
+  /** Signs cursor tokens (task 012). */
+  cursorSecret?: string;
 }
 
 // Mongoose's Query generics are extremely deep; we drive queries untyped

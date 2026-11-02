@@ -5,7 +5,7 @@
  */
 import type { CursorMeta, InfiniteMeta, OffsetMeta } from "../types";
 
-import { encodeCursor } from "./cursor";
+import { encodeCursorToken } from "./cursor";
 
 /** A requested page size, defaulted, truncated, at least 1 and at most `max`. */
 export function clampPageSize(requested: number | undefined, fallback: number, max: number): number {
@@ -51,14 +51,18 @@ export interface CursorPageOptions {
   hasCursor: boolean;
   /** The row field the tokens are read from. */
   cursorField: string;
+  /** The primary-key field — the tie-break value in every token (task 012). */
+  idField: string;
+  /** Signs the tokens (registry `cursorSecret`). */
+  secret?: string;
 }
 
 /**
  * Rows fetched with `limit + 1` in query order → the page in display order and
  * its meta. A backward page is fetched reversed and flipped back here.
  */
-export function cursorPage<T extends Record<string, unknown>>(rows: readonly T[], options: CursorPageOptions): { data: T[]; meta: CursorMeta } {
-  const { limit, direction, hasCursor, cursorField } = options;
+export async function cursorPage<T extends Record<string, unknown>>(rows: readonly T[], options: CursorPageOptions): Promise<{ data: T[]; meta: CursorMeta }> {
+  const { limit, direction, hasCursor, cursorField, idField, secret } = options;
   const hasExtra = rows.length > limit;
   let data = hasExtra ? rows.slice(0, limit) : [...rows];
   if (direction === "backward") data = data.reverse();
@@ -74,8 +78,8 @@ export function cursorPage<T extends Record<string, unknown>>(rows: readonly T[]
       limit,
       has_next: hasNext,
       has_prev: hasPrev,
-      next_cursor: hasNext && last ? encodeCursor(last[cursorField]) : null,
-      prev_cursor: hasPrev && first ? encodeCursor(first[cursorField]) : null,
+      next_cursor: hasNext && last ? await encodeCursorToken({ k: last[cursorField], id: last[idField] }, secret) : null,
+      prev_cursor: hasPrev && first ? await encodeCursorToken({ k: first[cursorField], id: first[idField] }, secret) : null,
     },
   };
 }
