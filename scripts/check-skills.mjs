@@ -154,7 +154,10 @@ function buildPaths() {
     const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, pkg, "package.json"), "utf8"));
     for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
       const linked = join(PACKAGES_DIR, pkg, "node_modules", peer);
-      if (!paths[peer] && existsSync(linked)) paths[peer] = [toPosix(linked)];
+      if (!paths[peer] && existsSync(linked)) {
+        paths[peer] = [toPosix(linked)];
+        paths[`${peer}/*`] = [`${toPosix(linked)}/*`]; // subpath entries such as `drizzle-orm/pg-core`
+      }
     }
   }
   for (const [specifier, entry] of Object.entries(EXTRA_ENTRIES)) paths[specifier] = [toPosix(join(ROOT, entry))];
