@@ -1,7 +1,7 @@
 /**
  * Filter hot path benchmark (task 016, Locked 4) — informational, not in the gate.
  *
- *   bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/core/test/bench.ts
+ *   bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/core/test/bench.ts  (mongodb shares the shim)
  *
  * One `findAll` with a 30-condition tree (the `maxConditions` limit, depth 4) through
  * each adapter's conformance harness: limit check, policy check, filter compilation
@@ -41,6 +41,7 @@ const harnesses = await Promise.all([
   loadHarness("../../drizzle-pg/test/conformance.ts", "drizzleHarness"),
   loadHarness("../../prisma-pg/test/conformance.ts", "prismaHarness"),
   loadHarness("../../mongoose/test/conformance.ts", "mongooseHarness"),
+  loadHarness("../../mongodb/test/conformance.ts", "mongodbHarness"),
 ]);
 console.log(`bench: findAll, 30-condition tree, ${DURATION_MS} ms per adapter (fake drivers)`);
 for (const harness of harnesses) console.log(`  ${harness.name.padEnd(10)} ${String(await callsPerSecond(harness)).padStart(8)} ops/s`);

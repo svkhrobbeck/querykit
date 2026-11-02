@@ -146,8 +146,16 @@ function buildPaths() {
     // Subpath entries (R17): `@querykitjs/core/internal` and the like resolve to src as well.
     const internal = join(PACKAGES_DIR, pkg, "src", "internal", "index.ts");
     if (existsSync(internal)) paths[`@querykitjs/${pkg}/internal`] = [toPosix(internal)];
+    const testing = join(PACKAGES_DIR, pkg, "src", "testing.ts");
+    if (existsSync(testing)) paths[`@querykitjs/${pkg}/testing`] = [toPosix(testing)];
     const prelude = join(PACKAGES_DIR, pkg, "test", "skill-prelude.ts");
     if (existsSync(prelude)) paths[`@querykitjs/${pkg}/skill-prelude`] = [toPosix(prelude)];
+    // A skill imports its package's peers (`mongodb`, `zod`); bun links them per package, not at the root.
+    const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, pkg, "package.json"), "utf8"));
+    for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
+      const linked = join(PACKAGES_DIR, pkg, "node_modules", peer);
+      if (!paths[peer] && existsSync(linked)) paths[peer] = [toPosix(linked)];
+    }
   }
   for (const [specifier, entry] of Object.entries(EXTRA_ENTRIES)) paths[specifier] = [toPosix(join(ROOT, entry))];
   return paths;

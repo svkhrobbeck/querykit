@@ -5,7 +5,7 @@
 import type { QueryLimits } from "../../src/defaults";
 import type { Filterable, SkipReason, SkipSite, WireBaseParams, WireCursorParams, WireInfiniteParams, WireOffsetParams } from "../../src/types";
 
-export type AdapterName = "drizzle-pg" | "prisma-pg" | "mongoose";
+export type AdapterName = "drizzle-pg" | "prisma-pg" | "mongoose" | "mongodb";
 
 export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection" | "policy" | "mutation" | "scope";
 

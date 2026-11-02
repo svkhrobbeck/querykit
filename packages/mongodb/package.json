@@ -1,0 +1,98 @@
+{
+  "name": "@querykitjs/mongodb",
+  "version": "0.0.0",
+  "description": "Advanced filtering + flexible pagination repository layer for the official MongoDB driver.",
+  "type": "module",
+  "author": {
+    "name": "Suhrobbek Soatov",
+    "url": "https://soatov.uz",
+    "email": "svkhrobbeck@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svkhrobbeck/querykit.git",
+    "directory": "packages/mongodb"
+  },
+  "homepage": "https://github.com/svkhrobbeck/querykit/tree/main/packages/mongodb#readme",
+  "bugs": {
+    "url": "https://github.com/svkhrobbeck/querykit/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "bun --preload ./test/bun-v8-shim.ts test/smoke.ts",
+    "test:unit": "bun --preload ./test/bun-v8-shim.ts test/where.ts && bun --preload ./test/bun-v8-shim.ts test/policy.ts",
+    "test:types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@querykitjs/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "mongodb": "^6.21 || ^7.7",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "mongodb": "7.7.0",
+    "mongodb-memory-server": "11.3.0",
+    "zod": "4.6.7"
+  },
+  "keywords": [
+    "mongodb",
+    "repository",
+    "pagination",
+    "cursor",
+    "keyset",
+    "filter",
+    "query",
+    "zod",
+    "typescript"
+  ]
+}

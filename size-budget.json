@@ -3,6 +3,8 @@
   "@querykitjs/core": 1208,
   "@querykitjs/core/internal": 4337,
   "@querykitjs/drizzle-pg": 9739,
+  "@querykitjs/mongodb": 10069,
+  "@querykitjs/mongodb/testing": 183,
   "@querykitjs/mongoose": 9885,
   "@querykitjs/prisma-pg": 11504,
   "@querykitjs/web": 3591,

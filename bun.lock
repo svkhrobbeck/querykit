@@ -62,6 +62,22 @@
         "drizzle-orm": ">=0.44 <0.46",
       },
     },
+    "packages/mongodb": {
+      "name": "@querykitjs/mongodb",
+      "version": "0.0.0",
+      "dependencies": {
+        "@querykitjs/core": "workspace:*",
+      },
+      "devDependencies": {
+        "mongodb": "7.7.0",
+        "mongodb-memory-server": "11.3.0",
+        "zod": "4.6.7",
+      },
+      "peerDependencies": {
+        "mongodb": "^6.21 || ^7.7",
+        "zod": "^4",
+      },
+    },
     "packages/mongoose": {
       "name": "@querykitjs/mongoose",
       "version": "2.0.0",
@@ -365,6 +381,8 @@
     "@querykitjs/core": ["@querykitjs/core@workspace:packages/core"],
 
     "@querykitjs/drizzle-pg": ["@querykitjs/drizzle-pg@workspace:packages/drizzle-pg"],
+
+    "@querykitjs/mongodb": ["@querykitjs/mongodb@workspace:packages/mongodb"],
 
     "@querykitjs/mongoose": ["@querykitjs/mongoose@workspace:packages/mongoose"],
 

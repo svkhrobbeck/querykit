@@ -9,7 +9,7 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "build": "bun run --filter @querykitjs/core build && bun run --filter @querykitjs/zod build && bun run --filter @querykitjs/class-validator build && bun run --filter @querykitjs/drizzle-pg build && bun run --filter @querykitjs/prisma-pg build && bun run --filter @querykitjs/mongoose build && bun run --filter @querykitjs/web build",
+    "build": "bun run --filter @querykitjs/core build && bun run --filter @querykitjs/zod build && bun run --filter @querykitjs/class-validator build && bun run --filter @querykitjs/drizzle-pg build && bun run --filter @querykitjs/prisma-pg build && bun run --filter @querykitjs/mongoose build && bun run --filter @querykitjs/mongodb build && bun run --filter @querykitjs/web build",
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -20,7 +20,7 @@
     "test:treeshake": "node scripts/check-treeshake.mjs",
     "test:size": "node scripts/check-size.mjs",
     "test:publish": "node scripts/check-publish.mjs",
-    "test:conformance": "bun run packages/core/test/conformance/self-check.ts && bun run packages/drizzle-pg/test/conformance.ts && bun run packages/prisma-pg/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/mongoose/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/web/test/conformance.ts",
+    "test:conformance": "bun run packages/core/test/conformance/self-check.ts && bun run packages/drizzle-pg/test/conformance.ts && bun run packages/prisma-pg/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/mongoose/test/conformance.ts && bun --preload ./packages/mongodb/test/bun-v8-shim.ts packages/mongodb/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/web/test/conformance.ts",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "bun run build && node scripts/pin-workspace-deps.mjs && node scripts/ci-publish.mjs",

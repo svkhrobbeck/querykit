@@ -46,6 +46,22 @@ const EDGES = [
     preload: "./test/bun-v8-shim.ts",
   },
   { pkg: "mongoose", label: "mongoose 9.11.4", runs: ["test/conformance.ts", "test/smoke.ts"], preload: "./test/bun-v8-shim.ts" },
+  // mongodb's conformance reuses the mongoose adapter's in-memory matcher (test/fake-mongo.ts).
+  {
+    pkg: "mongodb",
+    label: "mongodb 6.21.0",
+    deps: { mongodb: "6.21.0" },
+    runs: ["test/conformance.ts", "test/where.ts", "test/policy.ts"],
+    preload: "./test/bun-v8-shim.ts",
+    extra: ["mongoose"],
+  },
+  {
+    pkg: "mongodb",
+    label: "mongodb 7.7.0",
+    runs: ["test/conformance.ts", "test/where.ts", "test/policy.ts"],
+    preload: "./test/bun-v8-shim.ts",
+    extra: ["mongoose"],
+  },
   {
     pkg: "class-validator",
     label: "class-validator 0.14.4 + reflect-metadata 0.1.14",
@@ -86,6 +102,7 @@ const CONSUMER_ENTRIES = {
   "drizzle-pg": ["@querykitjs/drizzle-pg"],
   "prisma-pg": ["@querykitjs/prisma-pg"],
   mongoose: ["@querykitjs/mongoose"],
+  mongodb: ["@querykitjs/mongodb", "@querykitjs/mongodb/testing"],
   web: ["@querykitjs/web", "@querykitjs/web/react"],
 };
 
@@ -171,7 +188,10 @@ function runConsumers(version) {
   for (const [pkg, entries] of Object.entries(CONSUMER_ENTRIES)) {
     entries.forEach((entry, index) => {
       const sub = entry.split("/").slice(2).join("/");
-      paths[entry] = [join(ROOT, "packages", pkg, "dist", sub, "index.d.ts").split("\\").join("/")];
+      // A subpath builds to `dist/<sub>/index.d.ts` (web/react) or `dist/<sub>.d.ts` (mongodb/testing).
+      const nested = join(ROOT, "packages", pkg, "dist", sub, "index.d.ts");
+      const types = sub && !existsSync(nested) ? join(ROOT, "packages", pkg, "dist", `${sub}.d.ts`) : nested;
+      paths[entry] = [types.split("\\").join("/")];
       const file = `${pkg}-${index}.ts`;
       writeFileSync(
         join(dir, file),

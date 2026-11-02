@@ -61,6 +61,7 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     // MongoDB ids are ObjectIds: a numeric id is invalid-value there (B8), a documented driver difference.
     expectFor: {
       mongoose: { names: ["Alice", "Bob", "Carol", "dave", "Eve_Ann", "Frank", "Alina"], skipped: [{ site: "filter", key: "id", reason: "invalid-value" }] },
+      mongodb: { names: ["Alice", "Bob", "Carol", "dave", "Eve_Ann", "Frank", "Alina"], skipped: [{ site: "filter", key: "id", reason: "invalid-value" }] },
     },
   },
   {
