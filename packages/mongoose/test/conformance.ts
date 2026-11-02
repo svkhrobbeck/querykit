@@ -61,11 +61,17 @@ const normalize = (row: Record<string, unknown>) => {
   return { id: _id, ...rest };
 };
 
+/** The 2.x behaviour for the cases that predate the policy: every fixture path, every operator, every sort path. */
+const PATHS = ["_id", "name", "email", "age", "createdAt"];
+const OPEN_POLICY = { filterable: Object.fromEntries(PATHS.map(key => [key, "*"])), sortable: PATHS };
+const policyOptions = (policy: CaseOptions["policy"]) => (policy === undefined ? OPEN_POLICY : policy === "default" ? {} : policy);
+
 export const mongooseHarness: Harness = {
   name: "mongoose",
   async run(call: Call, options: CaseOptions, onSkipped) {
     const registry = createRegistry(mongoose.connection, { strict: options.strict, onSkippedCondition: onSkipped });
     const repository = registry.repository(ConformanceUser, {
+      ...policyOptions(options.policy),
       forcedColumns: options.forcedColumns,
       allowedColumns: options.allowedColumns,
     } as never) as unknown as Record<string, (params: unknown) => Promise<unknown>>;

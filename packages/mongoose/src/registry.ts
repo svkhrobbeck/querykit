@@ -30,6 +30,7 @@ export function createRegistry(connection: Connection, options: RegistryOptions 
     maxLimit: options.maxLimit ?? DEFAULT_MAX_LIMIT,
     strict: options.strict ?? false,
     onSkippedCondition: options.onSkippedCondition,
+    limits: options.limits,
   };
 
   function repository<TDoc>(model: Model<TDoc>): Repository<TDoc>;

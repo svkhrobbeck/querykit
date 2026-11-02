@@ -6,7 +6,7 @@ import { toArr, type RepoContext } from "./context";
 
 /** `aggregate` — `$match` + `$group` with `count`/`$sum`/`$avg`/`$min`/`$max`. */
 export function aggregateMethods<TDoc>(ctx: RepoContext<TDoc>) {
-  const { runtime, m, diag, permits, composeWhere } = ctx;
+  const { runtime, m, diag, permits, policy, composeWhere } = ctx;
 
   // An aggregate spec can also come from a request, and `min(password)` or a
   // `groupBy` on a hidden field leaks just as much as a projection — so the
@@ -34,6 +34,12 @@ export function aggregateMethods<TDoc>(ctx: RepoContext<TDoc>) {
 
   return {
     async aggregate(spec: AggregateSpec<TDoc>) {
+      // `$group` or `$max` on a hidden path reads it as surely as a filter does.
+      policy.checkFilter(spec.filter);
+      for (const key of [spec.groupBy, spec.sum, spec.avg, spec.min, spec.max].flatMap(value =>
+        value === undefined ? [] : Array.isArray(value) ? value : [value],
+      ))
+        policy.checkAggregateKey(key as string);
       const groupKeys = (toArr(spec.groupBy) as string[]).filter(key => Boolean(aggregable(key)));
       const match = castMatch(composeWhere(spec.filter, spec.withDeleted));
       const groupId = groupKeys.length ? Object.fromEntries(groupKeys.map(k => [k, `$${aggregable(k) ?? k}`])) : null;

@@ -1,3 +1,4 @@
+import type * as Core from "@querykitjs/core";
 import type { Model } from "mongoose";
 
 import type {
@@ -58,6 +59,21 @@ export interface RepositoryOptions<TDoc = any, TRel extends RelationMap = Relati
    * An empty array throws (a projection selecting nothing means "everything").
    */
   allowedColumns?: readonly FieldKey<TDoc>[];
+  /**
+   * Paths a client may filter by, and the operators for each (`"*"` — all). A path
+   * not listed ⇒ `reason: "forbidden-key"`, an operator not listed ⇒
+   * `"forbidden-operator"` — a `QueryKitError` whatever `strict` says, before the
+   * query runs. **When not given** — `allowedColumns` (else the `forcedColumns` keys,
+   * else only `_id`) with `"="` and `"in"` only. `aggregate` paths come from this list too.
+   */
+  filterable?: Core.Filterable<FieldKey<TDoc> | "_id">;
+  /**
+   * Paths a client may sort (and use as `cursorKey`) by. When not given — `_id` and
+   * `createdAt` (when the schema has it). Anything else ⇒ `reason: "forbidden-key"`.
+   */
+  sortable?: readonly (FieldKey<TDoc> | "_id")[];
+  /** Request limits for this repository — over the registry's `limits`. */
+  limits?: Partial<Core.QueryLimits>;
 }
 
 /* --------------------------- result-type inference ------------------------ */

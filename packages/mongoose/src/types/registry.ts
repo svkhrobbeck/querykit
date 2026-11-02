@@ -32,6 +32,12 @@ export interface RegistryOptions {
    * path: watch with the hook first, flip `strict: true` once the log is clean.
    */
   onSkippedCondition?: (info: Core.SkippedCondition) => void;
+  /**
+   * Server-side request limits (core `DEFAULT_QUERY_LIMITS`) — enforced even when
+   * validation was bypassed. Past one ⇒ `QueryKitError` (`reason: "limit-exceeded"`).
+   * A repository's own `limits` win.
+   */
+  limits?: Partial<Core.QueryLimits>;
 }
 
 /** Extends a base repository with custom, model-specific methods (drizzle-pg style). */

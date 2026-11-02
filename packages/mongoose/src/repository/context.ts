@@ -1,6 +1,6 @@
 import type { ClientSession, Model } from "mongoose";
-import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
-import type { Diagnostics } from "@querykitjs/core/internal";
+import { QueryKitError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
+import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
 import { hasPath, resolveField, type AnyModel } from "../internal/fields";
@@ -22,6 +22,8 @@ export interface RepoRuntime {
   strict: boolean;
   /** Called for every dropped condition (also when `strict` is off). */
   onSkippedCondition?: (info: SkippedCondition) => void;
+  /** Registry-level request limits; a repository's own `limits` win. */
+  limits?: Partial<QueryLimits>;
 }
 
 // Mongoose's Query generics are extremely deep; we drive queries untyped
@@ -52,6 +54,8 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
   /** User filter + scope + soft-delete guard as one Mongo query. */
+  /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
+  policy: Policy;
   composeWhere: (userFilter?: Filter<TDoc>, withDeleted?: boolean) => Query;
   /** `filter AND idKey = id`. */
   withId: (filter: Filter<TDoc> | undefined, idKey: string, id: Id) => Filter<TDoc>;
@@ -121,8 +125,22 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
 
   const countWhere = (where: Query): Promise<number> => attachSession(m.countDocuments(where)).exec() as Promise<number>;
 
+  const policy = resolvePolicy({
+    source: m.modelName,
+    // `id` is `_id` on the wire, like everywhere else in this adapter.
+    fieldOf: key => resolveField(m, key),
+    primaryKey: "_id",
+    createdAt: resolveField(m, "createdAt") ?? resolveField(m, "created_at"),
+    filterable: config.filterable as never,
+    sortable: config.sortable as readonly string[] | undefined,
+    allowedColumns: config.allowedColumns as readonly string[] | undefined,
+    forcedColumns: config.forcedColumns as Record<string, unknown> | undefined,
+    limits: { ...runtime.limits, ...config.limits },
+  });
+
   return {
     ...guards,
+    policy,
     runtime,
     m,
     diag,
