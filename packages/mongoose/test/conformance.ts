@@ -83,6 +83,7 @@ export function assertNoConnection(): boolean {
 }
 
 if ((import.meta as { main?: boolean }).main) {
+  await import("./policy"); // task 011 attack tests — only when this file is the entry point, not when web/conformance imports it
   const summary = await runConformance(mongooseHarness);
   const offline = assertNoConnection();
   if (summary.failed > 0 || !offline) process.exitCode = 1;
