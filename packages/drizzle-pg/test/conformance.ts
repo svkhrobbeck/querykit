@@ -12,7 +12,8 @@ import { getTableColumns, type SQL } from "drizzle-orm";
 import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 import type { Call, CaseOptions } from "../../core/test/conformance/cases";
-import { cloneRows } from "../../core/test/conformance/fixtures";
+import { cloneRows, recordCall, writeRows, type ConformanceRow } from "../../core/test/conformance/fixtures";
+import { callArgs, toResult } from "../../core/test/conformance/harness-util";
 import { runConformanceCli, type Harness } from "../../core/test/conformance/runner";
 import { pick } from "../../core/test/conformance/semantics";
 import { createRegistry } from "../src/index";
@@ -45,6 +46,7 @@ interface FindConfig {
 }
 
 function findMany(config: FindConfig = {}): Record<string, unknown>[] {
+  recordCall("find", config.limit);
   const ordered = orderRows(filterRows(cloneRows(), config.where, columnKey), config.orderBy, columnKey);
   const offset = config.offset ?? 0;
   const page = ordered.slice(offset, config.limit === undefined ? undefined : offset + config.limit);
@@ -56,8 +58,33 @@ function findMany(config: FindConfig = {}): Record<string, unknown>[] {
 function countQuery(where?: SQL) {
   return {
     where: (next: SQL) => countQuery(next),
-    then: (resolve: (rows: Array<{ value: number }>) => void) => resolve([{ value: filterRows(cloneRows(), where, columnKey).length }]),
+    then: (resolve: (rows: Array<{ value: number }>) => void) => {
+      recordCall("count");
+      resolve([{ value: filterRows(cloneRows(), where, columnKey).length }]);
+    },
   };
+}
+
+/** `update(t).set(v).where(w).returning(sel?)` / `delete(t).where(w).returning(sel?)` on the case's rows (task 013). */
+function writeQuery(kind: "update" | "delete") {
+  let values: Record<string, unknown> = {};
+  let where: SQL | undefined;
+  const run = (selection?: Record<string, unknown>) => {
+    recordCall("write");
+    const rows = cloneRows();
+    const hit = new Set(filterRows(rows, where, columnKey).map(row => row.id));
+    const changed = kind === "update" ? rows.map(row => (hit.has(row.id) ? ({ ...row, ...values } as ConformanceRow) : row)) : rows;
+    writeRows(kind === "update" ? changed : rows.filter(row => !hit.has(row.id)));
+    const affected = changed.filter(row => hit.has(row.id));
+    return selection ? affected.map(() => Object.fromEntries(Object.keys(selection).map(key => [key, 1]))) : affected;
+  };
+  const query = {
+    set: (next: Record<string, unknown>) => ((values = next), query),
+    where: (next: SQL | undefined) => ((where = next), query),
+    returning: async (selection?: Record<string, unknown>) => run(selection),
+    then: (resolve: (value: unknown) => void) => resolve(run()),
+  };
+  return query;
 }
 
 const fakeDb = {
@@ -68,6 +95,8 @@ const fakeDb = {
     },
   },
   select: () => ({ from: () => countQuery() }),
+  update: () => writeQuery("update"),
+  delete: () => writeQuery("delete"),
 } as unknown as AnyDb;
 
 /** The 3.x behaviour for the cases that predate the policy: every column, every operator, every sort field. */
@@ -84,10 +113,9 @@ export const drizzleHarness: Harness = {
       ...policyOptions(options.policy),
       forcedColumns: options.forcedColumns,
       allowedColumns: options.allowedColumns,
+      scope: options.scope,
     } as never);
-    const result = (await (repository[call.method] as (params: unknown) => Promise<unknown>)(call.params)) as
-      Record<string, unknown>[] | { data: Record<string, unknown>[]; meta: Record<string, unknown> };
-    return Array.isArray(result) ? { rows: result } : { rows: result.data, meta: result.meta };
+    return toResult(await (repository[call.method] as (...args: unknown[]) => Promise<unknown>)(...callArgs(call)));
   },
 };
 

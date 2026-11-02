@@ -112,6 +112,11 @@ export interface WireBaseParams {
 export interface WireOffsetParams extends WireBaseParams {
   page?: number;
   perPage?: number;
+  /**
+   * `false` — umumiy son so'ralmaydi (count yo'q): `perPage + 1` qator o'qiladi,
+   * `has_next` shundan, `total_items` / `total_pages` = `null`. Default `true`.
+   */
+  withTotal?: boolean;
 }
 
 /** Infinite-scroll wire params. */
@@ -139,10 +144,10 @@ export interface WireCursorParams extends Omit<WireBaseParams, "sort"> {
  * `sortable` / `limits`): ular **hech qachon jim tashlanmaydi**, `strict`dan qat'i nazar
  * `QueryKitError` bo'ladi.
  */
-export type SkipReason = "unknown-key" | "invalid-value" | "forbidden-key" | "forbidden-operator" | "limit-exceeded";
+export type SkipReason = "unknown-key" | "invalid-value" | "forbidden-key" | "forbidden-operator" | "limit-exceeded" | "empty-filter";
 
-/** Shart qayerda tashlab yuborilgani (`page` — offset chuqurligi). */
-export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate" | "page";
+/** Shart qayerda tashlab yuborilgani (`page` — offset chuqurligi, `mutation` — `updateWhere` / `deleteWhere` filtri). */
+export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate" | "page" | "mutation";
 
 /**
  * Server siyosati: maydon → ruxsat etilgan operatorlar, yoki `"*"` (hammasi — faqat aniq
@@ -165,8 +170,10 @@ export interface SkippedCondition {
 
 /** Offset (sahifali) paginatsiya meta'si. */
 export interface OffsetMeta {
-  total_items: number;
-  total_pages: number;
+  /** `withTotal: false` bilan `null` (count so'ralmagan). */
+  total_items: number | null;
+  /** `withTotal: false` bilan `null`. */
+  total_pages: number | null;
   current_page: number;
   per_page: number;
   has_next: boolean;
@@ -189,4 +196,29 @@ export interface CursorMeta {
   has_prev: boolean;
   next_cursor: string | null;
   prev_cursor: string | null;
+}
+
+/* ------------------------------- mutations -------------------------------- */
+
+/**
+ * `updateWhere` / `deleteWhere` uchun "hamma qatorlar" — faqat shu aniq ko'rsatilsa filtrsiz
+ * mutatsiya bajariladi (scope baribir qo'llanadi). Bo'sh filtr — `QueryKitError` `empty-filter`.
+ */
+export interface AllRows {
+  all: true;
+}
+
+/** `updateWhere` / `deleteWhere` opsiyalari: `returning: { limit }` — ta'sirlangan qatorlardan ko'pi bilan `limit` tasi. */
+export interface MutationOptions {
+  returning?: false | { limit: number };
+}
+
+/** Ta'sirlangan qatorlar soni. */
+export interface MutationCount {
+  count: number;
+}
+
+/** `returning: { limit }` bilan: soni va ko'pi bilan `limit` ta qator. */
+export interface MutationRows<TRow> extends MutationCount {
+  rows: TRow[];
 }

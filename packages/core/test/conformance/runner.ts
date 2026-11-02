@@ -5,7 +5,7 @@
  */
 import type { SkippedCondition } from "../../src/types";
 
-import { useRows, type ConformanceRow } from "./fixtures";
+import { cloneRows, driverCalls, useRows } from "./fixtures";
 import { CASES, type AdapterName, type Call, type CaseOptions, type ConformanceCase, type SkipExpectation } from "./cases";
 
 export interface HarnessResult {
@@ -19,9 +19,15 @@ export interface Harness {
   run(call: Call, options: CaseOptions, onSkipped: (info: SkippedCondition) => void): Promise<HarnessResult>;
 }
 
+/** The rows left and the driver calls made — read after every call (task 013). */
+export interface After {
+  remaining: string[];
+  calls: string[];
+}
+
 export type Outcome =
-  | { kind: "ok"; result: HarnessResult; skipped: SkippedCondition[] }
-  | { kind: "error"; info: SkippedCondition; skipped: SkippedCondition[] }
+  | ({ kind: "ok"; result: HarnessResult; skipped: SkippedCondition[] } & Partial<After>)
+  | ({ kind: "error"; info: SkippedCondition; skipped: SkippedCondition[] } & Partial<After>)
   | { kind: "crash"; message: string };
 
 export interface Summary {
@@ -45,6 +51,7 @@ export async function execute(harness: Harness, call: Call, options: CaseOptions
   const skipped: SkippedCondition[] = [];
   const onSkipped = (info: SkippedCondition) => skipped.push(info);
   useRows(options.rows);
+  const after = (): After => ({ remaining: cloneRows().map(row => row.name), calls: [...driverCalls] });
   try {
     if (call.method === "findCursor" && call.walk) return { kind: "ok", result: await walk(harness, call, options, onSkipped), skipped };
     let result = await harness.run(call, options, onSkipped);
@@ -52,10 +59,10 @@ export async function execute(harness: Harness, call: Call, options: CaseOptions
       const cursor = result.meta?.next_cursor as string | null | undefined;
       result = await harness.run({ method: "findCursor", params: { ...call.params, cursor } }, options, onSkipped);
     }
-    return { kind: "ok", result, skipped };
+    return { kind: "ok", result, skipped, ...after() };
   } catch (err) {
     const info = asQueryKitError(err);
-    if (info) return { kind: "error", info, skipped };
+    if (info) return { kind: "error", info, skipped, ...after() };
     return { kind: "crash", message: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -76,14 +83,25 @@ const sortedLabels = (list: readonly SkipExpectation[]) => list.map(skipLabel).s
 export function compare(testCase: ConformanceCase, outcome: Outcome, adapter?: AdapterName): string[] {
   const expect = (adapter && testCase.expectFor?.[adapter]) ?? testCase.expect;
   if (outcome.kind === "crash") return [`crashed: ${outcome.message}`];
+  const problems: string[] = [];
+  if (expect.remaining) {
+    const got = [...(outcome.remaining ?? [])].sort();
+    if (canonical(got) !== canonical([...expect.remaining].sort()))
+      problems.push(`rows left ${canonical(got)}, expected ${canonical([...expect.remaining].sort())}`);
+  }
+  if (expect.calls) {
+    const got = [...(outcome.calls ?? [])].sort();
+    if (canonical(got) !== canonical([...expect.calls].sort())) problems.push(`driver calls ${canonical(outcome.calls)}, expected ${canonical(expect.calls)}`);
+  }
   if (expect.error) {
-    if (outcome.kind !== "error") return [`expected QueryKitError ${skipLabel(expect.error)}, got rows`];
+    if (outcome.kind !== "error") return [`expected QueryKitError ${skipLabel(expect.error)}, got rows`, ...problems];
     const got = skipLabel(outcome.info);
-    return got === skipLabel(expect.error) ? [] : [`expected QueryKitError ${skipLabel(expect.error)}, got ${got}`];
+    return got === skipLabel(expect.error) ? problems : [`expected QueryKitError ${skipLabel(expect.error)}, got ${got}`, ...problems];
   }
   if (outcome.kind === "error") return [`unexpected QueryKitError ${skipLabel(outcome.info)}`];
 
-  const problems: string[] = [];
+  if (expect.returned !== undefined && outcome.result.rows.length !== expect.returned)
+    problems.push(`returned ${outcome.result.rows.length} rows, expected ${expect.returned}`);
   const { rows, meta } = outcome.result;
   if (expect.names) {
     const names = rows.map(row => String(row.name));

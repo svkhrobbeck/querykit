@@ -25,14 +25,35 @@ export const ROWS: readonly ConformanceRow[] = [
   { id: 7, name: "Alina", email: "alina@example.com", age: null, createdAt: new Date("2026-07-04T09:00:00.000Z") },
 ];
 
-let override: readonly ConformanceRow[] | undefined;
+const copy = (rows: readonly ConformanceRow[]): ConformanceRow[] => rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) }));
+
+/** The rows of the running case — a fake driver's write (task 013) changes them, the next case starts over. */
+let current: ConformanceRow[] = copy(ROWS);
+
+/**
+ * What the fake drivers were asked for, in order (task 013): `find:<limit>` (`find:all`
+ * without a limit), `count`, `write`. Lets a case prove "one write, no read before it"
+ * or "no count" the same way on every adapter.
+ */
+export const driverCalls: string[] = [];
 
 /** Run one case on its own rows (`CaseOptions.rows`); `undefined` restores `ROWS`. Set by the runner only. */
 export function useRows(rows: readonly ConformanceRow[] | undefined): void {
-  override = rows;
+  current = copy(rows ?? ROWS);
+  driverCalls.length = 0;
 }
 
-/** Plain copies, so a fake driver can never mutate the shared table. */
+/** Plain copies, so a fake driver can never mutate the table by accident. */
 export function cloneRows(): ConformanceRow[] {
-  return (override ?? ROWS).map(row => ({ ...row, createdAt: new Date(row.createdAt) }));
+  return copy(current);
+}
+
+/** A fake driver's update / delete: the case's rows from now on. */
+export function writeRows(rows: readonly ConformanceRow[]): void {
+  current = copy(rows);
+}
+
+/** One driver call for `driverCalls`. */
+export function recordCall(kind: "find" | "count" | "write", limit?: number): void {
+  driverCalls.push(kind === "find" ? `find:${limit ?? "all"}` : kind);
 }

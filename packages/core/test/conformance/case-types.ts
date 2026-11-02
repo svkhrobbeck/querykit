@@ -7,7 +7,7 @@ import type { Filterable, SkipReason, SkipSite, WireBaseParams, WireCursorParams
 
 export type AdapterName = "drizzle-pg" | "prisma-pg" | "mongoose";
 
-export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection" | "policy";
+export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection" | "policy" | "mutation";
 
 /** Repository request policy (task 009). `"default"` — none given, the adapter's safe default applies. */
 export type CasePolicy = "default" | { filterable?: Filterable; sortable?: readonly string[]; limits?: Partial<QueryLimits> };
@@ -16,7 +16,9 @@ export type Call =
   | { method: "findAll"; params: WireBaseParams }
   | { method: "findList"; params: WireOffsetParams }
   | { method: "findInfinite"; params: WireInfiniteParams }
-  | { method: "findCursor"; params: WireCursorParams; followNext?: boolean; walk?: "forward" | "forward-back" };
+  | { method: "findCursor"; params: WireCursorParams; followNext?: boolean; walk?: "forward" | "forward-back" }
+  | { method: "updateWhere"; params: { filter?: unknown; patch: Record<string, unknown>; options?: unknown } }
+  | { method: "deleteWhere"; params: { filter?: unknown; options?: unknown } };
 
 export interface CaseOptions {
   strict?: boolean;
@@ -28,6 +30,8 @@ export interface CaseOptions {
   policy?: CasePolicy;
   /** Registry `cursorSecret` (task 012): tokens are signed and an unsigned one is refused. */
   cursorSecret?: string;
+  /** Repository `scope` (RBAC / tenancy filter, task 013). */
+  scope?: Record<string, unknown>;
 }
 
 export interface SkipExpectation {
@@ -49,6 +53,12 @@ export interface Expectation {
   skipped?: readonly SkipExpectation[];
   /** The call throws a `QueryKitError` with this info. */
   error?: SkipExpectation;
+  /** Names of the rows left after the call (a set) — also checked when the call throws. */
+  remaining?: readonly string[];
+  /** Number of rows the call returned (`returning: { limit }` mutations). */
+  returned?: number;
+  /** Driver calls as `driverCalls` records them (a multiset) — also checked when the call throws. */
+  calls?: readonly string[];
 }
 
 export interface ConformanceCase {

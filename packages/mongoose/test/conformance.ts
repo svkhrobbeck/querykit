@@ -11,7 +11,8 @@
 import mongoose, { Schema, Types, type Query } from "mongoose";
 
 import type { Call, CaseOptions } from "../../core/test/conformance/cases";
-import { cloneRows } from "../../core/test/conformance/fixtures";
+import { cloneRows, recordCall, writeRows, type ConformanceRow } from "../../core/test/conformance/fixtures";
+import { callArgs, toResult } from "../../core/test/conformance/harness-util";
 import { runConformance, type Harness } from "../../core/test/conformance/runner";
 import { createRegistry } from "../src/index";
 
@@ -34,6 +35,21 @@ const ConformanceUser = mongoose.model("ConformanceUser", userSchema);
 /** Fixture rows as documents: `_id` is an ObjectId derived from the numeric id. */
 const documents = () => cloneRows().map(({ id, ...rest }) => ({ _id: new Types.ObjectId(id.toString(16).padStart(24, "0")), ...rest }));
 
+/** Documents back to fixture rows (`_id` → numeric `id`). */
+const toRows = (docs: readonly Record<string, unknown>[]): ConformanceRow[] =>
+  docs.map(({ _id, ...rest }) => ({ id: Number.parseInt(String(_id), 16), ...rest }) as ConformanceRow);
+
+/** `updateMany` / `deleteMany` on the case's rows (task 013). */
+function write(kind: "update" | "delete", filter: Record<string, unknown>, update: Record<string, unknown> = {}) {
+  recordCall("write");
+  const docs = documents();
+  const hit = new Set(docs.filter(doc => matches(filter, doc)).map(doc => String(doc._id)));
+  const patch = (update.$set as Record<string, unknown> | undefined) ?? update;
+  const kept = kind === "update" ? docs.map(doc => (hit.has(String(doc._id)) ? { ...doc, ...patch } : doc)) : docs.filter(doc => !hit.has(String(doc._id)));
+  writeRows(toRows(kept));
+  return hit.size;
+}
+
 const realExec = mongoose.Query.prototype.exec;
 mongoose.Query.prototype.exec = async function exec(this: Query<unknown, unknown>) {
   if (this.model !== ConformanceUser) return realExec.call(this);
@@ -44,11 +60,20 @@ mongoose.Query.prototype.exec = async function exec(this: Query<unknown, unknown
   const op = (this as unknown as { op?: string }).op;
   switch (op) {
     case "find":
+      recordCall("find", options.limit);
       return find(documents(), filter, options, projection);
     case "findOne":
+      recordCall("find", 1);
       return find(documents(), filter, { ...options, limit: 1 }, projection)[0] ?? null;
     case "countDocuments":
+      recordCall("count");
       return documents().filter(doc => matches(filter, doc)).length;
+    case "updateMany": {
+      const matchedCount = write("update", filter, this.getUpdate() as Record<string, unknown>);
+      return { acknowledged: true, matchedCount, modifiedCount: matchedCount, upsertedCount: 0 };
+    }
+    case "deleteMany":
+      return { acknowledged: true, deletedCount: write("delete", filter) };
     default:
       throw new Error(`fake-mongo: unsupported op "${op}"`);
   }
@@ -74,10 +99,9 @@ export const mongooseHarness: Harness = {
       ...policyOptions(options.policy),
       forcedColumns: options.forcedColumns,
       allowedColumns: options.allowedColumns,
-    } as never) as unknown as Record<string, (params: unknown) => Promise<unknown>>;
-    const result = (await repository[call.method]!(call.params)) as
-      Record<string, unknown>[] | { data: Record<string, unknown>[]; meta: Record<string, unknown> };
-    return Array.isArray(result) ? { rows: result.map(normalize) } : { rows: result.data.map(normalize), meta: result.meta };
+      scope: options.scope,
+    } as never) as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    return toResult(await repository[call.method]!(...callArgs(call)), normalize);
   },
 };
 
