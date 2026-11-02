@@ -15,29 +15,16 @@
  * dev machine (and pin-workspace-deps also skips locally, so deps would still
  * be `workspace:*` anyway).
  */
-import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+
+import { isPublished, publishablePackages } from "./lib/registry.mjs";
 
 if (process.env.CI !== "true") {
   console.log("[ci-publish] not CI — skipping (publishing happens in CI via OIDC).");
   process.exit(0);
 }
 
-const packagesDir = new URL("../packages/", import.meta.url).pathname;
-
-const pkgs = readdirSync(packagesDir)
-  .filter(d => existsSync(join(packagesDir, d, "package.json")))
-  .map(d => ({ dir: join(packagesDir, d), ...JSON.parse(readFileSync(join(packagesDir, d, "package.json"), "utf8")) }))
-  .filter(p => !p.private);
-
-async function isPublished(name, version) {
-  const url = `https://registry.npmjs.org/${name.replace("/", "%2F")}/${version}`;
-  const res = await fetch(url, { headers: { accept: "application/json" } });
-  if (res.status === 200) return true;
-  if (res.status === 404) return false;
-  throw new Error(`Unexpected ${res.status} from npm registry for ${name}@${version}`);
-}
+const pkgs = publishablePackages();
 
 const toPublish = [];
 for (const p of pkgs) {

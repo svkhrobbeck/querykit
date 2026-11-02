@@ -25,6 +25,9 @@
     "test:conformance": "bun run packages/core/test/conformance/self-check.ts && bun run packages/drizzle-pg/test/conformance.ts && bun run packages/prisma-pg/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/mongoose/test/conformance.ts && bun --preload ./packages/mongodb/test/bun-v8-shim.ts packages/mongodb/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/web/test/conformance.ts",
     "changeset": "changeset",
     "version-packages": "changeset version",
+    "release:check": "node scripts/release-check.mjs",
+    "release:pending": "node scripts/release-check.mjs --pending",
+    "release:wait": "node scripts/release-wait.mjs",
     "release": "bun run build && node scripts/pin-workspace-deps.mjs && node scripts/ci-publish.mjs",
     "prepare": "husky"
   },
