@@ -5,8 +5,6 @@
  */
 import { ALL, type ConformanceCase } from "./case-types";
 
-/** Red until 014 phase 4 (relations); removed there. */
-const WITH = { "drizzle-pg": "014 p4", "prisma-pg": "014 p4", mongoose: "014 p4" } as const;
 const WEB = "a repository option, not built by web";
 const AGE_25_OR_30 = { age: { in: [25, 30] } };
 
@@ -96,7 +94,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     group: "scope",
     call: { method: "findAll", params: { with: { posts: true } } },
     expect: { error: { site: "with", key: "posts", reason: "forbidden-key" }, calls: [] },
-    knownDifference: WITH,
     notBuiltByWeb: WEB,
   },
   {
@@ -104,7 +101,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     group: "scope",
     call: { method: "findList", params: { with: { posts: true } } },
     expect: { error: { site: "with", key: "posts", reason: "forbidden-key" }, calls: [] },
-    knownDifference: WITH,
     notBuiltByWeb: WEB,
   },
 ];

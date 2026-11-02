@@ -2,6 +2,7 @@ import { and, getTableName, isNull, isSQLWrapper, sql, type SQL } from "drizzle-
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 import {
+  checkWith,
   type Diagnostics,
   isAllRows,
   isEmptyFilter,
@@ -10,6 +11,7 @@ import {
   refuseEmptyFilter,
   resolvePolicy,
   scopeConditions,
+  type WithDialect,
 } from "@querykitjs/core/internal";
 import type { QueryLimits } from "@querykitjs/core";
 
@@ -70,6 +72,12 @@ export interface RepoContext<TTable extends AnyPgTable> {
   createdAtKey: string | undefined;
   /** ORDER BY for a sort; none given ⇒ createdAt desc, else the primary key. */
   sortBy: (sort?: Sort<TTable>) => SQL[];
+  /**
+   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
+   * is selected even when the client asks with `true`.
+   */
+  withOf: (value: unknown) => never;
   projection: Projection<TTable>;
   /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
   policy: Policy;
@@ -114,6 +122,8 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
   const deletedAtKey = keyOf(deletedAtCol);
   const createdAtKey = keyOf(createdAtCol);
   const sortBy = (sort?: Sort<TTable>): SQL[] => buildOrderBy(table, sort, diag, createdAtCol);
+  // drizzle's relational `where` / `orderBy` are code, not JSON: a client may only select and page.
+  const withOf = (value: unknown) => checkWith(value, config.relations, WITH_DIALECT, diag.source) as never;
 
   const scopeWhere = buildScopeWhere(table, config);
   const projection = buildProjection(config);
@@ -162,6 +172,7 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
     deletedAtKey,
     createdAtKey,
     sortBy,
+    withOf,
     projection,
     policy,
     composeWhere,
@@ -170,6 +181,8 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
     countWhere,
   };
 }
+
+const WITH_DIALECT: WithDialect = { columns: "columns", nested: "with", filters: [], logical: [], paging: ["limit", "offset"] };
 
 /** The table's request policy. Fields are named by JS property; a DB column name maps to the same field. */
 function buildPolicy<TTable extends AnyPgTable>(

@@ -490,6 +490,26 @@ async function main() {
     String(badCursor),
   );
 
+  /* 26b. task 014 (R21): a client `with` opens only listed relations and columns, before any SQL. */
+  {
+    recorded = [];
+    const bare = await rejects(() => usersRepo.findAll({ with: { posts: true } as never }));
+    check(
+      "A4 no relations: with posts → forbidden-key, site with",
+      bare instanceof QueryKitError && bare.info.site === "with" && bare.info.key === "posts" && recorded.length === 0,
+      String(bare),
+    );
+    const listedRepo = registry.repository(users, { ...OPEN, relations: { posts: { columns: ["title"] } } });
+    const wide = await rejects(() => listedRepo.findAll({ with: { posts: { columns: { body: true } } } as never }));
+    check("A6 columns [title]: columns body → forbidden-key posts.body", wide instanceof QueryKitError && wide.info.key === "posts.body", String(wide));
+    const nested = await rejects(() => listedRepo.findAll({ with: { posts: { with: { author: true } } } as never }));
+    check(
+      "R21 no nested rule: a nested with → forbidden-key posts.author",
+      nested instanceof QueryKitError && nested.info.key === "posts.author",
+      String(nested),
+    );
+  }
+
   /* 27. a scope key that does not resolve is a programming error, not bad input:
    *     dropping it would silently remove the RBAC filter from every query. */
   check(

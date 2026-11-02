@@ -1,6 +1,8 @@
+import type { Relations } from "@querykitjs/core";
 import type { ClientSession, Model } from "mongoose";
 import { QueryKitError, QueryKitTimeoutError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
 import {
+  checkWith,
   type Diagnostics,
   isAllRows,
   isEmptyFilter,
@@ -9,6 +11,7 @@ import {
   refuseEmptyFilter,
   resolvePolicy,
   scopeConditions,
+  type WithDialect,
 } from "@querykitjs/core/internal";
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
@@ -70,6 +73,12 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   /** Stamp `updatedAt` when the schema has a manual one (no `timestamps`). */
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
+  /**
+   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
+   * is selected even when the client asks with `true`.
+   */
+  withOf: (value: unknown) => never;
   /** User filter + scope + soft-delete guard as one Mongo query. */
   /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
   policy: Policy;
@@ -116,6 +125,8 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
   };
 
   const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag, createdAtPath);
+  // A bare model (`{ author: User }`) is for typing only and opens nothing (R21).
+  const withOf = (value: unknown) => checkWith(value, config.relations as Relations | undefined, WITH_DIALECT, diag.source) as never;
 
   /** An already built user filter + scope + soft-delete guard. */
   const combineWhere = (userWhere: Query | undefined, withDeleted?: boolean): Query => {
@@ -189,6 +200,7 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     deletedAtPath,
     forUpdate,
     sortSpec,
+    withOf,
     composeWhere,
     mutationWhere,
     withId,
@@ -200,6 +212,16 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
 }
 
 /** `.populate()` every truthy `with` entry. */
+/** Populate options: `select`, nested `populate`, `match` (field-checked), `options.limit` / `options.skip`. */
+const WITH_DIALECT: WithDialect = {
+  columns: "select",
+  nested: "populate",
+  filters: ["match"],
+  logical: ["$and", "$or", "$nor"],
+  paging: ["limit", "skip"],
+  options: "options",
+};
+
 function applyPopulate(q: AnyQuery, withRel?: Record<string, unknown>): AnyQuery {
   if (withRel) {
     for (const key of Object.keys(withRel)) {

@@ -30,6 +30,7 @@ import { runLimitCases } from "./conformance/limits-runner";
 import "./dist";
 import "./cursor";
 import "./mutation";
+import "./with";
 
 let passed = 0;
 let failed = 0;

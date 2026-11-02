@@ -31,6 +31,8 @@ import "./policy";
 const OPEN = {
   filterable: { id: "*", name: "*", email: "*", age: "*", secret: "*", createdAt: "*", title: "*", authorId: "*", updatedAt: "*", deletedAt: "*" },
   sortable: ["id", "name", "email", "age", "secret", "createdAt", "title", "authorId", "updatedAt", "deletedAt"],
+  // Task 014 (R21): `with` opens only listed relations; these tests predate the allow-list.
+  relations: { posts: { columns: "*" }, author: { columns: "*" } },
 } as const;
 
 /* -------------------------------- runner ---------------------------------- */
@@ -646,6 +648,46 @@ console.log("\n=== 8. projection: columns → select, with → include (D8) ==="
 
   await repo.findAll({ with: { posts: false } });
   check("falsy relation is dropped", lastArgs(calls, "findMany").include === undefined);
+}
+
+console.log("\n=== 8b. with allow-list: relations (task 014, R21) ===");
+{
+  const { client, calls } = spyClient();
+  const registry = createRegistry(client as never);
+  const refused = async (repo: Record<string, (params: unknown) => Promise<unknown>>, params: unknown) => {
+    const before = calls.length;
+    try {
+      await repo.findAll!(params);
+      return "ok";
+    } catch (err) {
+      const info = (err as { info?: { site?: string; key?: string; reason?: string } }).info;
+      return `${info?.reason}/${info?.site}/${info?.key} calls+${calls.length - before}`;
+    }
+  };
+  const bare = registry.repository("user" as never, { filterable: OPEN.filterable, sortable: OPEN.sortable } as never) as never;
+  check(
+    "A4 no relations: with posts → forbidden-key/with, driver not called",
+    (await refused(bare, { with: { posts: true } })) === "forbidden-key/with/posts calls+0",
+  );
+  const listed = registry.repository("user" as never, { ...OPEN, relations: { posts: { columns: ["title"] } } } as never) as never;
+  check(
+    "A6 columns [title]: select body → forbidden-key/with/posts.body, driver not called",
+    (await refused(listed, { with: { posts: { select: { body: true } } } })) === "forbidden-key/with/posts.body calls+0",
+  );
+  await (listed as { findAll(p: unknown): Promise<unknown> }).findAll({ with: { posts: { select: { title: true } } } });
+  check("A6 columns [title]: select title passes", eq(lastArgs(calls, "findMany").include, { posts: { select: { title: true } } }));
+  await (listed as { findAll(p: unknown): Promise<unknown> }).findAll({ with: { posts: true } });
+  check(
+    "R21 columns [title] + with true → only title is selected",
+    eq(lastArgs(calls, "findMany").include, { posts: { select: { title: true } } }),
+    show(lastArgs(calls, "findMany").include),
+  );
+  const filtered = registry.repository("user" as never, { ...OPEN, relations: { posts: { columns: "*", filterable: { title: "*" } } } } as never) as never;
+  check(
+    "A5 where on a field outside filterable → forbidden-key/with/posts.secret",
+    (await refused(filtered, { with: { posts: { where: { secret: "x" } } } })) === "forbidden-key/with/posts.secret calls+0",
+  );
+  check('R21 columns "*" passes', (await refused(filtered, { with: { posts: { select: { body: true } } } })) === "ok");
 }
 
 console.log("\n=== 9. pagination arguments and meta ===");

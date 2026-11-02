@@ -6,7 +6,7 @@ import type { RepoContext } from "./context";
 
 /** `findAll`, `findOne`, `findById`, `findList`, `findInfinite`, `count`, `exists`. */
 export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>) {
-  const { runtime, handle, policy, sortBy, composeWhere, withId, countWhere } = ctx;
+  const { runtime, handle, policy, sortBy, withOf, composeWhere, withId, countWhere } = ctx;
   const { pickColumns } = ctx.projection;
 
   /** The client's filter and sort, checked before any SQL is built. */
@@ -22,7 +22,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
         where: composeWhere(params.filter, params.withDeleted),
         orderBy: sortBy(params.sort),
         columns: pickColumns(params.columns),
-        with: params.with,
+        with: withOf(params.with),
       });
       return rows as never;
     },
@@ -33,7 +33,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
         where: composeWhere(params.filter, params.withDeleted),
         orderBy: sortBy(params.sort),
         columns: pickColumns(params.columns),
-        with: params.with,
+        with: withOf(params.with),
       });
       return (row ?? undefined) as never;
     },
@@ -45,7 +45,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
       const row = await handle().findFirst({
         where: composeWhere(withId(filter, idKey, id), params.withDeleted),
         columns: pickColumns(rest.columns),
-        with: rest.with,
+        with: withOf(rest.with),
       });
       return (row ?? undefined) as never;
     },
@@ -63,7 +63,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
           limit,
           offset: (page - 1) * perPage,
           columns: pickColumns(params.columns),
-          with: params.with,
+          with: withOf(params.with),
         });
 
       // Task 013: no count — one extra row tells whether a next page exists.
@@ -84,7 +84,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
         limit: limit + 1,
         offset,
         columns: pickColumns(params.columns),
-        with: params.with,
+        with: withOf(params.with),
       });
 
       return infinitePage(rows, limit, offset) as InfiniteResult<never>;

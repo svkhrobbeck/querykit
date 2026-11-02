@@ -60,7 +60,8 @@ async function main() {
   const db = drizzle(client, { schema });
   const registry = createRegistry(db, schema);
   const usersRepo = registry.repository(users);
-  const postsRepo = registry.repository(posts);
+  // Task 014 (R21): `with` opens only listed relations.
+  const postsRepo = registry.repository(posts, { relations: { author: { columns: "*" } } });
   const uf = createFilters<typeof users>();
 
   // fresh isolated schema

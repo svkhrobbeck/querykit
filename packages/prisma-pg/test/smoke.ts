@@ -39,7 +39,8 @@ const prisma = createTestClient(url, SCHEMA);
 
 async function main() {
   const registry = createRegistry(prisma);
-  const usersRepo = registry.repository("user");
+  // Task 014 (R21): `with` opens only listed relations.
+  const usersRepo = registry.repository("user", { relations: { posts: { columns: "*" } } });
   const postsRepo = registry.repository("post");
   const uf = createFilters<typeof prisma.user>();
 

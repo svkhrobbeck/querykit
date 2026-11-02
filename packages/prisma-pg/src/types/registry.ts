@@ -1,3 +1,4 @@
+import type { Relations } from "@querykitjs/core";
 import type * as Core from "@querykitjs/core";
 
 import type { FieldOverride } from "../internal/fields";
@@ -66,6 +67,12 @@ export interface RegistryOptions {
  * yourself, before handing a write result to a client.
  */
 export interface RepositoryOptions<TDelegate = AnyDelegate> {
+  /**
+   * Relations a client may open with `with` (task 014, R21): relation → `{ columns, filterable?, nested? }`.
+   * `columns` is required (a list or `"*"`); an unlisted relation, column, `where` field or nested
+   * `include` is `QueryKitError` `forbidden-key`, `site: "with"`. Without it `with` opens nothing.
+   */
+  relations?: Relations;
   /** Constant equality filter added to every read/write (RBAC / multi-tenancy). */
   scope?: Scope<TDelegate>;
   /**

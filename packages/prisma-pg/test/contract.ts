@@ -45,6 +45,8 @@ import { User as UserModel } from "../../mongoose/test/user.model";
 const OPEN = {
   filterable: { id: "*", name: "*", email: "*", age: "*", secret: "*", createdAt: "*", title: "*", authorId: "*", updatedAt: "*", deletedAt: "*" },
   sortable: ["id", "name", "email", "age", "secret", "createdAt", "title", "authorId", "updatedAt", "deletedAt"],
+  // Task 014 (R21): `with` opens only listed relations; these tests predate the allow-list.
+  relations: { posts: { columns: "*", filterable: { published: "*" } }, author: { columns: "*" } },
 } as const;
 
 /* -------------------------------- runner ---------------------------------- */

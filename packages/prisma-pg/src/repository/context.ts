@@ -1,5 +1,6 @@
 import { QueryKitError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
 import {
+  checkWith,
   type Diagnostics,
   isAllRows,
   isEmptyFilter,
@@ -8,6 +9,7 @@ import {
   refuseEmptyFilter,
   resolvePolicy,
   scopeConditions,
+  type WithDialect,
 } from "@querykitjs/core/internal";
 
 import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
@@ -79,6 +81,12 @@ export interface RepoContext<TDelegate> {
   createdAtField: string | undefined;
   /** `orderBy` for a sort; none given ⇒ createdAt desc, else the id. */
   sortBy: (sort?: Sort) => Record<string, unknown>[];
+  /**
+   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
+   * is selected even when the client asks with `true`.
+   */
+  withOf: (value: unknown) => never;
   guard: ProjectionGuard;
   /** `forcedColumns` or `allowedColumns` is configured. */
   guarded: boolean;
@@ -115,6 +123,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
   const deletedAtField = resolveField(meta, runtime.timestamps?.deletedAt ?? "deletedAt");
   const createdAtField = resolveField(meta, runtime.timestamps?.createdAt ?? "createdAt");
   const sortBy = (sort?: Sort) => buildOrderBy(meta, sort as never, diag, createdAtField) as Record<string, unknown>[];
+  const withOf = (value: unknown) => checkWith(value, config.relations, WITH_DIALECT, diag.source) as never;
 
   const scopeWhere = buildScopeWhere(meta, config);
   const policy = buildPolicy(meta, config, runtime.limits, createdAtField);
@@ -171,6 +180,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
     deletedAtField,
     createdAtField,
     sortBy,
+    withOf,
     composeWhere,
     mutationWhere,
     withId,
@@ -225,6 +235,16 @@ function buildGuard<TDelegate>(config: RepositoryOptions<TDelegate>): Projection
  * `@map`ped column name maps to the field); `relation.field` is a field of its own
  * when `relation` is a relation field, so it can be opened or kept closed.
  */
+/** Prisma `include` options: `select`, nested `include`, `where` (field-checked), `take` / `skip`, `orderBy` on allowed columns. */
+const WITH_DIALECT: WithDialect = {
+  columns: "select",
+  nested: "include",
+  filters: ["where"],
+  logical: ["AND", "OR", "NOT"],
+  paging: ["take", "skip"],
+  orderBy: "orderBy",
+};
+
 function buildPolicy<TDelegate>(
   meta: ModelMeta,
   config: RepositoryOptions<TDelegate>,

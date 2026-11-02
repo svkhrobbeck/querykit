@@ -38,7 +38,8 @@ async function main() {
 
   const registry = createRegistry(mongoose.connection);
   const usersRepo = registry.repository(User, OPEN_USER);
-  const postsRepo = registry.repository(Post, OPEN_POST);
+  // Task 014 (R21): `with` opens only listed relations.
+  const postsRepo = registry.repository(Post, { ...OPEN_POST, relations: { author: { model: User, columns: "*" } } });
   const uf = createFilters<IUser>();
 
   try {
@@ -223,11 +224,25 @@ async function main() {
     check("extender custom method (findByEmail)", (await uExt.findByEmail("ali@example.com"))?.name === "Ali Valiyev");
 
     // 17. relations + extender together
-    const pRel = registry.repository(Post, { ...OPEN_POST, relations: { author: User } }, base => ({
+    // R21: the bare-model shorthand types `with` but opens nothing.
+    const shorthand = registry.repository(Post, { ...OPEN_POST, relations: { author: User } });
+    let shortErr = "";
+    try {
+      await shorthand.findOne({ with: { author: true } });
+    } catch (err) {
+      shortErr = `${(err as QueryKitError).info?.reason}/${(err as QueryKitError).info?.site}`;
+    }
+    check("R21 relations { author: User } (shorthand) + with → forbidden-key/with", shortErr === "forbidden-key/with", shortErr);
+    const pRel = registry.repository(Post, { ...OPEN_POST, relations: { author: { model: User, columns: ["name"] } } }, base => ({
       byTitle: (t: string) => base.findOne({ filter: [{ key: "title", operation: "=", value: t }] }),
     }));
     const pr = await pRel.findOne({ filter: [{ key: "title", operation: "=", value: "A2" }], with: { author: true } });
-    check("relations repo: with populate", Boolean((pr as { author?: { name?: string } })?.author?.name));
+    const populated = (pr as unknown as { author?: Record<string, unknown> })?.author;
+    check(
+      "relations repo: with populate selects only the listed columns",
+      Boolean(populated?.name) && !("email" in (populated ?? {})),
+      JSON.stringify(populated),
+    );
     check("relations repo: custom method (byTitle)", (await pRel.byTitle("G1"))?.title === "G1");
 
     /* ============================ STAGE 2: writes ========================== */
