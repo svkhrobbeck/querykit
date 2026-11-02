@@ -68,4 +68,18 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     expect: { error: { site: "filter", key: "name", reason: "forbidden-key" } },
     notBuiltByWeb: "the web builders drop a node without a key, so this payload only reaches a repository directly",
   },
+  {
+    name: "Y2: a LIKE pattern past maxLikeWildcards is refused (3 wildcards)",
+    group: "policy",
+    call: { method: "findAll", params: { filter: [{ key: "name", operation: "like", value: "%a%l%e" }] } },
+    options: { policy: { filterable: { name: "*" } } },
+    expect: { error: { site: "filter", key: "maxLikeWildcards", reason: "limit-exceeded" } },
+  },
+  {
+    name: 'Y2: a run of % counts once ("%%li%" is 2 wildcards)',
+    group: "policy",
+    call: { method: "findAll", params: { filter: [{ key: "name", operation: "like", value: "%%li%" }] } },
+    options: { policy: { filterable: { name: "*" } } },
+    expect: { names: ["Alice", "Alina"] },
+  },
 ];

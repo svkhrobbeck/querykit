@@ -71,5 +71,30 @@ export function findFilterLimitViolation(filter: unknown, limits: FilterLimits):
   return undefined;
 }
 
+const LIKE_OPERATORS: ReadonlySet<string> = new Set(["like", "ilike", "notLike"]);
+
+/** Whether an operator takes a SQL LIKE pattern. */
+export const isLikeOperator = (operation: string): boolean => LIKE_OPERATORS.has(operation);
+
+/**
+ * Unescaped wildcards in a LIKE pattern, a run of `%` counted once (`%%a%` ⇒ 2).
+ * A backslash escapes the next character, as in the adapters' LIKE translation.
+ */
+export function likeWildcards(pattern: string): number {
+  let count = 0;
+  let previous = "";
+  for (let index = 0; index < pattern.length; index++) {
+    const char = pattern[index]!;
+    if (char === "\\") {
+      index++;
+      previous = "";
+      continue;
+    }
+    if (char === "_" || (char === "%" && previous !== "%")) count++;
+    previous = char;
+  }
+  return count;
+}
+
 /** Rows an offset-paginated request skips: `(page - 1) × perPage`, with the core default page size. */
 export const offsetOf = (page: number | undefined, perPage: number | undefined): number => ((page ?? 1) - 1) * (perPage ?? DEFAULT_PER_PAGE);

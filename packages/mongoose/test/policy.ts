@@ -210,11 +210,11 @@ allowed(
   await attempt(() => repositoryOf({ filterable: { name: ["contains"] } }).findAll!({ filter: [{ key: "name", operation: "contains", value: "a" }] })),
 );
 
-/* A9 — startsWith anchored, case-sensitive (index-friendly). */
+/* A9 — startsWith anchored and escaped, case-insensitive like every adapter (R11; thinker dropped Locked 4's case part). */
 await attempt(() => repositoryOf({ filterable: { name: ["startsWith"] } }).findAll!({ filter: [{ key: "name", operation: "startsWith", value: "Al" }] }));
 check(
-  "A9 startsWith 'Al' → { $regex: '^Al' } without the i flag",
-  JSON.stringify(sent[0]?.filter.name) === JSON.stringify({ $regex: "^Al" }),
+  "A9 startsWith 'Al' → { $regex: '^Al', $options: 'i' }",
+  JSON.stringify(sent[0]?.filter.name) === JSON.stringify({ $regex: "^Al", $options: "i" }),
   JSON.stringify(sent[0]?.filter),
 );
 
