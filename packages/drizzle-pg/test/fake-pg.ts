@@ -9,7 +9,7 @@
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
-import { and3, not3, or3, pgOrder, sortRows, sqlCompare, sqlIn, sqlLike, type Direction, type Tri } from "../../core/test/conformance/semantics";
+import { and3, mongoOrder, not3, or3, pgOrder, sortRows, sqlCompare, sqlIn, sqlLike, type Direction, type Tri } from "../../core/test/conformance/semantics";
 
 type Row = Record<string, unknown>;
 type Token = { kind: "ident" | "param" | "punct" | "op" | "word"; text: string };
@@ -181,9 +181,16 @@ export function orderRows<T extends Row>(rows: readonly T[], orderBy: readonly S
   if (!orderBy || orderBy.length === 0) return [...rows];
   const keys = orderBy.map(item => {
     const { sql } = dialect.sqlToQuery(item);
-    const match = /"([^"]+)"\s+(asc|desc)$/i.exec(sql.trim());
+    const match = /"([^"]+)"\s+(asc|desc)(?:\s+nulls\s+(first|last))?$/i.exec(sql.trim());
     if (!match) throw new Error(`fake-pg: unsupported ORDER BY "${sql}"`);
-    return { key: columnKey(match[1]!), direction: match[2]!.toLowerCase() as Direction };
+    const direction = match[2]!.toLowerCase() as Direction;
+    const nulls = match[3]?.toLowerCase();
+    // `asc nulls first` / `desc nulls last` is MongoDB's order (task 021 B11); bare asc/desc is PostgreSQL's.
+    const mongoStyle = nulls === undefined ? false : (direction === "asc") === (nulls === "first");
+    if (nulls !== undefined && !mongoStyle) throw new Error(`fake-pg: unsupported NULLS order "${sql}"`);
+    return { key: columnKey(match[1]!), direction, mongoStyle };
   });
-  return sortRows(rows, keys, pgOrder);
+  const explicit = keys.filter(k => k.mongoStyle).length;
+  if (explicit !== 0 && explicit !== keys.length) throw new Error("fake-pg: mixed NULLS orders in one ORDER BY");
+  return sortRows(rows, keys, explicit ? mongoOrder : pgOrder);
 }

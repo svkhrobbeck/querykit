@@ -439,6 +439,30 @@ console.log("\n=== 5. orderBy ===");
     ),
   );
   check("direction defaults to asc", eq(buildOrderBy(userMeta, [{ key: "name" }]), [{ name: "asc" }]));
+  // Task 021 B11: `nulls` only where nullability is known — the runtime model (Prisma 6.19)
+  // or a `fields` override. Prisma 7's runtime model has no `isRequired`: plain order.
+  {
+    const rdmAge = (
+      prisma as unknown as { _runtimeDataModel: { models: Record<string, { fields: Array<Record<string, unknown>> }> } }
+    )._runtimeDataModel.models.User!.fields.find(field => field.name === "age");
+    const knowsNullability = rdmAge?.isRequired === false;
+    check(
+      `undeclared nullable field: ${knowsNullability ? "runtime model knows it (Prisma 6) → nulls first" : "Prisma 7 runtime model is silent → plain asc"}`,
+      eq(buildOrderBy(userMeta, [{ key: "age" }]), [{ age: knowsNullability ? { sort: "asc", nulls: "first" } : "asc" }]),
+      show(buildOrderBy(userMeta, [{ key: "age" }])),
+    );
+    const declared = readModelMeta(prisma as never, "user", [{ name: "age", isRequired: false }]);
+    check(
+      "fields override { name: 'age', isRequired: false } → asc nulls first, desc nulls last",
+      eq(buildOrderBy(declared, [{ key: "age" }, { key: "name", direction: "desc" }]), [{ age: { sort: "asc", nulls: "first" } }, { name: "desc" }]) &&
+        eq(buildOrderBy(declared, [{ key: "age", direction: "desc" }]), [{ age: { sort: "desc", nulls: "last" } }]),
+      show(buildOrderBy(declared, [{ key: "age" }])),
+    );
+    check(
+      "override patches by name: other fields keep their discovered metadata",
+      declared.fields.get("createdAt")?.dbName === "created_at" && declared.fields.size === userMeta.fields.size,
+    );
+  }
 
   const { diag, seen } = spy();
   check(

@@ -4,7 +4,7 @@ import type { Sort, SortDirection } from "../types";
 import { resolveField, type ModelMeta } from "./fields";
 
 /** A Prisma `orderBy` list, e.g. `[{ name: "asc" }, { createdAt: "desc" }]`. */
-export type OrderBy = Array<Record<string, SortDirection>>;
+export type OrderBy = Array<Record<string, SortDirection | { sort: SortDirection; nulls: "first" | "last" }>>;
 
 /**
  * Build an `orderBy` list. Unknown keys are skipped; when no valid sort remains,
@@ -15,9 +15,15 @@ export type OrderBy = Array<Record<string, SortDirection>>;
 export function buildOrderBy(meta: ModelMeta, sort?: Sort, diag?: Diagnostics): OrderBy {
   const orderBy: OrderBy = [];
 
-  for (const { key, direction } of normalizeSort(sort)) {
+  for (const { key, direction } of normalizeSort(sort, diag)) {
     const field = resolveField(meta, key);
-    if (field) orderBy.push({ [field]: direction });
+    // Task 021 B11: MongoDB's NULL order on every adapter — first on asc, last on desc.
+    // Prisma takes `nulls` only on an optional field; a required one has no NULLs to place.
+    if (field)
+      orderBy.push({
+        [field]:
+          meta.fields.get(field)?.isRequired === false ? { sort: direction, nulls: direction === "asc" ? ("first" as const) : ("last" as const) } : direction,
+      });
     // An unknown sort key falls back to the default order, so the list looks
     // "unsorted" to the caller with nothing in the log to explain it.
     else reportSkip(diag, { site: "sort", key, reason: "unknown-key" });

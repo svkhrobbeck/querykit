@@ -12,7 +12,7 @@ export type SortSpec = Record<string, 1 | -1>;
  */
 export function buildSort(model: AnyModel, sort?: Sort, diag?: Diagnostics): SortSpec {
   const spec: SortSpec = {};
-  for (const item of normalizeSort(sort)) {
+  for (const item of normalizeSort(sort, diag)) {
     const field = resolveField(model, item.key);
     if (field) spec[field] = item.direction === "desc" ? -1 : 1;
     // An unknown sort key falls back to the default order, so the list looks

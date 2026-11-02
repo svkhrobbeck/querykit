@@ -1,6 +1,6 @@
 import type * as Core from "@querykitjs/core";
 
-import type { FieldMeta } from "../internal/fields";
+import type { FieldOverride } from "../internal/fields";
 import type { AnyClient, AnyDelegate, ColumnSelection, DelegateOf, FieldKey, ModelKey, Scope } from "./common";
 import type { Repository, RepositoryExtender } from "./repository";
 
@@ -74,7 +74,7 @@ export interface RepositoryOptions<TDelegate = AnyDelegate> {
    * the Prisma client itself (it tries `_runtimeDataModel`, then the public
    * `delegate.fields`) — e.g. behind an unusual client wrapper.
    */
-  fields?: readonly FieldMeta[];
+  fields?: readonly FieldOverride[];
   /**
    * Fields a client may filter by, and the operators for each (`"*"` — all). A
    * relation field is `"relation.field"` (`"posts.title": ["="]`). A field not
