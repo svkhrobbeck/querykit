@@ -5,7 +5,7 @@
  */
 import { ALL, type ConformanceCase } from "./case-types";
 
-const WEB = "a repository option, not built by web";
+const WEB = "a mutation is a repository call, not built by web";
 const AGE_25_OR_30 = { age: { in: [25, 30] } };
 
 export const SCOPE_CASES: readonly ConformanceCase[] = [
@@ -15,7 +15,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: {} },
     options: { scope: AGE_25_OR_30 },
     expect: { names: ["Alice", "Bob", "Eve_Ann"] },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P1/A1: scope in also limits deleteWhere({ all: true })",
@@ -39,7 +38,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findList", params: { page: 1, perPage: 5 } },
     options: { scope: { age: { in: [] } } },
     expect: { names: [], meta: { total_items: 0, total_pages: 0, current_page: 1, per_page: 5, has_next: false, has_prev: false } },
-    notBuiltByWeb: WEB,
   },
   {
     name: "Must-not: an equality scope works as before",
@@ -47,7 +45,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: {} },
     options: { scope: { age: 25 } },
     expect: { names: ["Bob", "Eve_Ann"] },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P2/A3: timestamps.createdAt names the default sort field",
@@ -55,7 +52,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findList", params: { page: 1, perPage: 7 } },
     options: { timestamps: { createdAt: "email" } },
     expect: { names: ["Frank", "Eve_Ann", "dave", "Carol", "Bob", "Alina", "Alice"], ordered: true },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P2/A3: timestamps.createdAt is in the default sortable (and createdAt no longer is)",
@@ -63,7 +59,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { sort: [{ key: "createdAt", direction: "asc" }] } },
     options: { policy: "default", timestamps: { createdAt: "email" } },
     expect: { error: { site: "sort", key: "createdAt", reason: "forbidden-key" } },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P2/A3: timestamps.createdAt sorts under the default policy",
@@ -71,7 +66,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { sort: [{ key: "email", direction: "asc" }] } },
     options: { policy: "default", timestamps: { createdAt: "email" } },
     expect: { names: ["Alice", "Alina", "Bob", "Carol", "dave", "Eve_Ann", "Frank"], ordered: true },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P2/A3: timestamps.deletedAt names the soft-delete field (rows with a value are hidden)",
@@ -79,7 +73,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: {} },
     options: { timestamps: { deletedAt: "age" } },
     expect: { names: ["Carol", "Alina"] },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P2/A3: …and withDeleted shows them",
@@ -87,20 +80,17 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { withDeleted: true } },
     options: { timestamps: { deletedAt: "age" } },
     expect: { names: ALL },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P4/A4: with on a repository without relations → forbidden-key, site with, the driver is not called",
     group: "scope",
     call: { method: "findAll", params: { with: { posts: true } } },
     expect: { error: { site: "with", key: "posts", reason: "forbidden-key" }, calls: [] },
-    notBuiltByWeb: WEB,
   },
   {
     name: "P4/A4: …also on findList",
     group: "scope",
     call: { method: "findList", params: { with: { posts: true } } },
     expect: { error: { site: "with", key: "posts", reason: "forbidden-key" }, calls: [] },
-    notBuiltByWeb: WEB,
   },
 ];

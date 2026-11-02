@@ -58,6 +58,8 @@ export interface Params<T = Record<string, unknown>> {
 export interface ListParams<T = Record<string, unknown>> extends Params<T> {
   page?: number;
   perPage?: number;
+  /** `false` — the server runs no count; the meta totals come back `null` (sent only when given). */
+  withTotal?: boolean;
 }
 
 /** Infinite-scroll (limit + offset) paginatsiya kirishi. */
@@ -88,6 +90,8 @@ export interface QueryPayload {
 export interface ListPayload extends QueryPayload {
   page: number;
   perPage: number;
+  /** Only present when given in the input. */
+  withTotal?: boolean;
 }
 
 export interface InfinitePayload extends QueryPayload {
@@ -122,8 +126,10 @@ export type RawCursorMeta = Partial<Core.CursorMeta>;
 
 /** Offset (list) — normalizatsiya qilingan meta (camelCase). */
 export interface Meta {
-  totalPages: number;
-  totalCount: number;
+  /** `null` when the request sent `withTotal: false` (no count ran). */
+  totalPages: number | null;
+  /** `null` when the request sent `withTotal: false` (no count ran). */
+  totalCount: number | null;
   currentPage: number;
   perPage: number;
   hasNext: boolean;

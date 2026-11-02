@@ -24,6 +24,7 @@ export interface QueryConfig {
   columnsField?: string;
   withField?: string;
   withDeletedField?: string;
+  withTotalField?: string;
   pageField?: string;
   perPageField?: string;
   limitField?: string;
@@ -58,6 +59,7 @@ const DEFAULTS: Required<QueryConfig> = {
   columnsField: "columns",
   withField: "with",
   withDeletedField: "withDeleted",
+  withTotalField: "withTotal",
   pageField: "page",
   perPageField: "perPage",
   limitField: "limit",
@@ -145,7 +147,8 @@ function buildBase(input: Params, cfg: Required<QueryConfig>): Record<string, un
   return base;
 }
 
-function clampInt(value: number | undefined, fallback: number, max = Infinity): number {
+/** A positive integer (fraction truncated); absent, < 1 or NaN → `fallback`; capped at `max`. */
+export function clampInt(value: number | undefined, fallback: number, max = Infinity): number {
   const resolved = value === undefined || value < 1 || Number.isNaN(value) ? fallback : Math.trunc(value);
   return Math.min(max, resolved);
 }
@@ -170,7 +173,9 @@ function buildList(input: ListParams, cfg: Required<QueryConfig>): Record<string
   const page = clampInt(input.page, 1); // page >= 1 (kasr/0/manfiy → 1)
   const perPage = clampInt(input.perPage, cfg.defaultPerPage, cfg.maxPerPage);
   if ((page - 1) * perPage > cfg.maxOffset) throw limitError(`page ${page} × perPage ${perPage}`, "maxOffset", cfg.maxOffset, CURSOR_HINT);
-  return { ...build(input, cfg), [cfg.pageField]: page, [cfg.perPageField]: perPage };
+  const payload: Record<string, unknown> = { ...build(input, cfg), [cfg.pageField]: page, [cfg.perPageField]: perPage };
+  if (input.withTotal !== undefined) payload[cfg.withTotalField] = input.withTotal;
+  return payload;
 }
 
 function buildInfinite(input: InfiniteParams, cfg: Required<QueryConfig>): Record<string, unknown> {

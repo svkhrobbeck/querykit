@@ -96,18 +96,20 @@ export const qk = createRegistry({
     sort: ["-createdAt"], // list + infinite tartibi (boshidagi "-" = desc)
     cursor: { order: "asc" }, // faqat cursor: kalit bo'ylab yurish tartibi
   },
+  timestamps: { createdAt: "created_at" }, // backend registry'dagi bilan bir xil; default sort shu maydon bo'yicha desc
   pruneEmpty: true, // bo'sh filterlarni tashlash (""/null/undefined/[]); 0/false qoladi
 });
 ```
 
-| Config                  | Vazifasi                                                                          |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| `adapter`               | Backend turi — `with` tipini moslaydi (faqat intellisense).                       |
-| `defaults.perPage`      | `list` uchun default `perPage`.                                                   |
-| `defaults.limit`        | `infinite` va `cursor` uchun default `limit`.                                     |
-| `defaults.sort`         | `list`/`infinite` default sort — `[{key,direction}]` yoki `["-field"]` shorthand. |
-| `defaults.cursor.order` | Default cursor tartibi (`"asc"`/`"desc"`).                                        |
-| `pruneEmpty`            | Form input'lardan qurilgan bo'sh filterlarni avtomatik tashlash (default `true`). |
+| Config                  | Vazifasi                                                                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter`               | Backend turi — `with` tipini moslaydi (faqat intellisense).                                                                                               |
+| `defaults.perPage`      | `list` uchun default `perPage`.                                                                                                                           |
+| `defaults.limit`        | `infinite` va `cursor` uchun default `limit`.                                                                                                             |
+| `defaults.sort`         | `list`/`infinite` default sort — `[{key,direction}]` yoki `["-field"]` shorthand.                                                                         |
+| `defaults.cursor.order` | Default cursor tartibi (`"asc"`/`"desc"`).                                                                                                                |
+| `timestamps.createdAt`  | Backend `timestamps.createdAt` bilan bir xil; `defaults.sort` yo'q bo'lsa default sort `[{ key: createdAt, direction: "desc" }]` (default `"createdAt"`). |
+| `pruneEmpty`            | Form input'lardan qurilgan bo'sh filterlarni avtomatik tashlash (default `true`).                                                                         |
 
 Har bir default har chaqiriqда override qilinadi.
 
@@ -118,19 +120,19 @@ import type { IUser } from "@my/api-types";
 export const users = qk.resource<IUser>("users"); // "users" = cache-key namespace (majburiy, unikal)
 ```
 
-| A'zo                                                           | Nima                                                                   |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `users.list(input)`                                            | offset (page) payload quradi                                           |
-| `users.infinite(input)`                                        | infinite (limit/offset) payload quradi                                 |
-| `users.cursor(input)`                                          | cursor (keyset) payload quradi                                         |
-| `users.params(input)`                                          | pagination'siz payload (filter/sort/columns/with)                      |
-| `users.f`                                                      | `createFilters<IUser>()` — maydon-tipli builder                        |
-| `users.search(term, fields)`                                   | ko'p maydon bo'ylab OR-of-`contains` preset                            |
-| `users.schema(desc)`                                           | `defineListSchema` bog'langan (URL ↔ filter)                           |
-| `users.fromSearchParams(sp, {schema})`                         | `URLSearchParams`'dan to'g'ridan-to'g'ri list payload (SSR / hook'siz) |
-| `users.keys`                                                   | TanStack/SWR uchun barqaror query keys                                 |
-| `users.parseList / parseInfinite / parseCursor`                | javob meta'sini snake→camel                                            |
-| `ListResult<T> / InfiniteResult<T> / CursorResult<T>` (tiplar) | `parse*` qaytaradigan tiplar                                           |
+| A'zo                                                           | Nima                                                                         |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `users.list(input)`                                            | offset (page) payload quradi                                                 |
+| `users.infinite(input)`                                        | infinite (limit/offset) payload quradi                                       |
+| `users.cursor(input)`                                          | cursor (keyset) payload quradi                                               |
+| `users.params(input)`                                          | pagination'siz payload (filter/sort/columns/with)                            |
+| `users.f`                                                      | `createFilters<IUser>()` — maydon-tipli builder                              |
+| `users.search(term, fields, { operation? })`                   | ko'p maydon bo'ylab OR preset (`contains` default, `startsWith`, `endsWith`) |
+| `users.schema(desc)`                                           | `defineListSchema` bog'langan (URL ↔ filter)                                 |
+| `users.fromSearchParams(sp, {schema})`                         | `URLSearchParams`'dan to'g'ridan-to'g'ri list payload (SSR / hook'siz)       |
+| `users.keys`                                                   | TanStack/SWR uchun barqaror query keys                                       |
+| `users.parseList / parseInfinite / parseCursor`                | javob meta'sini snake→camel                                                  |
+| `ListResult<T> / InfiniteResult<T> / CursorResult<T>` (tiplar) | `parse*` qaytaradigan tiplar                                                 |
 
 Barcha builder'lar registry'ning `defaults` + `pruneEmpty`ini meros oladi; tiplar `IUser` va `adapter`dan kelib chiqadi.
 
@@ -167,7 +169,12 @@ f.contains("age", "x"); // ✗ compile-error — `contains` string-only
 ```ts
 users.search("ali", ["buyerName", "email"]);
 // → or(contains("buyerName","ali"), contains("email","ali"))
+users.search("ali", ["buyerName"], { operation: "startsWith" });
+// → or(startsWith("buyerName","ali")) — indeks ishlatishi mumkin
 ```
+
+- `contains` qimmat: `%ali%` B-tree indeksini ishlata olmaydi (Postgres'da to'liq skan, MongoDB'da regex). Katta jadvalda `startsWith` (`ali%`) yoki full-text qidiruvni tanlang.
+- Har maydon serverda `filterable` bo'lishi kerak, o'sha operator bilan (`{ buyerName: ["%_%"] }` yoki `["%_"]`); aks holda server `forbidden-key` / `forbidden-operator` bilan 400 qaytaradi.
 
 Tipsiz `f` ham bor: `import { f } from "@querykitjs/web"` (maydon-tip tekshiruvisiz, tez ishlatish).
 
@@ -230,6 +237,15 @@ const r = users.parseList(res.data); // { data: IUser[], meta: { totalPages, cur
 users.parseInfinite(res.data); // { data, meta: { hasMore, nextOffset, … } }
 users.parseCursor(res.data); // { data, meta: { nextCursor, hasNext, … } }
 ```
+
+**`withTotal: false`** — umumiy son kerak bo'lmasa (infinite-ga o'xshash ro'yxat, "keyingi" tugmasi), server count so'rovini ishlatmaydi:
+
+```ts
+const body = users.list({ page, perPage: 20, withTotal: false }); // payload'da withTotal: false (berilmasa — kalit yo'q)
+const { meta } = users.parseList(res.data); // meta.totalCount === null, meta.totalPages === null; hasNext ishlaydi
+```
+
+`Meta.totalCount` / `Meta.totalPages` tipi `number | null`: `null` — count ishlamagan; server umuman bermagan maydon avvalgidek `0`. zod (`makeOffsetParamsSchema`) va class-validator (`makeOffsetParamsDto`) `withTotal`ni qabul qiladi.
 
 `parse*` ikki darajaда bor (bitta umumiy implementatsiya — meta entity-agnostik):
 `qk.parseList/...` (registry, `data: unknown[]`) — `resource` bo'lmasa; `users.parseList/...` (entity'ga tipli).
@@ -312,6 +328,8 @@ function UsersListPage() {
 ```
 
 Input/sort/page o'zgarishi URL'ni o'zgartiradi → `params` o'zgaradi → `queryKey` o'zgaradi → TanStack qayta so'raydi (va har kombinatsiyani cache qiladi).
+
+Hook `clamped: boolean` ham qaytaradi — URL'dagi `page` yoki `sort` limitdan oshgani uchun kesilgan (pastda «Limits»). URL'ni tuzatish uchun: `if (clamped) setPage(params.page)`.
 
 **Router-agnostik** (Next.js, TanStack Router) — base hook'ga `searchParams` bering (`react-router` talab qilmaydi):
 
@@ -495,11 +513,40 @@ createRegistry({ adapter: "drizzle-pg", defaults: { maxOffset: 50_000 } });
 ```
 
 - Filtr limitlari (chuqurlik, shartlar, `in` elementlari, satr uzunligi) web'da **tekshirilmaydi** — ularni server (zod / class-validator) rad etadi va 400 qaytaradi.
-- ⚠️ URL'dan o'qiladigan `page` (`useListParams`, `fromSearchParams`, `searchParamsToPayload`) foydalanuvchi qo'lida: `?page=9999` builder'ni `Error`ga olib keladi. Sahifani error boundary bilan o'rang yoki `page`ni hook'dan oldin tekshiring.
+- **URL o'quvchilar clamp qiladi.** URL foydalanuvchi qo'lida, shuning uchun `readListParams`, `searchParamsToPayload`, `resource.fromSearchParams` va hook'lar (`useListParams`, `useListParamsBase`) xato tashlamaydi: `page` ruxsat etilgan oxirgi sahifaga (`floor(maxOffset / perPage) + 1`), `sort` birinchi `maxSortFields` maydoniga kesiladi va natijada `clamped: true` bo'ladi. `?page=9999&size=20` → `page: 501`, `clamped: true`; `?sortType=a,b,c,d` → 3 maydon, `clamped: true`. Registry orqali — registry `defaults` limitlari bilan.
+
+```ts
+const read = readListParams(schema, new URLSearchParams("page=9999&size=20")); // { page: 501, perPage: 20, clamped: true, … }
+const body = users.fromSearchParams(sp, { schema }); // body.clamped === true
+JSON.stringify(body); // clamped yo'q — u payload'da non-enumerable, server'ga bormaydi
+const { params, clamped } = useListParams(users, { schema }); // render paytida xato yo'q
+```
+
+Dasturchi to'g'ridan-to'g'ri chaqirgan builder'lar (`buildListParams`, `resource.list`, …) avvalgidek `Error` tashlaydi.
 
 ## Migrating (limitlar)
 
 - `buildListParams` / `buildInfiniteParams` / `createQuery` / registry `list`/`infinite` endi offset 10 000 dan chuqur yoki 3 tadan ko'p sort maydonli so'rovda `Error` tashlaydi (ilgari payload yasalardi va server uni qabul qilardi). Chuqur sahifalar — cursor; zarur bo'lsa `maxOffset` / `maxSortFields` bilan oshiring (serverda ham xuddi shu limitni oshiring).
+
+- `Meta.totalCount` / `Meta.totalPages` endi `number | null` (`withTotal: false` javobida `null`). `meta.totalCount + 1` kabi kod TS'da `null` tekshiruvini talab qiladi; `withTotal` yubormaydigan ilovada qiymat avvalgidek raqam.
+- URL'dan o'qilgan chuqur `page` endi xato emas, clamp (`clamped: true`) — error boundary yoki qo'lda tekshiruv kerak emas.
+
+## Xatolar — `isQueryKitError`
+
+Server so'rovni rad etsa (`forbidden-key`, `forbidden-operator`, `limit-exceeded`, `empty-filter`, …), backend `QueryKitError.info`ni 400 javobida qaytarishi mumkin. Javob konverti loyihaniki; web faqat `info` shaklini tiplaydi:
+
+```ts
+import { isQueryKitError, type QueryKitErrorBody } from "@querykitjs/web";
+
+// backend: catch (e) { if (e instanceof QueryKitError) return res.status(400).json({ error: e.info }); }
+const body = error.response?.data?.error;
+if (isQueryKitError(body)) {
+  // body: { reason, site, key, source?, operation? }
+  if (body.reason === "forbidden-key" && body.site === "filter") showFieldError(body.key);
+}
+```
+
+`isQueryKitError` `reason` va `site` ni core ro'yxatidan tekshiradi, `key` — satr; boshqa har obyekt (masalan `{ statusCode: 400, message }`) → `false`.
 
 ## So'rovni o'zingiz yuborasiz
 
@@ -522,7 +569,7 @@ const { data, meta } = users.parseList(await res.json());
 | `registry.resource<T>(name)`                                                      | entity-tipli builder/filter/schema/keys/parser         |
 | `resource.list/infinite/cursor/params(input)`                                     | payload qurish (offset/infinite/cursor/pagination'siz) |
 | `resource.f` / `createFilters<T>()` / `f`                                         | tipli filter builder / tipli / tipsiz                  |
-| `resource.search(term, fields)`                                                   | OR-of-contains preset                                  |
+| `resource.search(term, fields, { operation? })`                                   | OR preset (`contains` / `startsWith` / `endsWith`)     |
 | `resource.schema(desc)` / `defineListSchema(desc)`                                | URL param → filter tavsifi                             |
 | `resource.fromSearchParams(sp, {schema})`                                         | searchParams → list payload (SSR)                      |
 | `resource.keys`                                                                   | TanStack/SWR query keys                                |
@@ -531,8 +578,9 @@ const { data, meta } = users.parseList(await res.json());
 | `buildParams / buildListParams / buildInfiniteParams / buildCursorParams`         | standalone builder'lar                                 |
 | `createQuery(config)`                                                             | registry'siz builder (default'lar/pruneEmpty)          |
 | `schemaToFilter(schema, sp)`                                                      | searchParams → `FieldCondition[]`                      |
-| `searchParamsToPayload(schema, sp)`                                               | searchParams → to'liq payload                          |
-| `readListParams(schema, sp)`                                                      | searchParams → `ListParams`                            |
+| `searchParamsToPayload(schema, sp)`                                               | searchParams → to'liq payload (clamp, `clamped`)       |
+| `readListParams(schema, sp, url?, limits?)`                                       | searchParams → `ListParams` + `clamped`                |
+| `isQueryKitError(body)` / `QueryKitErrorBody`                                     | 400 javobidagi querykit xatosini tanish                |
 | `setParam/setPage/setSize/setSort/resetParams`                                    | URL yozish (immutable, page-reset)                     |
 | `encodeSort/decodeSort`                                                           | `[{key,direction}]` ↔ `"-createdAt,id"` (multi-field)  |
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router)                           |

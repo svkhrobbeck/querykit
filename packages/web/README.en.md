@@ -96,18 +96,20 @@ export const qk = createRegistry({
     sort: ["-createdAt"], // list + infinite ordering (leading "-" = desc)
     cursor: { order: "asc" }, // cursor-only key traversal order
   },
+  timestamps: { createdAt: "created_at" }, // same as the backend registry; the default sort is this field, desc
   pruneEmpty: true, // drop empty filter values (""/null/undefined/[]); keep 0/false
 });
 ```
 
-| Config                  | Meaning                                                                             |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| `adapter`               | Target backend — tailors `with` typing (intellisense only).                         |
-| `defaults.perPage`      | Default `perPage` for `list`.                                                       |
-| `defaults.limit`        | Default `limit` for `infinite` and `cursor`.                                        |
-| `defaults.sort`         | Default sort for `list`/`infinite` — `[{key,direction}]` or `["-field"]` shorthand. |
-| `defaults.cursor.order` | Default cursor traversal order (`"asc"`/`"desc"`).                                  |
-| `pruneEmpty`            | Auto-drop empty filter conditions built from form inputs (default `true`).          |
+| Config                  | Meaning                                                                                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter`               | Target backend — tailors `with` typing (intellisense only).                                                                                                |
+| `defaults.perPage`      | Default `perPage` for `list`.                                                                                                                              |
+| `defaults.limit`        | Default `limit` for `infinite` and `cursor`.                                                                                                               |
+| `defaults.sort`         | Default sort for `list`/`infinite` — `[{key,direction}]` or `["-field"]` shorthand.                                                                        |
+| `defaults.cursor.order` | Default cursor traversal order (`"asc"`/`"desc"`).                                                                                                         |
+| `timestamps.createdAt`  | Same as the backend `timestamps.createdAt`; without `defaults.sort` the default sort is `[{ key: createdAt, direction: "desc" }]` (default `"createdAt"`). |
+| `pruneEmpty`            | Auto-drop empty filter conditions built from form inputs (default `true`).                                                                                 |
 
 Every default is overridable per call.
 
@@ -118,19 +120,19 @@ import type { IUser } from "@my/api-types";
 export const users = qk.resource<IUser>("users"); // "users" = cache-key namespace (required, unique)
 ```
 
-| Member                                                        | What it is                                                           |
-| ------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `users.list(input)`                                           | build an offset (page) payload                                       |
-| `users.infinite(input)`                                       | build an infinite (limit/offset) payload                             |
-| `users.cursor(input)`                                         | build a cursor (keyset) payload                                      |
-| `users.params(input)`                                         | build a paginationless payload (filter/sort/columns/with)            |
-| `users.f`                                                     | `createFilters<IUser>()` — field-typed builder                       |
-| `users.search(term, fields)`                                  | OR-of-`contains` preset across `fields`                              |
-| `users.schema(desc)`                                          | `defineListSchema` bound (URL ↔ filter)                              |
-| `users.fromSearchParams(sp, {schema})`                        | build a list payload straight from `URLSearchParams` (SSR / no hook) |
-| `users.keys`                                                  | stable query keys for TanStack/SWR                                   |
-| `users.parseList / parseInfinite / parseCursor`               | map response meta snake→camel                                        |
-| `ListResult<T> / InfiniteResult<T> / CursorResult<T>` (types) | `parse*` return types                                                |
+| Member                                                        | What it is                                                                  |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `users.list(input)`                                           | build an offset (page) payload                                              |
+| `users.infinite(input)`                                       | build an infinite (limit/offset) payload                                    |
+| `users.cursor(input)`                                         | build a cursor (keyset) payload                                             |
+| `users.params(input)`                                         | build a paginationless payload (filter/sort/columns/with)                   |
+| `users.f`                                                     | `createFilters<IUser>()` — field-typed builder                              |
+| `users.search(term, fields, { operation? })`                  | OR preset across `fields` (`contains` by default, `startsWith`, `endsWith`) |
+| `users.schema(desc)`                                          | `defineListSchema` bound (URL ↔ filter)                                     |
+| `users.fromSearchParams(sp, {schema})`                        | build a list payload straight from `URLSearchParams` (SSR / no hook)        |
+| `users.keys`                                                  | stable query keys for TanStack/SWR                                          |
+| `users.parseList / parseInfinite / parseCursor`               | map response meta snake→camel                                               |
+| `ListResult<T> / InfiniteResult<T> / CursorResult<T>` (types) | `parse*` return types                                                       |
 
 All builders inherit the registry's `defaults` + `pruneEmpty`; all types are driven by `IUser` and the `adapter`.
 
@@ -167,7 +169,12 @@ f.contains("age", "x"); // ✗ compile error — `contains` is string-only
 ```ts
 users.search("ali", ["buyerName", "email"]);
 // → or(contains("buyerName","ali"), contains("email","ali"))
+users.search("ali", ["buyerName"], { operation: "startsWith" });
+// → or(startsWith("buyerName","ali")) — can use an index
 ```
+
+- `contains` is expensive: `%ali%` cannot use a B-tree index (a full scan on Postgres, a regex on MongoDB). On a large table prefer `startsWith` (`ali%`) or full-text search.
+- Every field must be `filterable` on the server with that operator (`{ buyerName: ["%_%"] }` or `["%_"]`); otherwise the server answers 400 with `forbidden-key` / `forbidden-operator`.
 
 An untyped `f` is also exported: `import { f } from "@querykitjs/web"` (no field-type checks, quick use).
 
@@ -230,6 +237,15 @@ const r = users.parseList(res.data); // { data: IUser[], meta: { totalPages, cur
 users.parseInfinite(res.data); // { data, meta: { hasMore, nextOffset, … } }
 users.parseCursor(res.data); // { data, meta: { nextCursor, hasNext, … } }
 ```
+
+**`withTotal: false`** — when you do not need the total (an infinite-like list, a "next" button), the server skips the count query:
+
+```ts
+const body = users.list({ page, perPage: 20, withTotal: false }); // the payload carries withTotal: false (absent when not given)
+const { meta } = users.parseList(res.data); // meta.totalCount === null, meta.totalPages === null; hasNext still works
+```
+
+`Meta.totalCount` / `Meta.totalPages` are typed `number | null`: `null` means no count ran; a field the server did not send at all is `0` as before. zod (`makeOffsetParamsSchema`) and class-validator (`makeOffsetParamsDto`) accept `withTotal`.
 
 `parse*` exists at two levels (one shared implementation — meta is entity-agnostic):
 `qk.parseList/...` (registry, `data: unknown[]`) when you don't have a `resource`; `users.parseList/...` (entity-typed).
@@ -310,6 +326,8 @@ function UsersListPage() {
   // setParam("status","active") → updates URL, resets page; setPage(2); setSort("-createdAt")
 }
 ```
+
+The hook also returns `clamped: boolean` — the URL's `page` or `sort` was past a limit and was cut (see «Limits» below). To fix the URL: `if (clamped) setPage(params.page)`.
 
 An input/sort/page change mutates the URL → `params` changes → `queryKey` changes → TanStack refetches (and caches each combo).
 
@@ -495,11 +513,40 @@ createRegistry({ adapter: "drizzle-pg", defaults: { maxOffset: 50_000 } });
 ```
 
 - Filter limits (depth, conditions, `in` items, string length) are **not** checked in web — the server (zod / class-validator) rejects them with a 400.
-- ⚠️ A `page` read from the URL (`useListParams`, `fromSearchParams`, `searchParamsToPayload`) is in the user's hands: `?page=9999` makes the builder throw. Wrap the page in an error boundary or check `page` before the hook.
+- **The URL readers clamp.** The URL is in the user's hands, so `readListParams`, `searchParamsToPayload`, `resource.fromSearchParams` and the hooks (`useListParams`, `useListParamsBase`) never throw: `page` becomes the last allowed page (`floor(maxOffset / perPage) + 1`), `sort` keeps its first `maxSortFields` fields, and the result has `clamped: true`. `?page=9999&size=20` → `page: 501`, `clamped: true`; `?sortType=a,b,c,d` → 3 fields, `clamped: true`. Through a registry, the registry's `defaults` limits apply.
+
+```ts
+const read = readListParams(schema, new URLSearchParams("page=9999&size=20")); // { page: 501, perPage: 20, clamped: true, … }
+const body = users.fromSearchParams(sp, { schema }); // body.clamped === true
+JSON.stringify(body); // no clamped — it is non-enumerable on the payload and never reaches the server
+const { params, clamped } = useListParams(users, { schema }); // no error during render
+```
+
+Builders the developer calls directly (`buildListParams`, `resource.list`, …) still throw an `Error`.
 
 ## Migrating (limits)
 
 - `buildListParams` / `buildInfiniteParams` / `createQuery` / registry `list`/`infinite` now throw for an offset deeper than 10 000 or more than 3 sort fields (they used to build the payload and the server accepted it). Use a cursor for deep pages; raise `maxOffset` / `maxSortFields` where you must (and raise the same limit on the server).
+
+- `Meta.totalCount` / `Meta.totalPages` are now `number | null` (`null` in a `withTotal: false` response). Code like `meta.totalCount + 1` needs a `null` check in TS; in an app that never sends `withTotal` the value is a number as before.
+- A deep `page` read from the URL is now clamped (`clamped: true`), not an error — no error boundary or manual check needed.
+
+## Errors — `isQueryKitError`
+
+When the server rejects a request (`forbidden-key`, `forbidden-operator`, `limit-exceeded`, `empty-filter`, …), the backend may return `QueryKitError.info` in its 400 response. The envelope is the project's own; web only types the `info` shape:
+
+```ts
+import { isQueryKitError, type QueryKitErrorBody } from "@querykitjs/web";
+
+// backend: catch (e) { if (e instanceof QueryKitError) return res.status(400).json({ error: e.info }); }
+const body = error.response?.data?.error;
+if (isQueryKitError(body)) {
+  // body: { reason, site, key, source?, operation? }
+  if (body.reason === "forbidden-key" && body.site === "filter") showFieldError(body.key);
+}
+```
+
+`isQueryKitError` checks `reason` and `site` against the core lists and `key` is a string; any other object (e.g. `{ statusCode: 400, message }`) → `false`.
 
 ## You send the request yourself
 
@@ -522,7 +569,7 @@ const { data, meta } = users.parseList(await res.json());
 | `registry.resource<T>(name)`                                                      | entity-typed builders/filters/schema/keys/parsers       |
 | `resource.list/infinite/cursor/params(input)`                                     | build a payload (offset/infinite/cursor/paginationless) |
 | `resource.f` / `createFilters<T>()` / `f`                                         | typed filter builder / typed / untyped                  |
-| `resource.search(term, fields)`                                                   | OR-of-contains preset                                   |
+| `resource.search(term, fields, { operation? })`                                   | OR preset (`contains` / `startsWith` / `endsWith`)      |
 | `resource.schema(desc)` / `defineListSchema(desc)`                                | URL param → filter descriptor                           |
 | `resource.fromSearchParams(sp, {schema})`                                         | searchParams → list payload (SSR)                       |
 | `resource.keys`                                                                   | TanStack/SWR query keys                                 |
@@ -531,8 +578,9 @@ const { data, meta } = users.parseList(await res.json());
 | `buildParams / buildListParams / buildInfiniteParams / buildCursorParams`         | standalone builders                                     |
 | `createQuery(config)`                                                             | builder without a registry (defaults/pruneEmpty)        |
 | `schemaToFilter(schema, sp)`                                                      | searchParams → `FieldCondition[]`                       |
-| `searchParamsToPayload(schema, sp)`                                               | searchParams → full payload                             |
-| `readListParams(schema, sp)`                                                      | searchParams → `ListParams`                             |
+| `searchParamsToPayload(schema, sp)`                                               | searchParams → full payload (clamped, `clamped`)        |
+| `readListParams(schema, sp, url?, limits?)`                                       | searchParams → `ListParams` + `clamped`                 |
+| `isQueryKitError(body)` / `QueryKitErrorBody`                                     | recognise a querykit error in a 400 response            |
 | `setParam/setPage/setSize/setSort/resetParams`                                    | write URL (immutable, page-reset)                       |
 | `encodeSort/decodeSort`                                                           | `[{key,direction}]` ↔ `"-createdAt,id"` (multi-field)   |
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router)                            |

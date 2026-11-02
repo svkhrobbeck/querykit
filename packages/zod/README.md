@@ -50,7 +50,7 @@ Infinite/cursor uchun `infiniteParamsSchema` / `cursorParamsSchema`.
 - **Operatorlar** — core'ning to'liq to'plami: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ token `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
 - **Sort** — `{ key, direction }[]` (ko'p-maydon, ko'pi bilan 3).
 - **So'rov limitlari** — filtr chuqurligi, shartlar soni, massiv elementlari, satr uzunligi, offset chuqurligi, sort maydonlari ([Limits](#limits)).
-- **Paginatsiya** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
+- **Paginatsiya** — offset (`page`/`perPage`/`withTotal` — `false` ⇒ count yo'q, totals `null`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **`with`** (relations), **`columns`**, **`withDeleted`**.
 - Eski `type` maydoni **e'tiborsiz** qoldiriladi (rad etilmaydi) — migratsiya oson.
 
@@ -147,7 +147,7 @@ Yangi kod yuqoridagi factory'lardan foydalansin.
 | `filterNodeSchema` / `filterSchema` | nested tugun / to'liq filter (nested yoki flat)    |
 | `sortSchema`                        | sort (`{ key, direction }[]`, ko'pi bilan 3)       |
 | `baseParamsSchema`                  | filter/sort/columns/with/withDeleted               |
-| `offsetParamsSchema`                | + `page`/`perPage`                                 |
+| `offsetParamsSchema`                | + `page`/`perPage`/`withTotal`                     |
 | `infiniteParamsSchema`              | + `limit`/`offset`                                 |
 | `cursorParamsSchema`                | + `limit`/`cursor`/`cursorKey`/`order`/`direction` |
 

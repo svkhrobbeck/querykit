@@ -9,7 +9,6 @@ import type { ConformanceRow } from "./fixtures";
 /** A raw token body, base64url — the shape a client could send. */
 const rawToken = (body: unknown): string => Buffer.from(JSON.stringify(body), "utf8").toString("base64url");
 const BAD_TOKEN = { error: { site: "cursorKey", key: "createdAt", reason: "invalid-value" } } as const;
-const WEB = "a cursor token is decoded by the repository, not built by web";
 
 const SAME_TIME = new Date("2026-03-01T09:00:00.000Z");
 const TIED: readonly ConformanceRow[] = Array.from({ length: 25 }, (_, index) => ({
@@ -48,21 +47,18 @@ export const CURSOR_CASES: readonly ConformanceCase[] = [
     group: "pagination",
     call: { method: "findCursor", params: { limit: 10, cursorKey: "createdAt", cursor: rawToken({ v: 2, k: { $ne: null }, id: 1 }) } },
     expect: BAD_TOKEN,
-    notBuiltByWeb: WEB,
   },
   {
     name: "A5: an old v1 token → invalid-value, cursorKey",
     group: "pagination",
     call: { method: "findCursor", params: { limit: 10, cursorKey: "createdAt", cursor: rawToken({ v: "2026-03-20T09:00:00.000Z" }) } },
     expect: BAD_TOKEN,
-    notBuiltByWeb: WEB,
   },
   {
     name: "A6: a date cursorKey with a value that is not a date → invalid-value, cursorKey",
     group: "pagination",
     call: { method: "findCursor", params: { limit: 10, cursorKey: "createdAt", cursor: rawToken({ v: 2, k: "not-a-date", id: 1 }) } },
     expect: BAD_TOKEN,
-    notBuiltByWeb: WEB,
   },
   {
     name: "A4: with cursorSecret the signed tokens walk all 25 rows",
@@ -78,6 +74,5 @@ export const CURSOR_CASES: readonly ConformanceCase[] = [
     call: { method: "findCursor", params: { limit: 10, cursorKey: "createdAt", cursor: rawToken({ v: 2, k: "2026-03-01T09:00:00.000Z", id: 1 }) } },
     options: { cursorSecret: "s" },
     expect: BAD_TOKEN,
-    notBuiltByWeb: WEB,
   },
 ];

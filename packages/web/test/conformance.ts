@@ -12,10 +12,15 @@
  */
 import type { Call, ConformanceCase } from "../../core/test/conformance/cases";
 import { CASES } from "../../core/test/conformance/cases";
+import { CURSOR_CASES } from "../../core/test/conformance/cases-cursor";
+import { MUTATION_CASES } from "../../core/test/conformance/cases-mutation";
+import { POLICY_CASES } from "../../core/test/conformance/cases-policy";
+import { SCOPE_CASES } from "../../core/test/conformance/cases-scope";
 import { runConformance, type Harness } from "../../core/test/conformance/runner";
 import { DEFAULT_MAX_LIMIT, DEFAULT_MAX_PER_PAGE } from "../../core/src/defaults";
 import type { FieldCondition, Filter, FilterNode, SortItem } from "../../core/src/types";
 import { buildCursorParams, buildInfiniteParams, buildListParams } from "../src/query";
+import { createRegistry } from "../src/registry";
 
 /** One page large enough for the whole fixture, so a `findAll` case keeps all its rows. */
 const ONE_PAGE = 50;
@@ -53,6 +58,17 @@ function payloadMismatches(input: Record<string, unknown>, payload: Record<strin
   return problems;
 }
 
+/**
+ * The list builder for a case: a case with registry `timestamps` is built by a registry
+ * configured the same way, so its default sort names the same createdAt field (task 015).
+ */
+function listBuilderFor(testCase: ConformanceCase): (params: never) => unknown {
+  const createdAt = testCase.options?.timestamps?.createdAt;
+  if (!createdAt) return buildListParams;
+  const resource = createRegistry({ adapter: "drizzle-pg", timestamps: { createdAt } }).resource("conformance");
+  return params => resource.list(params);
+}
+
 type WebCase = { testCase: ConformanceCase; builder: string; input: Record<string, unknown>; payload: Record<string, unknown> };
 
 function toWebCase(testCase: ConformanceCase): WebCase {
@@ -63,7 +79,7 @@ function toWebCase(testCase: ConformanceCase): WebCase {
         testCase,
         builder: "buildListParams",
         input: call.params as Record<string, unknown>,
-        payload: overTheWire(buildListParams(call.params as never)) as never,
+        payload: overTheWire(listBuilderFor(testCase)(call.params as never)) as never,
       };
     case "findInfinite":
       return {
@@ -81,7 +97,7 @@ function toWebCase(testCase: ConformanceCase): WebCase {
       };
     case "findAll": {
       const input = { ...call.params, page: 1, perPage: ONE_PAGE } as Record<string, unknown>;
-      return { testCase, builder: "buildListParams", input, payload: overTheWire(buildListParams(input as never)) as never };
+      return { testCase, builder: "buildListParams", input, payload: overTheWire(listBuilderFor(testCase)(input as never)) as never };
     }
     default:
       throw new Error(`web conformance: ${call.method} is not built by web (mark it notBuiltByWeb)`);
@@ -115,6 +131,13 @@ for (const webCase of webCases) {
 }
 const builders = new Set(webCases.map(webCase => webCase.builder));
 console.log(`web payloads: ${webCases.length - shapeFailures}/${webCases.length} equal the table input (${[...builders].join(", ")})`);
+
+/** Cases added by tasks 008–014 (limits under a policy, policy, cursor, mutations, scope). */
+const HARDENING_CASES = [...POLICY_CASES, ...CURSOR_CASES, ...MUTATION_CASES, ...SCOPE_CASES];
+const hardeningOnWeb = HARDENING_CASES.filter(testCase => !testCase.notBuiltByWeb).length;
+console.log(
+  `008–014 cases: ${hardeningOnWeb} built by web × 3 adapters, ${HARDENING_CASES.length - hardeningOnWeb} repository-only (mutations, multi-page walks, keyless payloads)`,
+);
 
 const harnesses = await Promise.all([
   loadHarness("../../drizzle-pg/test/conformance.ts", "drizzleHarness"),

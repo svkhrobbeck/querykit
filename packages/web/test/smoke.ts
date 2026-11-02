@@ -8,6 +8,7 @@ import { buildCursorParams, buildInfiniteParams, buildListParams, createFilters,
 import { mapCursorMeta, mapInfiniteMeta, mapMeta } from "../src/meta"; // internal (not public — use registry `parse*`)
 import { decodeSort, readListParams, schemaToFilter, setParam, setSort } from "../src/url";
 import type { FieldCondition, FilterNode } from "../src/types";
+import "./contract";
 import "./limits";
 
 let passed = 0;

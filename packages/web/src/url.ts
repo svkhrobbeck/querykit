@@ -1,4 +1,6 @@
-import { buildListParams } from "./query";
+import { DEFAULT_MAX_OFFSET, DEFAULT_MAX_PER_PAGE, DEFAULT_MAX_SORT_FIELDS, DEFAULT_PER_PAGE } from "@querykitjs/core";
+
+import { buildListParams, clampInt } from "./query";
 import type { FieldDescriptor, ListSchema } from "./schema";
 import type { FieldCondition, Filter, FilterNode, FilterValue, ListParams, ListPayload, Sort, SortDirection, SortInput } from "./types";
 
@@ -106,21 +108,67 @@ function cond(key: string, operation: FieldCondition["operation"], value: Filter
   return { key, operation, value };
 }
 
-/** searchParams → normalizatsiyalanmagan {@link ListParams} (filter/sort/page/perPage). */
-export function readListParams(schema: ListSchema, searchParams: URLSearchParams, url: UrlConfig = {}): ListParams {
+/**
+ * The bounds the URL readers clamp to — the builder's own (`createRegistry`
+ * `defaults`); an absent one is the core default.
+ */
+export interface UrlLimits {
+  perPage?: number;
+  maxPerPage?: number;
+  maxOffset?: number;
+  maxSortFields?: number;
+}
+
+/** {@link ListParams} read from a URL. `clamped` — the URL's page or sort was cut to the limits. */
+export type UrlListParams = ListParams & { clamped: boolean };
+
+/**
+ * A list payload built from a URL. `clamped` is non-enumerable: readable in code,
+ * never serialized, so the wire payload is unchanged.
+ */
+export type UrlListPayload = ListPayload & { readonly clamped?: boolean };
+
+/** Marks a payload with a non-enumerable `clamped` flag. */
+export function withClamped(payload: ListPayload, clamped: boolean): UrlListPayload {
+  return Object.defineProperty(payload, "clamped", { value: clamped, enumerable: false });
+}
+
+/** The last page the builder accepts: `(page - 1) × perPage ≤ maxOffset`. */
+function lastPage(perPage: number | undefined, limits: UrlLimits): number {
+  const resolved = clampInt(perPage, limits.perPage ?? DEFAULT_PER_PAGE, limits.maxPerPage ?? DEFAULT_MAX_PER_PAGE);
+  return Math.floor((limits.maxOffset ?? DEFAULT_MAX_OFFSET) / resolved) + 1;
+}
+
+/**
+ * searchParams → normalizatsiyalanmagan {@link ListParams} (filter/sort/page/perPage).
+ * The URL is user input: a page past `maxOffset` becomes the last allowed page and a
+ * sort past `maxSortFields` keeps its first fields, with `clamped: true` — so a
+ * hand-edited `?page=9999` never throws during render. The builders still throw
+ * for a direct call (task 008).
+ */
+export function readListParams(schema: ListSchema, searchParams: URLSearchParams, url: UrlConfig = {}, limits: UrlLimits = {}): UrlListParams {
   const cfg = { ...URL_DEFAULTS, ...url };
   const size = searchParams.get(cfg.sizeParam);
+  const perPage = size ? Number(size) : undefined;
+  const page = Math.trunc(Number(searchParams.get(cfg.pageParam))) || 1;
+  const sort = decodeSort(searchParams.get(cfg.sortParam));
+  const maxPage = lastPage(perPage, limits);
+  const maxSortFields = limits.maxSortFields ?? DEFAULT_MAX_SORT_FIELDS;
+  const isPageClamped = page > maxPage;
+  const isSortClamped = sort !== undefined && sort.length > maxSortFields;
   return {
     filter: schemaToFilter(schema, searchParams),
-    sort: decodeSort(searchParams.get(cfg.sortParam)),
-    page: Number(searchParams.get(cfg.pageParam)) || 1,
-    perPage: size ? Number(size) : undefined,
+    sort: isSortClamped ? sort.slice(0, maxSortFields) : sort,
+    page: isPageClamped ? maxPage : page,
+    perPage,
+    clamped: isPageClamped || isSortClamped,
   };
 }
 
-/** searchParams → to'liq, yuborishga tayyor {@link ListPayload}. */
-export function searchParamsToPayload(schema: ListSchema, searchParams: URLSearchParams, url?: UrlConfig): ListPayload {
-  return buildListParams(readListParams(schema, searchParams, url));
+/** searchParams → to'liq, yuborishga tayyor {@link ListPayload} (core default limits; clamped like {@link readListParams}). */
+export function searchParamsToPayload(schema: ListSchema, searchParams: URLSearchParams, url?: UrlConfig): UrlListPayload {
+  const params = readListParams(schema, searchParams, url);
+  return withClamped(buildListParams(params), params.clamped);
 }
 
 /* ------------------------- URL yozish (immutable) ------------------------- */

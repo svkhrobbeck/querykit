@@ -2,7 +2,7 @@ import { createQuery, normalizeSort, type QueryConfig } from "./query";
 import { createFilters, f as rawF } from "./filters";
 import { mapMeta, mapInfiniteMeta, mapCursorMeta } from "./meta";
 import { defineListSchema, type ListSchema } from "./schema";
-import { readListParams, type UrlConfig } from "./url";
+import { readListParams, withClamped, type UrlConfig, type UrlLimits, type UrlListPayload } from "./url";
 import type { AdapterName, WithFor } from "./adapter";
 import type {
   CursorMeta,
@@ -32,6 +32,12 @@ export type ResourceListParams<T, A extends AdapterName> = Omit<ListParams<T>, "
 export type ResourceInfiniteParams<T, A extends AdapterName> = Omit<InfiniteParams<T>, "with"> & { with?: WithFor<A> };
 export type ResourceCursorParams<T, A extends AdapterName> = Omit<CursorParams<T>, "with"> & { with?: WithFor<A> };
 export type ResourceParams<T, A extends AdapterName> = Omit<Params<T>, "with"> & { with?: WithFor<A> };
+
+/** `resource.search` options. */
+export interface SearchOptions {
+  /** The string operator per field (default `"contains"`). */
+  operation?: "contains" | "startsWith" | "endsWith";
+}
 
 /* ---------------------------- responses / results ------------------------- */
 
@@ -75,12 +81,18 @@ export interface Resource<T, A extends AdapterName> {
   params(input?: ResourceParams<T, A>): QueryPayload;
   /** Filter builder typed to `T`'s fields. */
   f: ReturnType<typeof createFilters<T>>;
-  /** Search preset — OR of `contains` across `fields` (e.g. one input → many columns). */
-  search(term: string, fields: FieldKey<T>[]): Filter<T>;
+  /**
+   * Search preset — OR of `operation` (default `contains`) across `fields` (one input → many columns).
+   * Each field must be `filterable` with that operator on the server.
+   */
+  search(term: string, fields: FieldKey<T>[], options?: SearchOptions): Filter<T>;
   /** Declare a URL↔filter schema (identity helper). */
   schema<S extends ListSchema>(s: S): S;
-  /** Build a list payload from URL search params (SSR — the non-hook `useListParams`). */
-  fromSearchParams(searchParams: URLSearchParams, options: { schema: ListSchema; url?: UrlConfig; with?: WithFor<A> }): ListPayload;
+  /**
+   * Build a list payload from URL search params (SSR — the non-hook `useListParams`).
+   * A page or sort past the registry limits is clamped (`clamped`, non-enumerable — never sent).
+   */
+  fromSearchParams(searchParams: URLSearchParams, options: { schema: ListSchema; url?: UrlConfig; with?: WithFor<A> }): UrlListPayload;
   /** Stable query keys for TanStack/SWR caches. */
   keys: ResourceKeys;
   /** Map a list response's meta to camelCase (`data` typed to `T`). */
@@ -114,9 +126,17 @@ export interface RegistryDefaults {
   cursor?: { order?: SortDirection };
 }
 
+/** The backend registry's `timestamps` field names, so the web default sort names the same field. */
+export interface RegistryTimestamps {
+  /** The createdAt field (default `"createdAt"`) — the default `list`/`infinite` sort is `[{ key: createdAt, direction: "desc" }]`. */
+  createdAt?: string;
+}
+
 export interface RegistryConfig<A extends AdapterName> {
   adapter: A;
   defaults?: RegistryDefaults;
+  /** Same as the backend registry's `timestamps`; `defaults.sort` wins over it. */
+  timestamps?: RegistryTimestamps;
   /** Drop empty filter values built from form inputs (default `true`). */
   pruneEmpty?: boolean;
 }
@@ -145,7 +165,9 @@ export interface Registry<A extends AdapterName> {
  */
 export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>): Registry<A> {
   const defaults = config.defaults ?? {};
-  const sort: Sort = normalizeSort(defaults.sort, []); // accepts {key,direction}[] or "-field"[] shorthand
+  const createdAt = config.timestamps?.createdAt;
+  const timestampSort: Sort = createdAt ? [{ key: createdAt, direction: "desc" }] : [];
+  const sort: Sort = normalizeSort(defaults.sort, timestampSort); // accepts {key,direction}[] or "-field"[] shorthand
   const cursorOrder: SortDirection = defaults.cursor?.order ?? "asc";
 
   // Only set keys that are provided — createQuery merges over its own defaults,
@@ -160,6 +182,12 @@ export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>)
   if (sort.length) qcfg.defaultSort = sort; // only override when a real sort is given
   if (config.pruneEmpty !== undefined) qcfg.pruneEmpty = config.pruneEmpty;
   const q = createQuery(qcfg);
+  const urlLimits: UrlLimits = {
+    perPage: defaults.perPage,
+    maxPerPage: defaults.maxPerPage,
+    maxOffset: defaults.maxOffset,
+    maxSortFields: defaults.maxSortFields,
+  };
 
   const parseList = (raw?: RawResponse<unknown, RawMeta> | null): ListResult<unknown> => ({ data: raw?.data ?? [], meta: mapMeta(raw?.meta) });
   const parseInfinite = (raw?: RawResponse<unknown, RawInfiniteMeta> | null): InfiniteResult<unknown> => ({
@@ -186,10 +214,12 @@ export function createRegistry<A extends AdapterName>(config: RegistryConfig<A>)
       cursor: input => q.cursor({ ...(input as unknown as CursorParams), order: input?.order ?? cursorOrder }) as unknown as CursorPayload,
       params: input => q.params(input as unknown as Params) as unknown as QueryPayload,
       f,
-      search: (term, fields) => rawF.or(...fields.map(field => rawF.contains(field, term))) as unknown as Filter<T>,
+      search: (term, fields, options) => rawF.or(...fields.map(field => rawF[options?.operation ?? "contains"](field, term))) as unknown as Filter<T>,
       schema: s => defineListSchema(s),
-      fromSearchParams: (searchParams, options) =>
-        q.list({ ...readListParams(options.schema, searchParams, options.url), with: options.with } as unknown as ListParams) as unknown as ListPayload,
+      fromSearchParams: (searchParams, options) => {
+        const read = readListParams(options.schema, searchParams, options.url, urlLimits);
+        return withClamped(q.list({ ...read, with: options.with } as unknown as ListParams) as unknown as ListPayload, read.clamped);
+      },
       keys,
       parseList: raw => parseList(raw) as ListResult<T>,
       parseInfinite: raw => parseInfinite(raw) as InfiniteResult<T>,

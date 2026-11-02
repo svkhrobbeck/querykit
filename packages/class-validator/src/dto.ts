@@ -59,6 +59,11 @@ export class OffsetParamsDto extends BaseParamsDto {
   @IsPositive()
   @Max(DEFAULT_MAX_PER_PAGE)
   perPage?: number;
+
+  /** `false` — no count; the meta totals are `null` (task 013). */
+  @IsOptional()
+  @IsBoolean()
+  withTotal?: boolean;
 }
 
 /**
@@ -216,6 +221,7 @@ export function makeOffsetParamsDto(options: ParamsDtoOptions = {}) {
     sort?: Sort;
     page?: number;
     perPage?: number;
+    withTotal?: boolean;
     columns?: Record<string, boolean>;
     with?: Record<string, unknown>;
     withDeleted?: boolean;
@@ -226,6 +232,8 @@ export function makeOffsetParamsDto(options: ParamsDtoOptions = {}) {
   applyNumber(OffsetParams.prototype, "page", { positive: true });
   IsWithinMaxOffset({ mode: "page", maxOffset: limits.maxOffset })(OffsetParams.prototype, "page");
   applyNumber(OffsetParams.prototype, "perPage", { positive: true, max: options.maxPerPage ?? DEFAULT_MAX_PER_PAGE });
+  IsOptional()(OffsetParams.prototype, "withTotal");
+  IsBoolean()(OffsetParams.prototype, "withTotal");
 
   return nameClass(OffsetParams, "OffsetParamsDto");
 }

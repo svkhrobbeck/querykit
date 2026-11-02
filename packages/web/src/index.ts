@@ -27,8 +27,10 @@ export {
   type Registry,
   type RegistryConfig,
   type RegistryDefaults,
+  type RegistryTimestamps,
   type Resource,
   type ResourceKeys,
+  type SearchOptions,
   type ResourceListParams,
   type ResourceInfiniteParams,
   type ResourceCursorParams,
@@ -38,6 +40,7 @@ export {
   type CursorResult,
 } from "./registry";
 export type { AdapterName, WithFor, MongoosePopulate, DrizzleWith, PrismaInclude } from "./adapter";
+export { isQueryKitError, type QueryKitErrorBody } from "./errors";
 export { defineListSchema, type FieldDescriptor, type ListSchema } from "./schema";
 export {
   decodeSort,
@@ -51,5 +54,8 @@ export {
   setSize,
   setSort,
   type UrlConfig,
+  type UrlLimits,
+  type UrlListParams,
+  type UrlListPayload,
 } from "./url";
 export * from "./types";

@@ -132,6 +132,7 @@ export const offsetParamsSchema = baseParamsSchema
   .extend({
     page: z.number().int().positive().optional(),
     perPage: z.number().int().positive().optional(),
+    withTotal: z.boolean().optional(),
   })
   .superRefine(offsetDepthCheck(DEFAULT_QUERY_LIMITS.maxOffset));
 
@@ -237,6 +238,7 @@ export function makeOffsetParamsSchema<const TAllow extends readonly ServerOwned
       ...pickServerOwned(options.allow),
       page: z.number().int().positive().optional(),
       perPage: positive(options.maxPerPage ?? DEFAULT_MAX_PER_PAGE),
+      withTotal: z.boolean().optional(),
     })
     .superRefine(offsetDepthCheck(limits.maxOffset));
 }

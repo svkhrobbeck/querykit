@@ -1,5 +1,8 @@
 import type { CursorMeta, InfiniteMeta, Meta, RawCursorMeta, RawInfiniteMeta, RawMeta } from "./types";
 
+/** A server `null` total means "not counted" (`withTotal: false`) and stays `null`; an absent one is `0`. */
+const total = (value: number | null | undefined): number | null => (value === null ? null : (value ?? 0));
+
 /**
  * **Offset** (list) meta'sini snake_case → camelCase map qiladi.
  *
@@ -11,8 +14,8 @@ import type { CursorMeta, InfiniteMeta, Meta, RawCursorMeta, RawInfiniteMeta, Ra
  */
 export function mapMeta(raw?: RawMeta | null): Meta {
   return {
-    totalPages: raw?.total_pages ?? 0,
-    totalCount: raw?.total_items ?? 0,
+    totalPages: total(raw?.total_pages),
+    totalCount: total(raw?.total_items),
     currentPage: raw?.current_page ?? 0,
     perPage: raw?.per_page ?? 0,
     hasNext: raw?.has_next ?? false,

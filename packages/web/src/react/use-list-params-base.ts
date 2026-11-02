@@ -1,11 +1,11 @@
 import { useCallback, useMemo } from "react";
 
 import type { AdapterName, WithFor } from "../adapter";
-import type { Resource, ResourceListParams } from "../registry";
+import type { Resource } from "../registry";
 import type { ListSchema } from "../schema";
 import type { ListPayload, SortInput } from "../types";
 import type { UrlConfig } from "../url";
-import { readListParams, resetParams, setPage, setParam, setSize, setSort } from "../url";
+import { resetParams, setPage, setParam, setSize, setSort } from "../url";
 
 export interface UseListParamsBaseOptions<A extends AdapterName> {
   /** URL↔filter schema ({@link defineListSchema} / `resource.schema`). Memoize it. */
@@ -23,6 +23,11 @@ export interface UseListParamsBaseOptions<A extends AdapterName> {
 export interface UseListParamsResult {
   /** Ready-to-send list payload (built from the URL via the resource's defaults). */
   params: ListPayload;
+  /**
+   * The URL's page or sort was past the limits and was clamped (`?page=9999` → the last
+   * allowed page). The app may rewrite the URL (`setPage(params.page)`).
+   */
+  clamped: boolean;
   searchParams: URLSearchParams;
   /** Set/clear a filter param (resets `page`). */
   setParam: (name: string, value: string | null | undefined) => void;
@@ -33,7 +38,8 @@ export interface UseListParamsResult {
 }
 
 /**
- * Router-agnostic list URL-state hook. Reads the URL via the schema, builds a
+ * Router-agnostic list URL-state hook. Reads the URL via the schema (a page or sort
+ * past the limits is clamped — `clamped`, never a render error), builds a
  * ready-to-send payload through the `resource` (registry defaults + adapter), and
  * returns URL setters (filter/sort/size changes reset `page`). Bring your own
  * `searchParams`/`setSearchParams` (Next.js, TanStack Router, …).
@@ -41,13 +47,11 @@ export interface UseListParamsResult {
 export function useListParamsBase<T, A extends AdapterName>(resource: Resource<T, A>, options: UseListParamsBaseOptions<A>): UseListParamsResult {
   const { schema, searchParams, setSearchParams, url, with: withRel } = options;
 
-  const params = useMemo(
-    () => resource.list({ ...readListParams(schema, searchParams, url), with: withRel } as ResourceListParams<T, A>),
-    [resource, schema, searchParams, url, withRel],
-  );
+  const params = useMemo(() => resource.fromSearchParams(searchParams, { schema, url, with: withRel }), [resource, schema, searchParams, url, withRel]);
 
   return {
     params,
+    clamped: params.clamped === true,
     searchParams,
     setParam: useCallback((name, value) => setSearchParams(setParam(searchParams, name, value, url)), [searchParams, setSearchParams, url]),
     setPage: useCallback((page: number) => setSearchParams(setPage(searchParams, page, url)), [searchParams, setSearchParams, url]),

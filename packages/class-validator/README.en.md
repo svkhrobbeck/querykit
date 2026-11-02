@@ -92,7 +92,7 @@ Both flags are **required**, otherwise the guarantees are only half in place:
 - **Operators** — the full core set: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ tokens `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
 - **Sort** — `{ key, direction }[]` (multi-field, at most 3).
 - **Request limits** — filter size, sort fields, offset depth ([Limits](#limits)).
-- **Pagination** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
+- **Pagination** — offset (`page`/`perPage`/`withTotal` — `false` ⇒ no count, totals `null`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **Values** — a scalar or an array of scalars. Because the wire is JSON, a `Date` object, `NaN` and `Infinity` are **rejected** (dates arrive as ISO strings).
 - **A field allowlist** (`allowedKeys`) — zod has none, see below.
 - The legacy `type` field is **ignored** (not rejected) — easy migration.

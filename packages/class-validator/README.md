@@ -92,7 +92,7 @@ Ikkala flag ham **zarur**, aks holda kafolatlar yarim ishlaydi:
 - **Operatorlar** — core'ning to'liq to'plami: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ token `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
 - **Sort** — `{ key, direction }[]` (ko'p-maydon, ko'pi bilan 3).
 - **So'rov limitlari** — filtr hajmi, sort soni, offset chuqurligi ([Limits](#limits)).
-- **Paginatsiya** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
+- **Paginatsiya** — offset (`page`/`perPage`/`withTotal` — `false` ⇒ count yo'q, totals `null`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **Qiymat** — skalyar yoki skalyar massiv. Wire JSON bo'lgani uchun `Date` obyekti, `NaN` va `Infinity` **rad etiladi** (sana ISO string sifatida keladi).
 - **Field allowlist** (`allowedKeys`) — zod'da yo'q, quyiga qarang.
 - Eski `type` maydoni **e'tiborsiz** qoldiriladi (rad etilmaydi) — migratsiya oson.

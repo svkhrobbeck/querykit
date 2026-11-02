@@ -130,7 +130,6 @@ export const MUTATION_CASES: readonly ConformanceCase[] = [
       meta: { total_items: null, total_pages: null, current_page: 1, per_page: 3, has_next: true, has_prev: false },
       calls: ["find:4"],
     },
-    notBuiltByWeb: "withTotal is a server-side option (web meta follows in 015)",
   },
   {
     name: "A6: withTotal: false on the last page → has_next false",
@@ -141,14 +140,12 @@ export const MUTATION_CASES: readonly ConformanceCase[] = [
       meta: { total_items: null, total_pages: null, current_page: 3, per_page: 3, has_next: false, has_prev: true },
       calls: ["find:4"],
     },
-    notBuiltByWeb: "withTotal is a server-side option (web meta follows in 015)",
   },
   {
     name: "A6: withTotal: false with exactly perPage rows → has_next false",
     group: "pagination",
     call: { method: "findList", params: { sort: byCreated, page: 1, perPage: 7, withTotal: false } },
     expect: { names: ALL, meta: { total_items: null, total_pages: null, current_page: 1, per_page: 7, has_next: false, has_prev: false } },
-    notBuiltByWeb: "withTotal is a server-side option (web meta follows in 015)",
   },
   {
     name: "A7: findList without withTotal counts as before",

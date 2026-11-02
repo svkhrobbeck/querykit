@@ -169,6 +169,13 @@ check(
   "offset-depth issue sits on `page` and names `maxOffset (10000)`",
   !offsetIssue.success && offsetIssue.error.issues[0]?.path.join(".") === "page" && offsetIssue.error.issues[0].message.includes("maxOffset (10000)"),
 );
+/* 18. `withTotal` (task 015, R11): the offset schemas accept the client's `withTotal` flag. */
+const noTotal = makeOffsetParamsSchema().safeParse({ page: 1, perPage: 10, withTotal: false });
+check("factory: withTotal false accepted and kept", noTotal.success && noTotal.data.withTotal === false);
+check("factory: withTotal must be a boolean", !makeOffsetParamsSchema().safeParse({ withTotal: "no" }).success);
+const legacyNoTotal = offsetParamsSchema.safeParse({ page: 1, withTotal: false });
+check("legacy: offsetParamsSchema keeps withTotal", legacyNoTotal.success && legacyNoTotal.data.withTotal === false);
+
 const deepIssue = filterSchema.safeParse({ and: [{ key: "id", operation: "in", value: Array.from({ length: 201 }, (_, i) => i) }] });
 check("filter limit issue path points at the value", !deepIssue.success && deepIssue.error.issues[0]?.path.join(".") === "and.0.value");
 

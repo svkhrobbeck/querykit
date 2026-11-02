@@ -56,5 +56,26 @@ check("URL page → page", params?.page === 2, String(params?.page));
 check("URL sortType → sort", JSON.stringify(params?.sort) === '[{"key":"createdAt","direction":"desc"}]', JSON.stringify(params?.sort));
 check("rendered output carries the filter", html.includes("active"), html.slice(0, 80));
 
+check("in-bounds URL → clamped false", captured?.clamped === false);
+
+/* Task 015 A7a: a too-deep page from the URL does not throw during render — it is clamped. */
+let deep: UseListParamsResult | undefined;
+function DeepProbe() {
+  deep = useListParams(users, { schema });
+  return createElement("span", null, String(deep.params.page));
+}
+let renderError = "";
+try {
+  renderToString(createElement(MemoryRouter, { initialEntries: ["/users?page=9999&size=20"] }, createElement(DeepProbe)));
+} catch (error) {
+  renderError = error instanceof Error ? error.message : String(error);
+}
+check("?page=9999&size=20 renders without an error", renderError === "", renderError);
+check(
+  "…payload page 501, clamped true",
+  deep?.params.page === 501 && deep.clamped === true,
+  JSON.stringify({ page: deep?.params.page, clamped: deep?.clamped }),
+);
+
 console.log(`\nweb hook: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exitCode = 1;

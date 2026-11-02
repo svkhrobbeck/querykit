@@ -264,6 +264,13 @@ check("factory: allow:[withDeleted] keeps it", admin.instance.withDeleted === tr
 check("factory: allow:[withDeleted] still strips columns", !("columns" in admin.instance));
 check("factory: allow:[withDeleted] type-checks the value", run(Admin, { withDeleted: "yes" }).errors.length === 1);
 
+/* `withTotal` (task 015, R11): a client flag, kept by the offset DTOs under `whitelist`. */
+const noTotal = run(makeOffsetParamsDto(), { page: 1, perPage: 10, withTotal: false }, { whitelist: true });
+check("factory: withTotal false kept", noTotal.errors.length === 0 && noTotal.instance.withTotal === false);
+check("factory: withTotal must be a boolean", run(makeOffsetParamsDto(), { withTotal: "no" }).errors.length === 1);
+const legacyNoTotal = run(OffsetParamsDto, { withTotal: false }, { whitelist: true });
+check("legacy: OffsetParamsDto keeps withTotal", legacyNoTotal.errors.length === 0 && legacyNoTotal.instance.withTotal === false);
+
 const Projection = makeOffsetParamsDto({ allow: ["columns", "with"] });
 const projection = run(Projection, { columns: { name: true }, with: { author: true }, withDeleted: true }, { whitelist: true });
 check("factory: allow:[columns,with] keeps both", Boolean(projection.instance.columns) && Boolean(projection.instance.with));

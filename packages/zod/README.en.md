@@ -50,7 +50,7 @@ Use `infiniteParamsSchema` / `cursorParamsSchema` for the other modes.
 - **Operators** — the full core set: `= != > >= < <=`, `like/ilike/notLike`, `contains/startsWith/endsWith` (+ tokens `%_%`/`%_`/`_%`), `in/notIn`, `between/notBetween`, `isNull/isNotNull`.
 - **Sort** — `{ key, direction }[]` (multi-field, at most 3).
 - **Request limits** — filter depth, condition count, array items, string length, offset depth, sort fields ([Limits](#limits)).
-- **Pagination** — offset (`page`/`perPage`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
+- **Pagination** — offset (`page`/`perPage`/`withTotal` — `false` ⇒ no count, totals `null`), infinite (`limit`/`offset`), cursor (`limit`/`cursor`/`cursorKey`/`order`/`direction`).
 - **`with`** (relations), **`columns`**, **`withDeleted`**.
 - The legacy `type` field is **ignored** (stripped, not rejected) — easy migration.
 
@@ -147,7 +147,7 @@ New code should use the factories above.
 | `filterNodeSchema` / `filterSchema` | nested node / full filter (nested or flat)         |
 | `sortSchema`                        | sort (`{ key, direction }[]`, at most 3)           |
 | `baseParamsSchema`                  | filter/sort/columns/with/withDeleted               |
-| `offsetParamsSchema`                | + `page`/`perPage`                                 |
+| `offsetParamsSchema`                | + `page`/`perPage`/`withTotal`                     |
 | `infiniteParamsSchema`              | + `limit`/`offset`                                 |
 | `cursorParamsSchema`                | + `limit`/`cursor`/`cursorKey`/`order`/`direction` |
 
