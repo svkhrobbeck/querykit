@@ -30,10 +30,12 @@ Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the las
 
 ```ts
 import { sValidator } from "@hono/zod-validator";
-import { offsetParamsSchema } from "@querykitjs/zod";
+import { makeOffsetParamsSchema } from "@querykitjs/zod";
 import { buyersRepository } from "@/db/repositories/buyers.repository";
 
-buyersRoute.post("/list", sValidator("json", offsetParamsSchema), async ctx => {
+const listSchema = makeOffsetParamsSchema(); // safe defaults
+
+buyersRoute.post("/list", sValidator("json", listSchema), async ctx => {
   const params = ctx.req.valid("json"); // validated + core-aligned
   const { data, meta } = await buyersRepository.findList(params);
   return ctx.json({ data, meta });
@@ -131,6 +133,8 @@ const importList = makeOffsetParamsSchema({ limits: { maxInItems: 500 } });
 - `filterSchema` is now `z.unknown().pipe(...)`: `z.infer` (the output) is unchanged, `z.input` is `unknown`.
 
 ## Schemas (constants — legacy parity)
+
+> ⚠️ These constants are `@deprecated` (task 014) and go away in the next major. Use the `make*ParamsSchema` factories in new code.
 
 ⚠️ The constants below have **no `perPage`/`limit` cap** and keep `columns`/`with`/`withDeleted`
 **open** (so existing projects keep working); the [request limits](#limits) apply to them too.

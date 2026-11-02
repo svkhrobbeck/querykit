@@ -23,7 +23,11 @@ import { IsQueryFilter, IsQuerySort, IsWithinMaxOffset, type IsQueryFilterOption
 
 /* ------------------------------ static DTOs ------------------------------- */
 
-/** Paginatsiyasiz umumiy params — `filter` + `sort`. */
+/**
+ * Paginatsiyasiz umumiy params — `filter` + `sort`.
+ *
+ * @deprecated Use `makeOffsetParamsDto` / `makeInfiniteParamsDto` / `makeCursorParamsDto` (safe defaults, task 014 P3). Removed in the next major.
+ */
 export class BaseParamsDto {
   @IsOptional()
   @IsQueryFilter()
@@ -34,7 +38,11 @@ export class BaseParamsDto {
   sort?: Sort;
 }
 
-/** Offset (sahifali) params — `page` + `perPage` (`perPage` ≤ core cap). */
+/**
+ * Offset (sahifali) params — `page` + `perPage` (`perPage` ≤ core cap).
+ *
+ * @deprecated Use `makeOffsetParamsDto` (safe defaults, task 014 P3). Removed in the next major.
+ */
 export class OffsetParamsDto extends BaseParamsDto {
   /* `page`ning o'zida cap yo'q — chegara `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`
    * (`@querykitjs/zod` factory'lari ham aynan shunday). */
@@ -53,7 +61,11 @@ export class OffsetParamsDto extends BaseParamsDto {
   perPage?: number;
 }
 
-/** Infinite-scroll params — `limit` + `offset`. */
+/**
+ * Infinite-scroll params — `limit` + `offset`.
+ *
+ * @deprecated Use `makeInfiniteParamsDto` (safe defaults, task 014 P3). Removed in the next major.
+ */
 export class InfiniteParamsDto extends BaseParamsDto {
   @IsOptional()
   @Type(() => Number)
@@ -74,6 +86,8 @@ export class InfiniteParamsDto extends BaseParamsDto {
  * Cursor (keyset) params. `sort` **yo'q**: tartib `order` + `direction` bilan
  * boshqariladi. Shu sababli `BaseParamsDto`dan meros olinmaydi — aks holda
  * `sort` kontraktga qarshi ravishda meros bo'lib qolardi.
+ *
+ * @deprecated Use `makeCursorParamsDto` (safe defaults, task 014 P3). Removed in the next major.
  */
 export class CursorParamsDto {
   @IsOptional()

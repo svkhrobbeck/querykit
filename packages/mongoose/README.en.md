@@ -108,6 +108,12 @@ The `connection` is passed in (so transactions share the right session).
 `maxPerPage`/`maxLimit` are a **second layer**: even if validation
 (`@querykitjs/zod` factories) is bypassed, the repository clamps.
 
+`timestamps` — the createdAt / deletedAt field names (for example in a snake_case project): the default sort and the default `sortable` use that `createdAt`, soft delete (`softDelete`, `restore`, `withDeleted`) uses that `deletedAt`.
+
+```ts
+export const registry = createRegistry(mongoose.connection, { timestamps: { createdAt: "created_at", deletedAt: "deleted_at" } });
+```
+
 ### 2. Per-model repositories
 
 ```ts
@@ -300,6 +306,20 @@ export const registry = createRegistry(mongoose.connection, { cursorSecret: proc
 
 ## Typed relations & field selection
 
+A client `with` opens only the relations listed in `relations` (task 014, R21):
+
+```ts
+const postsRepository = registry.repository(Post, {
+  relations: { author: { model: User, columns: ["name"] } }, // model — for typing only
+});
+await postsRepository.findAll({ with: { author: true } }); // author with name only
+```
+
+- `columns` is required — a list or an explicit `"*"`. `with: { rel: true }` also selects only those columns.
+- An unlisted relation, column, filter field or nested relation → `QueryKitError` `reason: "forbidden-key"`, `site: "with"`, `key` `relation` or `relation.field`; the driver is not called.
+- Allowed options: `select`, a nested `populate` (with `nested`), `match` (its fields in `filterable`; no `$where` / `$expr`), `options.limit` / `options.skip`.
+- The shorthand `{ author: User }` is for typing only: `with: { author: … }` → `forbidden-key`.
+
 Read methods infer their return type from `with` (populate) and `columns` — no manual generics:
 
 ```ts
@@ -311,7 +331,7 @@ rows[0].id; // ObjectId
 rows[0].email; // ❌ type error — not selected
 ```
 
-To type populated relations at runtime, pass the referenced models: `registry.repository(Post, { relations: { author: User } })`.
+To type and open populated relations, give the referenced model inside the rule: `registry.repository(Post, { relations: { author: { model: User, columns: ["name"] } } })` (the shorthand `{ author: User }` only types — it does not allow `with`).
 
 ## Bulk update and delete
 
@@ -357,6 +377,12 @@ A scope can also be given as `registry.repository(Model, { scope })`. An unknown
 scope key **throws** when the repository is built — dropping it silently would
 remove the RBAC filter.
 
+A scope value may also be a list (task 014): `{ shopId: { in: [1, 2] } }` limits every read and write to those values; an empty list (`{ in: [] }`) matches no row (not an error). `create` fills in the equality scopes only.
+
+```ts
+const mine = repository.scoped({ shopId: { in: user.shopIds } });
+```
+
 ## Values, NULL order and parity
 
 All three adapters (drizzle-pg, prisma-pg, mongoose) return the same result (task 021):
@@ -398,6 +424,9 @@ await usersRepository.findAll({ filter: raw({ age: { $gt: 18 } }) });
 - `updateWhere` / `deleteWhere` return `{ count }` instead of `Row[]` (task 013); for rows pass `{ returning: { limit } }` → `{ count, rows }`.
 - A filterless `updateWhere` / `deleteWhere` is `empty-filter`; write `{ all: true }` for every row. A mutation filter now passes the `filterable` policy.
 - `OffsetMeta.total_items` / `total_pages` are typed `number | null` (`null` with `withTotal: false`).
+- `with` now needs the `relations` allow-list (task 014): on a repository without it `with` is `forbidden-key`, `site: "with"`.
+- `relations: { author: User }` → `relations: { author: { model: User, columns: ["name"] } }` (the shorthand no longer allows `with`).
+- A scope value may be `{ in: [...] }`; the registry option `timestamps` names the createdAt / deletedAt fields.
 
 ## Wire (JSON) values and migrating from DbService
 
