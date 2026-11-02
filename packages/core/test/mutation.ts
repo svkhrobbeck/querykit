@@ -3,7 +3,7 @@
  * and the `withTotal: false` page. Imported by `internal.ts`; sets `process.exitCode`.
  */
 import { QueryKitError } from "../src/index";
-import { isAllRows, isEmptyFilter, matchesNothing, offsetPageWithoutTotal, refuseEmptyFilter, scopeConditions, scopeDefaults } from "../src/internal/index";
+import { isAllRows, isEmptyFilter, offsetPageWithoutTotal, refuseEmptyFilter, scopeConditions, scopeDefaults } from "../src/internal/index";
 
 let failed = 0;
 function check(label: string, ok: boolean, extra = "") {
@@ -55,7 +55,6 @@ check(
     ]),
 );
 check("scopeDefaults keeps equality scopes only", JSON.stringify(scopeDefaults(scope)) === JSON.stringify({ tenant: "t1", meta: { in: [1], x: 1 } }));
-check("an empty in matches nothing; a filled one does", matchesNothing(scopeConditions({ a: { in: [] } })) && !matchesNothing(scopeConditions(scope)));
 
 if (failed > 0) process.exitCode = 1;
 console.log(`mutation: ${failed} failed`);

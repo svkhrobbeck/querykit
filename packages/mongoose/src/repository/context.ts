@@ -6,7 +6,6 @@ import {
   type Diagnostics,
   isAllRows,
   isEmptyFilter,
-  matchesNothing,
   type Policy,
   refuseEmptyFilter,
   resolvePolicy,
@@ -251,8 +250,7 @@ function buildScopeWhere<TDoc>(m: AnyModel, config: RepositoryOptions<TDoc>): Qu
       throw new QueryKitError({ source: m.modelName, site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  // An empty `in` list matches no row — explicitly, never by dropping the condition.
-  if (matchesNothing(conditions as never)) return { _id: { $in: [] } };
+  // An empty `in` list matches no row (`$in: []`).
   return conditions.length ? buildWhere(m, conditions) : undefined;
 }
 

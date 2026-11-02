@@ -6,7 +6,6 @@ import {
   type Diagnostics,
   isAllRows,
   isEmptyFilter,
-  matchesNothing,
   type Policy,
   refuseEmptyFilter,
   resolvePolicy,
@@ -249,7 +248,6 @@ function buildScopeWhere<TTable extends AnyPgTable>(table: TTable, config: Repos
       throw new QueryKitError({ source: getTableName(table), site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  // An empty `in` list matches no row — explicitly, never by dropping the condition.
-  if (matchesNothing(conditions as never)) return sql`false`;
+  // An empty `in` list matches no row (inArray(col, []) is false).
   return conditions.length ? buildWhere(table, conditions) : undefined;
 }

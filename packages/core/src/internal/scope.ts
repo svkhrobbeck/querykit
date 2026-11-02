@@ -23,10 +23,6 @@ export function scopeConditions(scope: Record<string, unknown> | undefined): Sco
   );
 }
 
-/** A scope with an empty `in` list matches no row (not an error). */
-export const matchesNothing = (conditions: readonly ScopeCondition[]): boolean =>
-  conditions.some(condition => condition.operation === "in" && (condition.value as unknown[]).length === 0);
-
 /** The values `create` / `upsert` fill in: the equality scopes only (a list has no single value). */
 export function scopeDefaults(scope: Record<string, unknown> | undefined): Record<string, unknown> {
   return Object.fromEntries(Object.entries(scope ?? {}).filter(([, value]) => !isInScope(value)));

@@ -4,7 +4,6 @@ import {
   type Diagnostics,
   isAllRows,
   isEmptyFilter,
-  matchesNothing,
   type Policy,
   refuseEmptyFilter,
   resolvePolicy,
@@ -204,8 +203,7 @@ function buildScopeWhere<TDelegate>(meta: ModelMeta, config: RepositoryOptions<T
       throw new QueryKitError({ source: meta.name, site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  // An empty `in` list matches no row — explicitly (an empty OR is false), never by dropping it.
-  if (matchesNothing(conditions as never)) return { OR: [] };
+  // An empty `in` list matches no row (`in: []`).
   return conditions.length ? buildWhere(meta, conditions) : undefined;
 }
 
