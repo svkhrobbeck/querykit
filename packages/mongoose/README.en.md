@@ -442,11 +442,9 @@ casts it according to the schema path:
   and leaves the rest to the database.
 - `in`/`notIn` arrays, `between`/`notBetween` tuples and cursor tokens are covered
   too (`cursorKey: "createdAt"` paginates correctly).
-- ⚠️ **Documented divergence:** Mongo cannot `$regex` a `Date` path
-  (`Can't use $options with Date`), so a text-pattern operator
-  (`contains`/`ilike`/…) on a date field is **skipped**. drizzle-pg _can_ match it
-  (Postgres renders the timestamp as text). Neither adapter crashes, and the
-  difference shows up in `onSkippedCondition`.
+- Mongo cannot `$regex` a `Date` path (`Can't use $options with Date`), so a
+  text-pattern operator (`contains`/`ilike`/…) on a date field is **skipped** as
+  `invalid-value` and reported in `onSkippedCondition` — the SQL adapters do the same.
 - An unparseable value (`"not-a-date"`) drops the condition (or 400s under
   `strict`). **One** bad element in an `in` list drops the whole condition.
 

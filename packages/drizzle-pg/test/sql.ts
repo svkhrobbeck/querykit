@@ -16,7 +16,7 @@
 import { relations, sql, type SQL } from "drizzle-orm";
 import { integer, pgSchema, serial, text, timestamp, PgDialect } from "drizzle-orm/pg-core";
 
-import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
+import { QueryKitError, type FilterOperator, type SkippedCondition } from "@querykitjs/core";
 
 import { createRegistry, createFilters } from "../src/index";
 import type { AnyDb } from "../src/types";
@@ -206,12 +206,25 @@ async function main() {
   const textCol = await capture(() => usersRepo.findAll({ filter: [uf.gte("createdAtText", ISO_FROM)] as never }));
   check("mode:'string' timestamp filter passes the raw string", allOk(textCol) && firstParams(textCol)[0] === ISO_FROM, JSON.stringify(firstParams(textCol)));
 
-  /* 6. text-pattern operators keep the caller's string (no String(Date)) */
-  const like = await capture(() => usersRepo.findAll({ filter: [uf.contains("createdAt", "2026-01")] as never }));
-  check("contains on a date column keeps the raw pattern", allOk(like) && firstParams(like)[0] === "%2026-01%", JSON.stringify(firstParams(like)));
-
-  const ilike = await capture(() => usersRepo.findAll({ filter: [uf.ilike("createdAt", "2026%")] as never }));
-  check("ilike on a date column keeps the raw pattern", allOk(ilike) && firstParams(ilike)[0] === "2026%", JSON.stringify(firstParams(ilike)));
+  /* 6. R11 (task 024): a text pattern on a non-text column is skipped as invalid-value —
+   *    Postgres has no `timestamptz ~~* text` operator, so it used to be a 500. */
+  const textOnNonText: [string, FilterOperator, string][] = [
+    ["contains on a timestamp", "contains", "createdAt"],
+    ["ilike on a timestamp", "ilike", "createdAt"],
+    ["notLike on a mode:'string' timestamp", "notLike", "createdAtText"],
+    ["startsWith on an integer", "startsWith", "age"],
+    ["endsWith on a serial id", "endsWith", "id"],
+  ];
+  for (const [label, operation, key] of textOnNonText) {
+    const res = await capture(() => usersRepo.findAll({ filter: [{ key, operation, value: "20" }] as never }));
+    check(`${label} is skipped (no pattern reaches SQL)`, allOk(res) && firstParams(res).length === 0, firstError(res) || JSON.stringify(firstParams(res)));
+  }
+  const textOnText = await capture(() => usersRepo.findAll({ filter: [uf.contains("name", "ali")] as never }));
+  check(
+    "contains on a text column still binds its pattern",
+    allOk(textOnText) && firstParams(textOnText)[0] === "%ali%",
+    JSON.stringify(firstParams(textOnText)),
+  );
 
   /* 7. an uncastable value must not reach the driver: the condition is dropped,
    *    matching the existing "incompatible value → skip" contract in operators.ts.
@@ -439,6 +452,14 @@ async function main() {
   seen.length = 0;
   await watchedRepo.findAll({ filter: [{ key: "createdAt", operation: ">=", value: "not-a-date" }] });
   check("hook: an uncastable date reported as invalid-value", seen.length === 1 && seen[0]!.reason === "invalid-value", JSON.stringify(seen[0]));
+
+  seen.length = 0;
+  await watchedRepo.findAll({ filter: [{ key: "createdAt", operation: "contains", value: "2026" }] });
+  check(
+    "hook: a text pattern on a timestamp reported as invalid-value",
+    seen.length === 1 && seen[0]!.reason === "invalid-value" && seen[0]!.site === "filter" && seen[0]!.key === "createdAt",
+    JSON.stringify(seen[0]),
+  );
 
   seen.length = 0;
   await watchedRepo.findAll({ sort: [{ key: "nope", direction: "asc" }] });

@@ -36,11 +36,9 @@ function buildCondition(meta: ModelMeta, condition: FieldCondition, diag?: Diagn
   const isString = isStringField(meta, field);
 
   // A text pattern cannot be matched against a non-String field: Prisma rejects
-  // `contains`/`mode` on `Int`/`DateTime`, which would surface as a 500. Postgres
-  // (via drizzle) *can* do it by rendering the value as text, so exact parity is
-  // not reachable here — skipping keeps the adapter non-crashing and makes the
-  // difference observable through `onSkippedCondition` instead of a stack trace.
-  // (Same trade-off the mongoose adapter makes for `$regex` on a Date path.)
+  // `contains`/`mode` on `Int`/`DateTime`, which would surface as a 500. Every adapter
+  // skips a text pattern on a non-text field (R11, task 024), reported through
+  // `onSkippedCondition` instead of a stack trace.
   if (isTextOperator(operator) && !isString) {
     reportSkip(diag, { site: "filter", key: condition.key, operation: operator, reason: "invalid-value" });
     return undefined;

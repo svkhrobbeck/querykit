@@ -45,6 +45,12 @@ const postsRelations = relations(posts, ({ one }) => ({ author: one(users, { fie
 
 const schema = { users, posts, usersRelations, postsRelations };
 
+/** Every `users` column filterable with every operator and sortable — the 3.x behaviour. */
+const OPEN_USERS = {
+  filterable: { id: "*", name: "*", email: "*", createdAt: "*" },
+  sortable: ["id", "name", "email", "createdAt"],
+} as const;
+
 /* -------------------------------- runner ---------------------------------- */
 
 let passed = 0;
@@ -59,9 +65,10 @@ async function main() {
   const client = postgres(url!);
   const db = drizzle(client, { schema });
   const registry = createRegistry(db, schema);
-  const usersRepo = registry.repository(users);
+  // Task 009: fields are closed by default; the smoke exercises every operator, so it opens them all.
+  const usersRepo = registry.repository(users, OPEN_USERS);
   // Task 014 (R21): `with` opens only listed relations.
-  const postsRepo = registry.repository(posts, { relations: { author: { columns: "*" } } });
+  const postsRepo = registry.repository(posts, { relations: { author: { columns: "*" } }, filterable: { authorId: "*" } });
   const uf = createFilters<typeof users>();
 
   // fresh isolated schema
@@ -211,7 +218,10 @@ async function main() {
     // Postgres renders the timestamp as text, so ILIKE works here. Mongo cannot
     // regex a Date path and skips the condition instead — a documented divergence
     // (see the mongoose adapter's buildCondition).
-    check("timestamp filter: text pattern keeps the raw string", (await usersRepo.findAll({ filter: [uf.contains("createdAt", "20")] })).length === total);
+    check(
+      "timestamp filter: a text pattern is skipped (R11), all rows come back",
+      (await usersRepo.findAll({ filter: [uf.contains("createdAt", "20")] })).length === total,
+    );
 
     // 14. cursor pagination over a timestamp column — the second P0-1 site.
     // A token stores the date as an ISO string, so page 2 crashed before the fix.
@@ -268,16 +278,26 @@ async function main() {
       throws(() => registry.repository(users, { allowedColumns: [] })),
     );
 
-    // 16. a client-chosen cursorKey must not become a way around the guard
-    const cursorLeak = await forcedRepo.findCursor({ limit: 1, cursorKey: "email", order: "asc" });
-    check("cursorKey cannot leak a forbidden column", !keysOf(cursorLeak.data[0]).includes("email"), keysOf(cursorLeak.data[0]).join());
-    check("…while pagination still works (token issued)", typeof cursorLeak.meta.next_cursor === "string", String(cursorLeak.meta.next_cursor));
+    /** The `reason` a repository call is refused with, or "allowed". */
+    const refusal = async (fn: () => Promise<unknown>) => {
+      try {
+        await fn();
+        return "allowed";
+      } catch (error) {
+        return (error as { info?: { reason?: string } }).info?.reason ?? String(error);
+      }
+    };
+
+    // 16. a client-chosen cursorKey must not become a way around the guard (task 009: refused, not dropped)
+    const cursorLeak = await refusal(() => forcedRepo.findCursor({ limit: 1, cursorKey: "email", order: "asc" }));
+    check("cursorKey outside sortable is refused", cursorLeak === "forbidden-key", cursorLeak);
     const cursorAllowed = await forcedRepo.findCursor({ limit: 1, cursorKey: "id", order: "asc" });
     check("a permitted cursorKey stays in the row", keysOf(cursorAllowed.data[0]).includes("id"), keysOf(cursorAllowed.data[0]).join());
+    check("…while pagination still works (token issued)", typeof cursorAllowed.meta.next_cursor === "string", String(cursorAllowed.meta.next_cursor));
 
-    // 17. aggregate honours the guard too — min(email) leaks as much as a column
-    const aggGuarded = await forcedRepo.aggregate({ count: true, min: "email" });
-    check("aggregate: a forbidden min is dropped", !("min_email" in (aggGuarded[0] ?? {})), Object.keys(aggGuarded[0] ?? {}).join());
+    // 17. aggregate honours the guard too — min(email) leaks as much as a column (task 009: refused)
+    const aggGuarded = await refusal(() => forcedRepo.aggregate({ count: true, min: "email" }));
+    check("aggregate: a forbidden min is refused", aggGuarded === "forbidden-key", aggGuarded);
     const aggOpen = await usersRepo.aggregate({ count: true, min: "email" });
     check("aggregate: unguarded repo is unchanged", "min_email" in (aggOpen[0] ?? {}), Object.keys(aggOpen[0] ?? {}).join());
 
@@ -315,6 +335,46 @@ async function main() {
       "an unknown wire key is skipped, not a type error",
       (await usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] })).length === (await usersRepo.count()),
     );
+
+    // 21. the database side of tasks 012–014 (task 024 closes their UAT)
+    const timedRegistry = createRegistry(db, schema, { timestamps: { createdAt: "createdAt", deletedAt: "deletedAt" } });
+    const tiesRepo = timedRegistry.repository(posts, { filterable: { title: "*", authorId: "*" }, sortable: ["id", "createdAt"] });
+    const tieFilter = [{ key: "title", operation: "startsWith" as const, value: "tie-" }];
+    const sameTime = new Date("2026-03-01T09:00:00.000Z");
+    await tiesRepo.createMany(Array.from({ length: 25 }, (_, index) => ({ title: `tie-${index}`, authorId: guli!.id, createdAt: sameTime })));
+
+    // 012: a cursor walk over 25 equal createdAt values returns every row once
+    const tieIds = new Set<number>();
+    let tieCursor: string | null | undefined;
+    for (let page = 0; page < 5; page++) {
+      const result = await tiesRepo.findCursor({ cursorKey: "createdAt", limit: 10, cursor: tieCursor, filter: tieFilter });
+      for (const row of result.data) tieIds.add(row.id);
+      tieCursor = result.meta.next_cursor;
+      if (!result.meta.has_next) break;
+    }
+    check("012 cursor walk over 25 equal createdAt → 25 unique rows", tieIds.size === 25, String(tieIds.size));
+
+    // 013: one atomic UPDATE / DELETE reports its count
+    const touched = await tiesRepo.updateWhere(tieFilter, { updatedAt: sameTime });
+    check("013 updateWhere → { count }", touched.count === 25, String(touched.count));
+    const touchedRows = await tiesRepo.updateWhere(tieFilter, { updatedAt: sameTime }, { returning: { limit: 3 } });
+    check(
+      "013 updateWhere returning { limit } → count + capped rows",
+      touchedRows.count === 25 && touchedRows.rows.length === 3,
+      `${touchedRows.count}/${touchedRows.rows.length}`,
+    );
+
+    // 014: scope { in }, the timestamps option (default sort and soft delete)
+    const inScope = await tiesRepo.scoped({ authorId: { in: [guli!.id, ali!.id] } }).count(tieFilter);
+    check("014 scope { in } narrows to the listed values", inScope === 25, String(inScope));
+    check("014 scope { in: [] } matches no row", (await tiesRepo.scoped({ authorId: { in: [] } }).count(tieFilter)) === 0);
+    const newest = (await tiesRepo.findList({ perPage: 1, filter: tieFilter })).data[0];
+    check("014 timestamps: the default sort runs on created_at", newest !== undefined);
+    const softDeleted = await tiesRepo.softDelete(newest!.id);
+    check("014 timestamps: soft delete writes deleted_at", softDeleted?.deletedAt instanceof Date);
+
+    const removed = await tiesRepo.deleteWhere(tieFilter);
+    check("013 deleteWhere → { count } (soft-deleted row excluded)", removed.count === 24, String(removed.count));
 
     console.log(`\n${failed === 0 ? "🎉 ALL PASSED" : "⚠️  SOME FAILED"} — ${passed} passed, ${failed} failed`);
   } finally {

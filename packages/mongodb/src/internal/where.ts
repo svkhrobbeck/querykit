@@ -35,10 +35,8 @@ function buildCondition(shape: DocShape, cond: FieldCondition, diag?: Diagnostic
 
   // A text pattern cannot be matched against a Date path: Mongo rejects
   // `$regex`/`$options` on a Date ("Can't use $options with Date"), which used to
-  // surface as a 500 (the mongoose adapter has the same rule). Drizzle can do it (Postgres renders the timestamp as text
-  // and ILIKEs it), so exact result parity is not reachable here — the rendered
-  // forms differ. Skipping keeps both adapters non-crashing and makes the
-  // difference observable via `onSkippedCondition` instead of a stack trace.
+  // surface as a 500. The SQL adapters skip a text pattern on a non-text field too
+  // (R11, task 024), reported via `onSkippedCondition` instead of a stack trace.
   if (isTextOperator(operator) && fieldKind(shape, field) === "date") {
     reportSkip(diag, { site: "filter", key: cond.key, operation: operator, reason: "invalid-value" });
     return undefined;

@@ -421,11 +421,11 @@ keladi. Adapter uni ustun tipiga qarab avtomatik cast qiladi:
   avtomatik `Date`ga aylanadi. `mode: "string"` ustunlari tegilmaydi.
 - `in`/`notIn` massivlari va `between`/`notBetween` tuple'lari ham qamraladi.
 - Cursor token ham shunday: `cursorKey: "createdAt"` bilan paginatsiya ishlaydi.
-- Text-pattern operatorlar (`like`/`ilike`/`contains`/…) date ustunda **cast
-  qilinmaydi** — Postgres timestamp'ni text sifatida render qiladi va `ILIKE`
-  qiladi. Mongoose'da Mongo `Date` path'da regex qila olmaydi, shuning uchun
-  shart tashlab yuboriladi — **ataylab hujjatlashtirilgan farq**, ikkalasi ham
-  crash qilmaydi.
+- Text-pattern operatorlar (`like`/`ilike`/`contains`/… va inkorlari) matn
+  bo'lmagan ustunda (timestamp, son, boolean, uuid, enum) — `invalid-value`:
+  shart tashlanadi va `onSkippedCondition` chaqiriladi, `strict` da `QueryKitError`;
+  drayver chaqirilmaydi (Postgres'da `timestamptz ~~* text` operatori yo'q, avval 500 edi).
+  Hamma adapterda bir xil (R11).
 - Parse bo'lmaydigan qiymat (`"not-a-date"`) shartni bekor qiladi (`strict`da —
   400). `in` ro'yxatidagi **bitta** yaroqsiz element butun shartni bekor qiladi,
   chunki yarim qo'llangan filter natijani jimgina kengaytirardi.

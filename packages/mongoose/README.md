@@ -442,11 +442,10 @@ keladi. Adapter uni schema path tipiga qarab avtomatik cast qiladi:
   hukm qiladi, qolganini bazaga qoldiradi.
 - `in`/`notIn` massivlari, `between`/`notBetween` tuple'lari va cursor token ham
   qamraladi (`cursorKey: "createdAt"` ishlaydi).
-- ⚠️ **Hujjatlashtirilgan farq:** Mongo `Date` path'da `$regex` qila olmaydi
-  (`Can't use $options with Date`), shuning uchun date maydonidagi text-pattern
-  operatori (`contains`/`ilike`/…) **tashlab yuboriladi**. drizzle-pg esa buni
-  bajaradi (Postgres timestamp'ni text sifatida render qiladi). Ikkalasi ham
-  crash qilmaydi; farq `onSkippedCondition`da ko'rinadi.
+- Mongo `Date` path'da `$regex` qila olmaydi (`Can't use $options with Date`),
+  shuning uchun date maydonidagi text-pattern operatori (`contains`/`ilike`/…)
+  `invalid-value` sifatida **tashlab yuboriladi** va `onSkippedCondition`da ko'rinadi —
+  SQL adapterlar ham shunday qiladi.
 - Parse bo'lmaydigan qiymat (`"not-a-date"`) shartni bekor qiladi (`strict`da —
   400). `in` ro'yxatidagi **bitta** yaroqsiz element butun shartni bekor qiladi.
 

@@ -397,10 +397,11 @@ casts it according to the column type:
   string cast to a `Date`. `mode: "string"` columns are left alone.
 - `in`/`notIn` arrays and `between`/`notBetween` tuples are covered too.
 - So are cursor tokens: `cursorKey: "createdAt"` paginates correctly.
-- Text-pattern operators (`like`/`ilike`/`contains`/…) are **not** cast on a date
-  column — Postgres renders the timestamp as text and `ILIKE`s it. Mongo cannot
-  regex a `Date` path, so the mongoose adapter skips such a condition instead —
-  a **deliberately documented divergence**; neither adapter crashes.
+- Text-pattern operators (`like`/`ilike`/`contains`/… and their negations) on a
+  non-text column (timestamp, number, boolean, uuid, enum) are `invalid-value`: the
+  condition is dropped and `onSkippedCondition` is called, a `QueryKitError` under
+  `strict`; the driver is not called (Postgres has no `timestamptz ~~* text` operator —
+  this used to be a 500). Every adapter does the same (R11).
 - An unparseable value (`"not-a-date"`) drops the condition (or 400s under
   `strict`). **One** bad element in an `in` list drops the whole condition, since
   a half-applied filter would silently widen the result set.

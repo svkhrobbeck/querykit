@@ -18,7 +18,7 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,7 +35,7 @@ const PRISMA_RUNS = ["script:test:generate", "script:test:query", "script:test:t
  * the peers to report, and `extra` packages a test imports from (test:contract
  * drives drizzle-pg, mongoose and web from source).
  */
-const EDGES = [
+export const EDGES = [
   { pkg: "drizzle-pg", label: "drizzle-orm 0.44.7", deps: { "drizzle-orm": "0.44.7" }, runs: ["test/sql.ts", "test/conformance.ts"] },
   { pkg: "drizzle-pg", label: "drizzle-orm 0.45.4", runs: ["test/sql.ts", "test/conformance.ts"] },
   {
@@ -111,7 +111,7 @@ const print = text => writeSync(1, `${text}\n`);
 const readJson = file => JSON.parse(readFileSync(file, "utf8"));
 
 /** `bun` is a `.cmd` shim on Windows, so it needs a shell — as one quoted command line (no unescaped args). */
-function run(command, args, cwd) {
+export function run(command, args, cwd) {
   const viaShell = process.platform === "win32" && command === "bun";
   const quoted = [command, ...args].map(part => `"${part.replaceAll('"', '\\"')}"`).join(" ");
   const result = viaShell ? spawnSync(quoted, { cwd, encoding: "utf8", shell: true }) : spawnSync(command, args, { cwd, encoding: "utf8" });
@@ -119,7 +119,7 @@ function run(command, args, cwd) {
 }
 
 /** A copy of `core` and the package under test, with the old peer versions as its devDependencies. */
-function oldEndWorkspace(edge) {
+export function oldEndWorkspace(edge) {
   const dir = join(WORK, `${edge.pkg}-old`);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, "packages"), { recursive: true });
@@ -231,14 +231,19 @@ function runConsumers(version) {
   return ok;
 }
 
-mkdirSync(WORK, { recursive: true });
-const build = run("bun", ["run", "build"], ROOT);
-if (!build.ok) {
-  print(`❌ build failed:\n${build.output.split("\n").slice(-25).join("\n")}`);
-  process.exitCode = 1;
-} else {
+function main() {
+  mkdirSync(WORK, { recursive: true });
+  const build = run("bun", ["run", "build"], ROOT);
+  if (!build.ok) {
+    print(`❌ build failed:\n${build.output.split("\n").slice(-25).join("\n")}`);
+    process.exitCode = 1;
+    return;
+  }
   const results = [...EDGES.map(runEdge), runConsumers("5.9"), runConsumers("6.0")];
   const failed = results.filter(ok => !ok).length;
   print(`\ntest:matrix: ${results.length - failed}/${results.length} passed`);
   if (failed > 0) process.exitCode = 1;
 }
+
+// `scripts/smoke-pg.mjs` imports the old-end workspace builder; only a direct run starts the matrix.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

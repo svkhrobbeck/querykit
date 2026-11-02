@@ -13,6 +13,14 @@ import { castValue } from "./columns";
 const TEXT_OPERATORS: ReadonlySet<FilterOperator> = new Set(TEXT_FILTER_OPERATORS);
 
 /**
+ * Columns Postgres can match a LIKE pattern against. Any other type (timestamp,
+ * number, boolean, uuid, enum, json…) has no `~~` / `~~*` operator, so a text
+ * pattern there is invalid-value (R11, task 024) — the same rule as the Mongo
+ * adapters — instead of a driver error. A custom column type is left to Postgres.
+ */
+const TEXT_COLUMN_TYPES: ReadonlySet<string> = new Set(["PgText", "PgVarchar", "PgChar", "PgCustomColumn"]);
+
+/**
  * Returned when a value cannot be represented in the column's type (e.g. the
  * string `"not-a-date"` on a `timestamp` column). Callers drop the condition —
  * the same contract `operators.ts` already uses for a non-array `in` value.
@@ -82,7 +90,8 @@ function castString(column: AnyPgColumn, value: unknown): unknown {
  * condition — a half-applied `in` list would silently widen the result set.
  */
 export function coerceCondition(column: AnyPgColumn, operator: FilterOperator, value: FilterValue | undefined): FilterValue | undefined | typeof INVALID_VALUE {
-  if (value === undefined || TEXT_OPERATORS.has(operator)) return value;
+  if (TEXT_OPERATORS.has(operator)) return TEXT_COLUMN_TYPES.has(column.columnType) ? value : INVALID_VALUE;
+  if (value === undefined) return value;
 
   if (Array.isArray(value)) {
     const items: unknown[] = [];

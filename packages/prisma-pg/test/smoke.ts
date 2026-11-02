@@ -14,6 +14,8 @@
  * The mirror of this file is `packages/drizzle-pg/test/smoke.ts` — the checks are
  * deliberately the same, because the two adapters must agree.
  */
+import { raw } from "@querykitjs/core";
+
 import { createTestClient } from "./prisma/client";
 import { Prisma } from "./prisma/generated/client";
 
@@ -40,11 +42,28 @@ const ids = (rows: Array<{ id: number }>) => rows.map(r => r.id).join(",");
 
 const prisma = createTestClient(url, SCHEMA);
 
+/** The `reason` a repository call is refused with, or "allowed". */
+async function refusal(fn: () => Promise<unknown>): Promise<string> {
+  try {
+    await fn();
+    return "allowed";
+  } catch (error) {
+    return (error as { info?: { reason?: string } }).info?.reason ?? String(error);
+  }
+}
+
+/** Every `User` field filterable with every operator and sortable — the 1.x behaviour. */
+const OPEN_USERS = {
+  filterable: { id: "*", name: "*", email: "*", age: "*", secret: "*", createdAt: "*" },
+  sortable: ["id", "name", "email", "age", "createdAt"],
+} as const;
+
 async function main() {
   const registry = createRegistry(prisma);
   // Task 014 (R21): `with` opens only listed relations.
-  const usersRepo = registry.repository("user", { relations: { posts: { columns: "*" } } });
-  const postsRepo = registry.repository("post");
+  // Task 010: fields are closed by default; the smoke exercises every operator, so it opens them all.
+  const usersRepo = registry.repository("user", { relations: { posts: { columns: "*" } }, ...OPEN_USERS });
+  const postsRepo = registry.repository("post", { filterable: { id: "*", title: "*", authorId: "*", createdAt: "*", deletedAt: "*" } });
   const uf = createFilters<typeof prisma.user>();
 
   // Fresh isolated schema (no `prisma migrate` dependency). Tagged templates only (SEC-06);
@@ -108,11 +127,10 @@ async function main() {
     const noTail = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "Ali%z" }] });
     check("…and it really anchors the tail ('Ali%z' matches nothing)", noTail.length === 0, `${noTail.length}`);
 
-    const underscore = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "Ali_Valiyev" }] });
-    check("like with a _ wildcard ('Ali_Valiyev')", underscore.length === 1, `${underscore.length}`);
-
-    const pinned = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "Ali_Valiye" }] });
-    check("…and the length is pinned ('Ali_Valiye' matches nothing)", pinned.length === 0, `${pinned.length}`);
+    // Task 021 B9: Prisma has no length-pinned `_` wildcard, so an unescaped `_` is refused as invalid-value.
+    const strictUsers = createRegistry(prisma, { strict: true }).repository("user", OPEN_USERS);
+    const underscore = await refusal(() => strictUsers.findAll({ filter: [{ key: "name", operation: "like", value: "Ali_Valiyev" }] }));
+    check("like with an unescaped _ ('Ali_Valiyev') is refused", underscore === "invalid-value", underscore);
 
     const litPercent = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "%50\\%%" }] });
     check("like with an escaped literal % ('%50\\%%')", litPercent.length === 1 && litPercent[0]!.name === "50% off", litPercent.map(u => u.name).join("|"));
@@ -120,8 +138,8 @@ async function main() {
     const litUnderscore = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "under\\_score" }] });
     check("like with an escaped literal _ ('under\\_score')", litUnderscore.length === 1, `${litUnderscore.length}`);
 
-    const wildUnderscore = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "under_score" }] });
-    check("…while an unescaped _ is a wildcard (still matches)", wildUnderscore.length === 1, `${wildUnderscore.length}`);
+    const wildUnderscore = await refusal(() => strictUsers.findAll({ filter: [{ key: "name", operation: "like", value: "under_score" }] }));
+    check("…while an unescaped _ is refused, not guessed", wildUnderscore === "invalid-value", wildUnderscore);
 
     const notInterior = await usersRepo.findAll({ filter: [{ key: "name", operation: "notLike", value: "Ali%v" }] });
     check("notLike with an interior % is the exact complement", notInterior.length === (await usersRepo.count()) - 1, `${notInterior.length}`);
@@ -203,8 +221,11 @@ async function main() {
     check("include relation", withPosts?.posts.length === 2, `${withPosts?.posts.length}`);
     const bothSel = await usersRepo.findOne({ filter: [{ key: "id", value: ali!.id }], columns: { name: true }, with: { posts: true } });
     check("columns + with compose into one select", bothSel?.name === "Ali Valiyev" && bothSel?.posts.length === 2 && !("email" in (bothSel as object)));
-    const rawRelation = await usersRepo.findAll({ filter: { posts: { some: { title: "G1" } } } });
+    // R19: the escape hatch needs the raw() brand; the same plain object from JSON is refused.
+    const rawRelation = await usersRepo.findAll({ filter: raw({ posts: { some: { title: "G1" } } }) });
     check("raw where escape hatch (relation predicate)", rawRelation.length === 1 && rawRelation[0]!.id === guli!.id);
+    const unbranded = await refusal(() => usersRepo.findAll({ filter: { posts: { some: { title: "G1" } } } as never }));
+    check("…an unbranded driver object is refused", unbranded === "forbidden-key", unbranded);
 
     /* ------------------------- soft delete + updatedAt ---------------------- */
     const post = (await postsRepo.findAll({}))[0]!;
@@ -281,6 +302,46 @@ async function main() {
       strictCode = (err as { code?: string }).code ?? "";
     }
     check("strict mode throws QueryKitError", strictCode === "QUERYKIT_INVALID_CONDITION", strictCode);
+
+    /* ------------- the database side of tasks 012–014 (task 024) ------------ */
+    const timedRegistry = createRegistry(prisma, { timestamps: { createdAt: "createdAt", deletedAt: "deletedAt" } });
+    const tiesRepo = timedRegistry.repository("post", { filterable: { title: "*", authorId: "*" }, sortable: ["id", "createdAt"] });
+    const tieFilter = [{ key: "title", operation: "startsWith" as const, value: "tie-" }];
+    const sameTime = new Date("2026-03-01T09:00:00.000Z");
+    await tiesRepo.createMany(Array.from({ length: 25 }, (_, index) => ({ title: `tie-${index}`, authorId: guli!.id, createdAt: sameTime })));
+
+    // 012: a cursor walk over 25 equal createdAt values returns every row once
+    const tieIds = new Set<number>();
+    let tieCursor: string | null | undefined;
+    for (let page = 0; page < 5; page++) {
+      const result = await tiesRepo.findCursor({ cursorKey: "createdAt", limit: 10, cursor: tieCursor, filter: tieFilter });
+      for (const row of result.data) tieIds.add(row.id);
+      tieCursor = result.meta.next_cursor;
+      if (!result.meta.has_next) break;
+    }
+    check("012 cursor walk over 25 equal createdAt → 25 unique rows", tieIds.size === 25, String(tieIds.size));
+
+    // 013: one atomic UPDATE / DELETE reports its count; `returning` uses updateManyAndReturn
+    const touched = await tiesRepo.updateWhere(tieFilter, { updatedAt: sameTime });
+    check("013 updateWhere → { count }", touched.count === 25, String(touched.count));
+    const touchedRows = await tiesRepo.updateWhere(tieFilter, { updatedAt: sameTime }, { returning: { limit: 3 } });
+    check(
+      "013 updateWhere returning { limit } → count + capped rows",
+      touchedRows.count === 25 && touchedRows.rows.length === 3,
+      `${touchedRows.count}/${touchedRows.rows.length}`,
+    );
+
+    // 014: scope { in }, the timestamps option (default sort and soft delete)
+    const inScope = await tiesRepo.scoped({ authorId: { in: [guli!.id, ali!.id] } }).count(tieFilter);
+    check("014 scope { in } narrows to the listed values", inScope === 25, String(inScope));
+    check("014 scope { in: [] } matches no row", (await tiesRepo.scoped({ authorId: { in: [] } }).count(tieFilter)) === 0);
+    const newest = (await tiesRepo.findList({ perPage: 1, filter: tieFilter })).data[0];
+    check("014 timestamps: the default sort runs on created_at", newest !== undefined);
+    const softDeleted = await tiesRepo.softDelete(newest!.id);
+    check("014 timestamps: soft delete writes deleted_at", softDeleted?.deletedAt instanceof Date);
+
+    const removedTies = await tiesRepo.deleteWhere(tieFilter);
+    check("013 deleteWhere → { count } (soft-deleted row excluded)", removedTies.count === 24, String(removedTies.count));
 
     /* --------------------------------- delete ------------------------------- */
     const deleted = await usersRepo.deleteById(up2.id);
