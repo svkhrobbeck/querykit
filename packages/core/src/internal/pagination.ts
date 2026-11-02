@@ -34,6 +34,18 @@ export function offsetMeta(page: number, perPage: number, totalItems: number): O
   };
 }
 
+/**
+ * `withTotal: false` (task 013): rows fetched with `perPage + 1` and no count →
+ * the page and its meta; the extra row only signals `has_next`, totals are `null`.
+ */
+export function offsetPageWithoutTotal<T>(rows: readonly T[], page: number, perPage: number): { data: T[]; meta: OffsetMeta } {
+  const hasNext = rows.length > perPage;
+  return {
+    data: hasNext ? rows.slice(0, perPage) : [...rows],
+    meta: { total_items: null, total_pages: null, current_page: page, per_page: perPage, has_next: hasNext, has_prev: page > 1 },
+  };
+}
+
 /** Rows fetched with `limit + 1` → the page and its meta (the extra row only signals `has_more`). */
 export function infinitePage<T>(rows: readonly T[], limit: number, offset: number): { data: T[]; meta: InfiniteMeta } {
   const hasMore = rows.length > limit;

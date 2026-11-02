@@ -29,6 +29,7 @@ import { HOSTILE_DEPTH, LIMIT_CASES, notChain } from "./conformance/cases-limits
 import { runLimitCases } from "./conformance/limits-runner";
 import "./dist";
 import "./cursor";
+import "./mutation";
 
 let passed = 0;
 let failed = 0;
