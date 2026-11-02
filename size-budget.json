@@ -1,0 +1,11 @@
+{
+  "@querykitjs/class-validator": 4849,
+  "@querykitjs/core": 1208,
+  "@querykitjs/core/internal": 4337,
+  "@querykitjs/drizzle-pg": 9739,
+  "@querykitjs/mongoose": 9885,
+  "@querykitjs/prisma-pg": 11504,
+  "@querykitjs/web": 3591,
+  "@querykitjs/web/react": 675,
+  "@querykitjs/zod": 1781
+}

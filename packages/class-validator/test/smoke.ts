@@ -301,6 +301,11 @@ if (existsSync(fileURLToPath(distUrl))) {
   check("dist build: unknown key rejected", run(DistDto, { filter: [{ key: "b" }] }).errors.length === 1);
   check("dist build: allowed key accepted", run(DistDto, { filter: [{ key: "a" }] }).errors.length === 0);
   check("dist build: perPage cap survives bundling", run(dist.OffsetParamsDto, { perPage: 201 }).errors.length === 1);
+  /* Task 016 minify: exported class names reach Nest / Swagger, so the build keeps them. */
+  check(
+    "dist build: exported class names survive minify",
+    dist.OffsetParamsDto.name === "OffsetParamsDto" && dist.IsQueryFilterConstraint.name === "IsQueryFilterConstraint" && DistDto.name === "OffsetParamsDto",
+  );
 } else {
   console.log("⏭️  dist/ not built — skipping the built-artifact checks (run `bun run build` to include them)");
 }

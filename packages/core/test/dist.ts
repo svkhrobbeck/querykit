@@ -7,7 +7,11 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
-type Entry = { QueryKitError: new (...args: never[]) => Error; resolvePolicy?: (options: unknown) => { checkPage(page: unknown): void } };
+type Entry = {
+  QueryKitError: new (...args: never[]) => Error;
+  QueryKitTimeoutError: new (source: string, ms: number) => Error;
+  resolvePolicy?: (options: unknown) => { checkPage(page: unknown): void };
+};
 
 const dist = (file: string) => fileURLToPath(new URL(`../dist/${file}`, import.meta.url));
 
@@ -44,6 +48,12 @@ if (existsSync(dist("index.js")) && existsSync(dist("index.cjs"))) {
     check(
       `dist ${format}: QueryKitError.name survives the build`,
       (error as Error | undefined)?.name === "QueryKitError" && main.QueryKitError.name === "QueryKitError",
+    );
+    /* Task 016: no keepNames — every exported error class sets `this.name` itself. */
+    const timeout = new main.QueryKitTimeoutError("users", 1);
+    check(
+      `dist ${format}: QueryKitTimeoutError.name survives the build`,
+      timeout.name === "QueryKitTimeoutError" && main.QueryKitTimeoutError.name === "QueryKitTimeoutError" && timeout instanceof Error,
     );
   }
 } else {

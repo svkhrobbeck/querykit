@@ -63,6 +63,18 @@ check("strict throws QueryKitError", thrown instanceof QueryKitError && thrown.i
 const store = createContextStore<{ executor?: string }>();
 const inside = store.run({ executor: "tx" }, () => store.get()?.executor);
 check("context is visible inside run and gone outside", inside === "tx" && store.get() === undefined);
+/* Task 016: node:async_hooks is loaded when a store is created; a runtime without it gets a clear error. */
+const getBuiltinModule = process.getBuiltinModule;
+let missing = "";
+try {
+  (process as { getBuiltinModule?: unknown }).getBuiltinModule = undefined;
+  createContextStore();
+} catch (error) {
+  missing = error instanceof Error ? error.message : String(error);
+} finally {
+  process.getBuiltinModule = getBuiltinModule;
+}
+check("context store without process.getBuiltinModule → clear error", missing.includes("needs node:async_hooks"), missing || "no error");
 
 /* sort */
 check(

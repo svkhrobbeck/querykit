@@ -26,7 +26,7 @@ export { IsQueryFilter, IsQueryFilterConstraint, IsQuerySort, IsQuerySortConstra
 export type { IsQueryFilterOptions, IsQuerySortOptions, IsWithinMaxOffsetOptions, MessageStyleOptions } from "./decorators";
 
 /* ---------------------------------- DTOs ---------------------------------- */
-export { BaseParamsDto, CursorParamsDto, InfiniteParamsDto, OffsetParamsDto } from "./dto";
+export { BaseParamsDto, CursorParamsDto, InfiniteParamsDto, OffsetParamsDto } from "./legacy-dto";
 export { makeCursorParamsDto, makeInfiniteParamsDto, makeOffsetParamsDto } from "./dto";
 export type { ParamsDtoOptions, ServerOwnedField, ServerOwnedParams } from "./dto";
 
@@ -38,7 +38,8 @@ export type { ParamsDtoOptions, ServerOwnedField, ServerOwnedParams } from "./dt
 
 import type { FieldCondition, Filter, FilterOperator, Sort, WireCursorParams, WireInfiniteParams, WireOffsetParams } from "@querykitjs/core";
 import type { QueryFilterOptions } from "./validate";
-import { BaseParamsDto, CursorParamsDto, InfiniteParamsDto, OffsetParamsDto, makeCursorParamsDto, makeInfiniteParamsDto, makeOffsetParamsDto } from "./dto";
+import type { makeCursorParamsDto, makeInfiniteParamsDto, makeOffsetParamsDto } from "./dto";
+import type { BaseParamsDto, CursorParamsDto, InfiniteParamsDto, OffsetParamsDto } from "./legacy-dto";
 
 type Expect<T extends true> = T;
 

@@ -11,9 +11,10 @@ export default defineConfig({
   // Shared chunk: `./internal` must throw the very `QueryKitError` class the main entry exports (instanceof).
   splitting: true,
   sourcemap: true,
-  // Task 009: the internal entry carries the shared adapter logic. keepNames keeps class names (`QueryKitError.name`) after minify.
-  minify: true,
-  keepNames: true,
+  // Minified (task 009) — syntax only (task 016): esbuild drops `/* @__PURE__ */` when it
+  // minifies whitespace, and keepNames adds top-level `__name()` calls; both stop consumers
+  // tree-shaking. Identifiers are kept, so the exported classes keep their names.
+  minifySyntax: true,
   treeshake: true,
   outExtension({ format }) {
     return { js: format === "cjs" ? ".cjs" : ".js" };

@@ -21,38 +21,49 @@ import type {
 } from "@querykitjs/core";
 import { findFilterLimitViolation, formatLimit, offsetOf } from "@querykitjs/core/internal";
 
+/**
+ * Builds a module-level schema. A bundler cannot tell that a zod call has no side effect,
+ * so without this every schema stays in the bundle when one is imported (task 016). The
+ * call is marked pure and takes only an arrow function, so an unused schema is dropped.
+ */
+const schema = <T>(build: () => T): T => build();
+
 /* --------------------------------- filter --------------------------------- */
 
 /** Operator enum — core `FILTER_OPERATORS` dan (yagona manba). */
-export const filterOperatorSchema = z.enum(FILTER_OPERATORS);
+export const filterOperatorSchema = /* @__PURE__ */ schema(() => z.enum(FILTER_OPERATORS));
 
-const scalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const scalarSchema = /* @__PURE__ */ schema(() => z.union([z.string(), z.number(), z.boolean(), z.null()]));
 
 /** Filter qiymati — skalyar yoki skalyar massiv (wire'da `Date` bo'lmaydi). */
-export const filterValueSchema = z.union([scalarSchema, z.array(scalarSchema)]);
+export const filterValueSchema = /* @__PURE__ */ schema(() => z.union([scalarSchema, z.array(scalarSchema)]));
 
 /** Bitta maydon sharti `{ key, operation?, value? }`. Noma'lum kalitlar (eski `type`) e'tiborsiz. */
-export const fieldConditionSchema = z.object({
-  key: z.string(),
-  operation: filterOperatorSchema.optional(),
-  value: filterValueSchema.optional(),
-});
+export const fieldConditionSchema = /* @__PURE__ */ schema(() =>
+  z.object({
+    key: z.string(),
+    operation: filterOperatorSchema.optional(),
+    value: filterValueSchema.optional(),
+  }),
+);
 
 /**
  * Nested filter tuguni: shart yoki `and`/`or`/`not` guruh (rekursiv).
  * ⚠️ O'zi **limitsiz** — so'rov body'si uchun {@link filterSchema} yoki factory'lardan
  * foydalaning: ular daraxtni shu sxemaga berishdan oldin hajm limitlarini tekshiradi.
  */
-export const filterNodeSchema: z.ZodType<FilterNode> = z.lazy(() =>
-  z.union([
-    fieldConditionSchema,
-    z.object({ and: z.array(filterNodeSchema) }),
-    z.object({ or: z.array(filterNodeSchema) }),
-    z.object({ not: filterNodeSchema }),
-  ]),
+export const filterNodeSchema: z.ZodType<FilterNode> = /* @__PURE__ */ schema(() =>
+  z.lazy(() =>
+    z.union([
+      fieldConditionSchema,
+      z.object({ and: z.array(filterNodeSchema) }),
+      z.object({ or: z.array(filterNodeSchema) }),
+      z.object({ not: filterNodeSchema }),
+    ]),
+  ),
 );
 
-const filterShapeSchema = z.union([filterNodeSchema, z.array(fieldConditionSchema)]);
+const filterShapeSchema = /* @__PURE__ */ schema(() => z.union([filterNodeSchema, z.array(fieldConditionSchema)]));
 
 /**
  * Hajm limitlari (chuqurlik, shartlar, massiv elementlari, satr uzunligi) xom
@@ -70,18 +81,18 @@ const limitedFilterSchema = (limits: QueryLimits) =>
     .pipe(filterShapeSchema);
 
 /** Public filter — daraxt/tugun yoki flat massiv (implicit AND), core default limitlari bilan. */
-export const filterSchema = limitedFilterSchema(DEFAULT_QUERY_LIMITS);
+export const filterSchema = /* @__PURE__ */ schema(() => limitedFilterSchema(DEFAULT_QUERY_LIMITS));
 
 /* ---------------------------------- sort ---------------------------------- */
 
-const directionSchema = z.enum(["asc", "desc"]);
+const directionSchema = /* @__PURE__ */ schema(() => z.enum(["asc", "desc"]));
 
-const sortItemSchema = z.object({ key: z.string(), direction: directionSchema.optional() });
+const sortItemSchema = /* @__PURE__ */ schema(() => z.object({ key: z.string(), direction: directionSchema.optional() }));
 
 const limitedSortSchema = (maxSortFields: number) => z.array(sortItemSchema).max(maxSortFields, `sort exceeds ${formatLimit("maxSortFields", maxSortFields)}`);
 
 /** Sort — an array of `{ key, direction }`, at most core `DEFAULT_MAX_SORT_FIELDS` (3) items. */
-export const sortSchema = limitedSortSchema(DEFAULT_QUERY_LIMITS.maxSortFields);
+export const sortSchema = /* @__PURE__ */ schema(() => limitedSortSchema(DEFAULT_QUERY_LIMITS.maxSortFields));
 
 /* ------------------------------ offset depth ------------------------------ */
 
@@ -115,36 +126,42 @@ const offsetField = (maxOffset: number) =>
  *
  * @deprecated Use `makeOffsetParamsSchema` / `makeInfiniteParamsSchema` / `makeCursorParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
  */
-export const baseParamsSchema = z.object({
-  filter: filterSchema.optional(),
-  sort: sortSchema.optional(),
-  columns: z.record(z.string(), z.boolean()).optional(),
-  with: z.record(z.string(), z.unknown()).optional(),
-  withDeleted: z.boolean().optional(),
-});
+export const baseParamsSchema = /* @__PURE__ */ schema(() =>
+  z.object({
+    filter: filterSchema.optional(),
+    sort: sortSchema.optional(),
+    columns: z.record(z.string(), z.boolean()).optional(),
+    with: z.record(z.string(), z.unknown()).optional(),
+    withDeleted: z.boolean().optional(),
+  }),
+);
 
 /**
  * Offset (sahifali) params — `page` + `perPage`; `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`.
  *
  * @deprecated Use `makeOffsetParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
  */
-export const offsetParamsSchema = baseParamsSchema
-  .extend({
-    page: z.number().int().positive().optional(),
-    perPage: z.number().int().positive().optional(),
-    withTotal: z.boolean().optional(),
-  })
-  .superRefine(offsetDepthCheck(DEFAULT_QUERY_LIMITS.maxOffset));
+export const offsetParamsSchema = /* @__PURE__ */ schema(() =>
+  baseParamsSchema
+    .extend({
+      page: z.number().int().positive().optional(),
+      perPage: z.number().int().positive().optional(),
+      withTotal: z.boolean().optional(),
+    })
+    .superRefine(offsetDepthCheck(DEFAULT_QUERY_LIMITS.maxOffset)),
+);
 
 /**
  * Infinite-scroll params — `limit` + `offset` (`offset` ≤ `DEFAULT_MAX_OFFSET`).
  *
  * @deprecated Use `makeInfiniteParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
  */
-export const infiniteParamsSchema = baseParamsSchema.extend({
-  limit: z.number().int().positive().optional(),
-  offset: offsetField(DEFAULT_QUERY_LIMITS.maxOffset),
-});
+export const infiniteParamsSchema = /* @__PURE__ */ schema(() =>
+  baseParamsSchema.extend({
+    limit: z.number().int().positive().optional(),
+    offset: offsetField(DEFAULT_QUERY_LIMITS.maxOffset),
+  }),
+);
 
 /**
  * Cursor (keyset) params — `limit`/`cursor`/`cursorKey`/`order`/`direction`.
@@ -152,13 +169,15 @@ export const infiniteParamsSchema = baseParamsSchema.extend({
  *
  * @deprecated Use `makeCursorParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
  */
-export const cursorParamsSchema = baseParamsSchema.omit({ sort: true }).extend({
-  limit: z.number().int().positive().optional(),
-  cursor: z.string().nullish(),
-  cursorKey: z.string().optional(),
-  order: directionSchema.optional(),
-  direction: z.enum(["forward", "backward"]).optional(),
-});
+export const cursorParamsSchema = /* @__PURE__ */ schema(() =>
+  baseParamsSchema.omit({ sort: true }).extend({
+    limit: z.number().int().positive().optional(),
+    cursor: z.string().nullish(),
+    cursorKey: z.string().optional(),
+    order: directionSchema.optional(),
+    direction: z.enum(["forward", "backward"]).optional(),
+  }),
+);
 
 /* ------------------------------- factories -------------------------------- */
 /* Sozlanadigan schema quruvchilar — **xavfsiz default** bilan. Yuqoridagi
@@ -169,14 +188,14 @@ export const cursorParamsSchema = baseParamsSchema.omit({ sort: true }).extend({
 /** Server'ga tegishli, default'da clientdan **qabul qilinmaydigan** maydonlar. */
 export type ServerOwnedField = "columns" | "with" | "withDeleted";
 
-const serverOwnedShape = {
+const serverOwnedShape = /* @__PURE__ */ schema(() => ({
   /** Client `{ password: true }` so'ramasin — projection server ishi. */
   columns: z.record(z.string(), z.boolean()).optional(),
   /** Client istalgan relation'ni tortmasin — data exposure. */
   with: z.record(z.string(), z.unknown()).optional(),
   /** Client soft-delete himoyasini o'chirmasin. */
   withDeleted: z.boolean().optional(),
-};
+}));
 
 type ServerOwnedShape = typeof serverOwnedShape;
 

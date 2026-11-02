@@ -55,4 +55,4 @@ export function createFilters<TKey extends string = string, TRaw = never>() {
 }
 
 /** Tipsiz (kalitga bog'lanmagan) filter quruvchilar — tez foydalanish uchun. */
-export const f = createFilters();
+export const f = /* @__PURE__ */ createFilters();
