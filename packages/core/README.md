@@ -17,7 +17,7 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle
 - **`FilterScalar` / `FilterValue`**, **`SortDirection`**.
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomik builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server javobi, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
-- **`Filterable`** va skip/rad etish sabablari (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`, `empty-filter`; `SkipSite` + `page`, `mutation`) — siyosat sabablari va bo'sh mutatsiya filtri hech qachon jim tashlanmaydi, har doim `QueryKitError`.
+- **`Filterable`** va skip/rad etish sabablari (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`, `empty-filter`; `SkipSite` + `page`, `mutation`, `with`) — siyosat sabablari va bo'sh mutatsiya filtri hech qachon jim tashlanmaydi, har doim `QueryKitError`.
 - **`QueryKitTimeoutError`** (`code: "QUERYKIT_TIMEOUT"`) — o'qish vaqt chegarasidan oshdi (mongoose `maxTimeMS`). `QueryKitError`dan alohida: so'rov to'g'ri, baza sekin — 503/504 qiling.
 - **`raw(value)`** — drayverning o'z filtr obyekti (Prisma `where`, Mongo filtri) uchun brend (R19). Adapter raw tugunni faqat `raw()` bilan belgilangan bo'lsa qabul qiladi; brendsiz oddiy obyekt (JSON body'dan kelishi mumkin) → `QueryKitError` `forbidden-key`. ⚠️ Raw tugun — server kodi, `filterable` uni tekshirmaydi; uni hech qachon so'rov ma'lumotidan qurmang.
 - **So'rov limitlari** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` va alohida konstantalar (pastdagi jadval).

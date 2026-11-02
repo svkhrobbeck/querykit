@@ -1,3 +1,4 @@
+import type { Relations } from "@querykitjs/core";
 import type * as Core from "@querykitjs/core";
 
 import type { FieldOverride } from "../internal/fields";
@@ -45,6 +46,11 @@ export interface RegistryOptions {
    * are unsigned but still checked (scalar values, v2 shape).
    */
   cursorSecret?: string;
+  /**
+   * The createdAt / deletedAt field names (task 014; default `createdAt`, `deletedAt`): the default
+   * sort and the default `sortable` use `createdAt`, soft delete uses `deletedAt`.
+   */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 /**
@@ -61,6 +67,12 @@ export interface RegistryOptions {
  * yourself, before handing a write result to a client.
  */
 export interface RepositoryOptions<TDelegate = AnyDelegate> {
+  /**
+   * Relations a client may open with `with` (task 014, R21): relation → `{ columns, filterable?, nested? }`.
+   * `columns` is required (a list or `"*"`); an unlisted relation, column, `where` field or nested
+   * `include` is `QueryKitError` `forbidden-key`, `site: "with"`. Without it `with` opens nothing.
+   */
+  relations?: Relations;
   /** Constant equality filter added to every read/write (RBAC / multi-tenancy). */
   scope?: Scope<TDelegate>;
   /**

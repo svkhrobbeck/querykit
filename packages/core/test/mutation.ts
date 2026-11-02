@@ -3,7 +3,7 @@
  * and the `withTotal: false` page. Imported by `internal.ts`; sets `process.exitCode`.
  */
 import { QueryKitError } from "../src/index";
-import { isAllRows, isEmptyFilter, offsetPageWithoutTotal, refuseEmptyFilter } from "../src/internal/index";
+import { isAllRows, isEmptyFilter, offsetPageWithoutTotal, refuseEmptyFilter, scopeConditions, scopeDefaults } from "../src/internal/index";
 
 let failed = 0;
 function check(label: string, ok: boolean, extra = "") {
@@ -42,6 +42,19 @@ check(
   JSON.stringify(page),
 );
 check("withTotal: false — perPage rows or fewer → no next page", offsetPageWithoutTotal([1, 2, 3], 1, 3).meta.has_next === false);
+
+/* Task 014 P1 — scope: equality or { in: [...] }. */
+const scope = { shopId: { in: [1, 2] }, tenant: "t1", meta: { in: [1], x: 1 } };
+check(
+  "scopeConditions: { in } → in, everything else → = (an object with more keys stays equality)",
+  JSON.stringify(scopeConditions(scope)) ===
+    JSON.stringify([
+      { key: "shopId", operation: "in", value: [1, 2] },
+      { key: "tenant", operation: "=", value: "t1" },
+      { key: "meta", operation: "=", value: { in: [1], x: 1 } },
+    ]),
+);
+check("scopeDefaults keeps equality scopes only", JSON.stringify(scopeDefaults(scope)) === JSON.stringify({ tenant: "t1", meta: { in: [1], x: 1 } }));
 
 if (failed > 0) process.exitCode = 1;
 console.log(`mutation: ${failed} failed`);

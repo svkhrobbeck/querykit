@@ -264,5 +264,21 @@ check("nope with strict → unknown-key", unknown.error instanceof QueryKitError
   check("A2 createdAt cursor → $or tie-break on _id", Array.isArray(sent[0]?.filter.$or), JSON.stringify(sent[0]?.filter));
 }
 
+/* Task 014 A5 (R21) — populate match is checked against relations[rel].filterable before exec. */
+{
+  const rel = { relations: { posts: { columns: "*", filterable: { title: "*" } } } };
+  const secretMatch = await attempt(() => repositoryOf(rel).findAll!({ with: { posts: { match: { secret: "x" } } } }));
+  check(
+    "A5 with posts match secret (not in filterable) → forbidden-key/with/posts.secret, 0 exec",
+    secretMatch.error instanceof QueryKitError &&
+      secretMatch.error.info.key === "posts.secret" &&
+      secretMatch.error.info.site === "with" &&
+      secretMatch.calls === 0,
+    describe(secretMatch),
+  );
+  const titleMatch = await attempt(() => repositoryOf(rel).findAll!({ with: { posts: { match: { title: "a" } } } }));
+  check("A5 …a listed field passes", !titleMatch.error, describe(titleMatch));
+}
+
 console.log(`policy: ${passed} passed, ${failed} failed, ${todo} todo`);
 if (failed > 0) process.exitCode = 1;

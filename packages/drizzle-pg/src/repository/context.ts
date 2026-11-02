@@ -1,10 +1,21 @@
 import { and, getTableName, isNull, isSQLWrapper, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
-import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import {
+  checkWith,
+  type Diagnostics,
+  isAllRows,
+  isEmptyFilter,
+  type Policy,
+  refuseEmptyFilter,
+  resolvePolicy,
+  scopeConditions,
+  type WithDialect,
+} from "@querykitjs/core/internal";
 import type { QueryLimits } from "@querykitjs/core";
 
-import type { AnyDb, ColumnKey, FieldCondition, Filter, Id, RepositoryOptions } from "../types";
+import type { AnyDb, FieldCondition, Filter, Id, RepositoryOptions, Sort } from "../types";
+import { buildOrderBy } from "../internal/order-by";
 import { getTableKey, isTable, resolveColumn, tableColumns } from "../internal/columns";
 import { buildWhere } from "../internal/where";
 import { buildProjection, type Projection } from "./projection";
@@ -31,6 +42,8 @@ export interface RepoRuntime {
   limits?: Partial<QueryLimits>;
   /** Signs cursor tokens (task 012). */
   cursorSecret?: string;
+  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 export interface RelationalHandle {
@@ -51,7 +64,19 @@ export interface RepoContext<TTable extends AnyPgTable> {
   executor: () => AnyDb;
   handle: () => RelationalHandle;
   updatedAtCol: AnyPgColumn | undefined;
+  /** The soft-delete column (`timestamps.deletedAt`, default `deletedAt`) and its JS key. */
   deletedAtCol: AnyPgColumn | undefined;
+  deletedAtKey: string | undefined;
+  /** The createdAt column's JS key (`timestamps.createdAt`, default `createdAt`). */
+  createdAtKey: string | undefined;
+  /** ORDER BY for a sort; none given ⇒ createdAt desc, else the primary key. */
+  sortBy: (sort?: Sort<TTable>) => SQL[];
+  /**
+   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
+   * is selected even when the client asks with `true`.
+   */
+  withOf: (value: unknown) => never;
   projection: Projection<TTable>;
   /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
   policy: Policy;
@@ -89,11 +114,19 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
   // Auto-detected columns (by JS property name): updatedAt is bumped on update,
   // deletedAt enables soft-delete.
   const updatedAtCol = resolveColumn(table, "updatedAt");
-  const deletedAtCol = resolveColumn(table, "deletedAt");
+  // Task 014: the registry's `timestamps` names these columns (JS key or DB column name).
+  const keyOf = (column: AnyPgColumn | undefined) => (column ? tableColumns(table).find(([, candidate]) => candidate === column)?.[0] : undefined);
+  const deletedAtCol = resolveColumn(table, runtime.timestamps?.deletedAt ?? "deletedAt");
+  const createdAtCol = resolveColumn(table, runtime.timestamps?.createdAt ?? "createdAt");
+  const deletedAtKey = keyOf(deletedAtCol);
+  const createdAtKey = keyOf(createdAtCol);
+  const sortBy = (sort?: Sort<TTable>): SQL[] => buildOrderBy(table, sort, diag, createdAtCol);
+  // drizzle's relational `where` / `orderBy` are code, not JSON: a client may only select and page.
+  const withOf = (value: unknown) => checkWith(value, config.relations, WITH_DIALECT, diag.source) as never;
 
   const scopeWhere = buildScopeWhere(table, config);
   const projection = buildProjection(config);
-  const policy = buildPolicy(table, config, runtime.limits);
+  const policy = buildPolicy(table, config, runtime.limits, createdAtKey, runtime.timestamps?.createdAt !== undefined);
 
   /** An already built user WHERE + scope + soft-delete guard. */
   const combineWhere = (userWhere: SQL | undefined, withDeleted?: boolean): SQL | undefined => {
@@ -127,11 +160,37 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
     return rows[0]?.value ?? 0;
   };
 
-  return { runtime, table, diag, executor, handle, updatedAtCol, deletedAtCol, projection, policy, composeWhere, mutationWhere, withId, countWhere };
+  return {
+    runtime,
+    table,
+    diag,
+    executor,
+    handle,
+    updatedAtCol,
+    deletedAtCol,
+    deletedAtKey,
+    createdAtKey,
+    sortBy,
+    withOf,
+    projection,
+    policy,
+    composeWhere,
+    mutationWhere,
+    withId,
+    countWhere,
+  };
 }
 
+const WITH_DIALECT: WithDialect = { columns: "columns", nested: "with", filters: [], logical: [], paging: ["limit", "offset"] };
+
 /** The table's request policy. Fields are named by JS property; a DB column name maps to the same field. */
-function buildPolicy<TTable extends AnyPgTable>(table: TTable, config: RepositoryOptions<TTable>, registryLimits?: Partial<QueryLimits>): Policy {
+function buildPolicy<TTable extends AnyPgTable>(
+  table: TTable,
+  config: RepositoryOptions<TTable>,
+  registryLimits: Partial<QueryLimits> | undefined,
+  createdAtKey: string | undefined,
+  createdAtConfigured: boolean,
+): Policy {
   const columns = tableColumns(table);
   const fieldByName = new Map<string, string>();
   for (const [key, column] of columns) {
@@ -143,7 +202,8 @@ function buildPolicy<TTable extends AnyPgTable>(table: TTable, config: Repositor
     source: getTableName(table),
     fieldOf,
     primaryKey: columns.find(([, column]) => column.primary)?.[0] ?? "id",
-    createdAt: fieldOf("createdAt") ?? fieldOf("created_at"),
+    // A configured `timestamps.createdAt` is the only one; else `createdAt` or `created_at`.
+    createdAt: createdAtConfigured ? createdAtKey : (fieldOf("createdAt") ?? fieldOf("created_at")),
     filterable: config.filterable,
     sortable: config.sortable,
     allowedColumns: config.allowedColumns,
@@ -177,21 +237,17 @@ function requireTableKey(schema: Record<string, unknown>, table: AnyPgTable): st
 
 /** The scope as a precompiled WHERE (equality on each field), or `undefined`. */
 function buildScopeWhere<TTable extends AnyPgTable>(table: TTable, config: RepositoryOptions<TTable>): SQL | undefined {
-  const scopeConditions: FieldCondition<TTable>[] = config.scope
-    ? Object.entries(config.scope).map(([key, value]) => ({
-        key: key as ColumnKey<TTable>,
-        operation: "=",
-        value: value as never,
-      }))
-    : [];
+  // Task 014: an equality value or `{ in: [...] }`.
+  const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition<TTable>[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this
   // repository. Fail when it is configured, not per request, and regardless of
   // `strict` — this is a programming error, not bad input.
-  for (const condition of scopeConditions) {
+  for (const condition of conditions) {
     if (!resolveColumn(table, condition.key)) {
       throw new QueryKitError({ source: getTableName(table), site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  return scopeConditions.length ? buildWhere(table, scopeConditions) : undefined;
+  // An empty `in` list matches no row (inArray(col, []) is false).
+  return conditions.length ? buildWhere(table, conditions) : undefined;
 }

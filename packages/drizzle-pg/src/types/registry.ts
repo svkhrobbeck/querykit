@@ -1,3 +1,4 @@
+import type { Relations } from "@querykitjs/core";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 import type * as Core from "@querykitjs/core";
 
@@ -47,6 +48,11 @@ export interface RegistryOptions {
    * are unsigned but still checked (scalar values, v2 shape).
    */
   cursorSecret?: string;
+  /**
+   * The createdAt / deletedAt field names (task 014; default `createdAt`, `deletedAt`): the default
+   * sort and the default `sortable` use `createdAt`, soft delete uses `deletedAt`.
+   */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 /**
@@ -63,6 +69,12 @@ export interface RegistryOptions {
  * `findById` bilan qayta o'qing yoki o'zingiz map qiling.
  */
 export interface RepositoryOptions<TTable extends AnyPgTable> {
+  /**
+   * Mijoz `with` bilan ochishi mumkin bo'lgan relation'lar (task 014, R21): relation → `{ columns, nested? }`.
+   * `columns` majburiy (ro'yxat yoki `"*"`); ro'yxatda yo'q relation, ustun yoki ichki `with` —
+   * `QueryKitError` `forbidden-key`, `site: "with"`. Berilmasa `with` umuman ochilmaydi.
+   */
+  relations?: Relations;
   /** Har bir o'qish/yozishga qo'shiladigan doimiy tenglik filtri (RBAC / multi-tenancy). */
   scope?: Scope<TTable>;
   /**

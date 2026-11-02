@@ -87,6 +87,12 @@ export const registry = createRegistry(db, schema);
 (`@querykitjs/zod` factory'lari) chetlab o'tilsa ham repository o'zi clamp
 qiladi.
 
+`timestamps` — createdAt / deletedAt maydon nomlari (masalan snake_case loyihada): default sort va default `sortable` shu `createdAt`ni, soft-delete (`softDelete`, `restore`, `withDeleted`) shu `deletedAt`ni ishlatadi.
+
+```ts
+export const registry = createRegistry(db, schema, { timestamps: { createdAt: "created_at", deletedAt: "deleted_at" } });
+```
+
 ### 2. Jadval repositorylari
 
 ```ts
@@ -293,6 +299,19 @@ export const registry = createRegistry(db, schema, { cursorSecret: process.env.C
 
 ## Tipli relation & column tanlash
 
+Mijoz `with` bilan faqat `relations`da yozilgan relation'larni ochadi (task 014, R21):
+
+```ts
+const postsRepository = registry.repository(posts, {
+  relations: { author: { columns: ["id", "name"] } }, // nested: { … } — ichki with uchun xuddi shu shakl
+});
+await postsRepository.findAll({ with: { author: true } }); // author faqat id, name bilan
+```
+
+- `columns` majburiy — ro'yxat yoki aniq `"*"`. `with: { rel: true }` ham faqat shu ustunlarni tanlaydi.
+- Ro'yxatda yo'q relation, ustun, filtr maydoni yoki ichki relation → `QueryKitError` `reason: "forbidden-key"`, `site: "with"`, `key` — `relation` yoki `relation.field`; drayver chaqirilmaydi.
+- Ruxsat etilgan opsiyalar: `columns`, ichki `with` (`nested` bilan), `limit` / `offset`.
+
 Read metodlar natija tipini `with` va `columns` argumentidan **avtomatik** chiqaradi — qo'lda generic yo'q:
 
 ```ts
@@ -352,6 +371,12 @@ Scope'ni `registry.repository(table, { scope })` bilan ham berish mumkin.
 Noma'lum scope kaliti — repository yaratilishida **xato** (jimgina tashlansa
 RBAC filtri yo'qolib ketardi).
 
+Scope qiymati ro'yxat ham bo'lishi mumkin (task 014): `{ shopId: { in: [1, 2] } }` — har o'qish va yozish shu qiymatlar bilan cheklanadi; bo'sh ro'yxat (`{ in: [] }`) — hech qanday qator (xato emas). `create` faqat tenglik scope'larini to'ldiradi.
+
+```ts
+const mine = repository.scoped({ shopId: { in: user.shopIds } });
+```
+
 ## Qiymatlar, NULL tartibi va bir xillik
 
 Uchala adapter (drizzle-pg, prisma-pg, mongoose) bir xil natija beradi (task 021):
@@ -380,6 +405,8 @@ const open = db.repository(users, {
 - `updateWhere` / `deleteWhere` endi `Row[]` emas, `{ count }` qaytaradi (task 013); qatorlar kerak bo'lsa `{ returning: { limit } }` → `{ count, rows }`.
 - Filtrsiz `updateWhere` / `deleteWhere` → `empty-filter`; hamma qatorlar uchun `{ all: true }` yozing. Mutatsiya filtri endi `filterable` siyosatidan o'tadi.
 - `OffsetMeta.total_items` / `total_pages` tipi `number | null` (`withTotal: false` bilan `null`).
+- `with` endi faqat `relations` allow-list bilan ishlaydi (task 014): ro'yxatsiz repository'da `with` → `forbidden-key`, `site: "with"`.
+- Scope qiymati `{ in: [...] }` bo'lishi mumkin; `timestamps` registry opsiyasi createdAt / deletedAt nomlarini beradi.
 
 ## Wire (JSON) qiymatlari va DbService'dan migratsiya
 

@@ -11,7 +11,7 @@ import type { RepoContext } from "./context";
 
 /** `findCursor` — keyset pagination on one column. */
 export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>) {
-  const { runtime, table, diag, handle, policy, composeWhere } = ctx;
+  const { runtime, table, diag, handle, policy, withOf, composeWhere } = ctx;
   const { guarded, permits, pickColumns } = ctx.projection;
 
   return {
@@ -73,7 +73,7 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
         orderBy: tieBreak ? [ascInQuery ? asc(column) : desc(column), ascInQuery ? asc(idColumn) : desc(idColumn)] : [ascInQuery ? asc(column) : desc(column)],
         limit: limit + 1,
         columns,
-        with: params.with,
+        with: withOf(params.with),
       })) as Record<string, unknown>[];
 
       const page = await cursorPage(rows, {

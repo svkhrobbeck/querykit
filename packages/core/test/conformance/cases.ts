@@ -14,6 +14,7 @@ import { DIAGNOSTIC_CASES, PAGINATION_CASES, PROJECTION_CASES, SORT_CASES } from
 import { POLICY_CASES } from "./cases-policy";
 import { CURSOR_CASES } from "./cases-cursor";
 import { MUTATION_CASES } from "./cases-mutation";
+import { SCOPE_CASES } from "./cases-scope";
 
 export * from "./case-types";
 
@@ -27,4 +28,5 @@ export const CASES: readonly ConformanceCase[] = [
   ...POLICY_CASES,
   ...CURSOR_CASES,
   ...MUTATION_CASES,
+  ...SCOPE_CASES,
 ];

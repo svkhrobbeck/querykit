@@ -69,8 +69,16 @@ export type Sort<TKey extends string = string> = SortItem<TKey>[];
 /* Generic shapes shared by every backend adapter (drizzle-pg, mongoose, …);
  * each binds its own key type (`ColumnKey`/`FieldKey`) and insert/filter types. */
 
-/** Equality scope applied to every operation of a scoped repository. */
-export type Scope<TKey extends string = string> = Partial<Record<TKey, FilterScalar>>;
+/** Scope qiymati ro'yxat bo'yicha (task 014): `{ in: [...] }`; bo'sh ro'yxat — hech qanday qator. */
+export interface ScopeIn {
+  in: readonly FilterScalar[];
+}
+
+/**
+ * Scoped repository'ning har amaliga qo'llanadigan scope: maydon → tenglik qiymati yoki `{ in: [...] }`.
+ * `create` default'lari faqat tenglik scope'laridan olinadi.
+ */
+export type Scope<TKey extends string = string> = Partial<Record<TKey, FilterScalar | ScopeIn>>;
 
 /** Options for upsert / upsertMany — conflict target(s) + optional update set. */
 export interface UpsertOptions<TKey extends string = string, TInsert = Record<string, unknown>> {
@@ -146,8 +154,11 @@ export interface WireCursorParams extends Omit<WireBaseParams, "sort"> {
  */
 export type SkipReason = "unknown-key" | "invalid-value" | "forbidden-key" | "forbidden-operator" | "limit-exceeded" | "empty-filter";
 
-/** Shart qayerda tashlab yuborilgani (`page` — offset chuqurligi, `mutation` — `updateWhere` / `deleteWhere` filtri). */
-export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate" | "page" | "mutation";
+/**
+ * Shart qayerda tashlab yuborilgani (`page` — offset chuqurligi, `mutation` — `updateWhere` / `deleteWhere` filtri,
+ * `with` — `relations` ro'yxatida yo'q relation, ustun yoki filtr).
+ */
+export type SkipSite = "filter" | "sort" | "cursorKey" | "aggregate" | "page" | "mutation" | "with";
 
 /**
  * Server siyosati: maydon → ruxsat etilgan operatorlar, yoki `"*"` (hammasi — faqat aniq
@@ -222,3 +233,19 @@ export interface MutationCount {
 export interface MutationRows<TRow> extends MutationCount {
   rows: TRow[];
 }
+
+/* ------------------------------- relations -------------------------------- */
+
+/**
+ * Bitta relation uchun mijoz `with` ruxsati (task 014, R21): `columns` majburiy — ro'yxat yoki aniq `"*"`;
+ * `filterable` — relation filtrida (prisma `where`, mongoose `match`) ruxsat etilgan maydonlar;
+ * `nested` — shu relation ichidagi `with` uchun xuddi shu shakl (yo'q ⇒ ichki `with` — `forbidden-key`).
+ */
+export interface RelationRule {
+  columns: readonly string[] | "*";
+  filterable?: Filterable;
+  nested?: Relations;
+}
+
+/** Repository `relations`: relation → {@link RelationRule}. Ro'yxatda yo'q relation — `forbidden-key`, `site: "with"`. */
+export type Relations = Record<string, RelationRule>;

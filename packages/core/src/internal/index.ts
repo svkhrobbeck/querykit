@@ -11,6 +11,8 @@ export { createContextStore, type ContextStore } from "./context";
 export { normalizeSort, type NormalizedSortItem } from "./sort";
 export { clampOffset, clampPage, clampPageSize, cursorPage, infinitePage, offsetMeta, offsetPageWithoutTotal, type CursorPageOptions } from "./pagination";
 export { isAllRows, isEmptyFilter, refuseEmptyFilter } from "./mutation";
+export { scopeConditions, scopeDefaults, type ScopeCondition } from "./scope";
+export { checkWith, type WithDialect } from "./with";
 export {
   findFilterLimitViolation,
   formatLimit,

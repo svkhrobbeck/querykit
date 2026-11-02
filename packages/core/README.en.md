@@ -17,7 +17,7 @@ You usually **don't install this directly** — it's the shared foundation used 
 - **`FilterScalar` / `FilterValue`**, **`SortDirection`**.
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomic builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server response, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
-- **`Filterable`** and the skip / refusal reasons (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`, `empty-filter`; `SkipSite` + `page`, `mutation`) — policy reasons and an empty mutation filter are never dropped silently, always a `QueryKitError`.
+- **`Filterable`** and the skip / refusal reasons (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`, `empty-filter`; `SkipSite` + `page`, `mutation`, `with`) — policy reasons and an empty mutation filter are never dropped silently, always a `QueryKitError`.
 - **`QueryKitTimeoutError`** (`code: "QUERYKIT_TIMEOUT"`) — a read ran past its time limit (mongoose `maxTimeMS`). Kept apart from `QueryKitError`: the request was valid, the database was slow — map it to 503/504.
 - **`raw(value)`** — the brand for a driver's own filter object (a Prisma `where`, a Mongo filter) (R19). An adapter accepts a raw node only when it is branded with `raw()`; an unbranded plain object (it can come from a JSON body) → `QueryKitError` `forbidden-key`. ⚠️ A raw node is server code — `filterable` does not look inside it; never build one from request data.
 - **Request limits** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` and one constant per limit (table below).

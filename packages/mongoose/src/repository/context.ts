@@ -1,6 +1,17 @@
+import type { Relations } from "@querykitjs/core";
 import type { ClientSession, Model } from "mongoose";
 import { QueryKitError, QueryKitTimeoutError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
-import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import {
+  checkWith,
+  type Diagnostics,
+  isAllRows,
+  isEmptyFilter,
+  type Policy,
+  refuseEmptyFilter,
+  resolvePolicy,
+  scopeConditions,
+  type WithDialect,
+} from "@querykitjs/core/internal";
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
 import { hasPath, resolveField, type AnyModel } from "../internal/fields";
@@ -28,6 +39,8 @@ export interface RepoRuntime {
   maxTimeMS: number;
   /** Signs cursor tokens (task 012). */
   cursorSecret?: string;
+  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 // Mongoose's Query generics are extremely deep; we drive queries untyped
@@ -54,9 +67,17 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   m: AnyModel;
   diag: Diagnostics;
   hasDeletedAt: boolean;
+  /** The soft-delete path (`timestamps.deletedAt`, default `deletedAt`). */
+  deletedAtPath: string;
   /** Stamp `updatedAt` when the schema has a manual one (no `timestamps`). */
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
+  /**
+   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
+   * is selected even when the client asks with `true`.
+   */
+  withOf: (value: unknown) => never;
   /** User filter + scope + soft-delete guard as one Mongo query. */
   /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
   policy: Policy;
@@ -81,7 +102,11 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
 
 export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, config: RepositoryOptions<TDoc>): RepoContext<TDoc> {
   const m = model as AnyModel;
-  const hasDeletedAt = hasPath(m, "deletedAt");
+  // Task 014: the registry's `timestamps` names these paths.
+  const deletedAtPath = resolveField(m, runtime.timestamps?.deletedAt ?? "deletedAt") ?? "deletedAt";
+  const hasDeletedAt = hasPath(m, deletedAtPath);
+  const createdAtConfigured = runtime.timestamps?.createdAt !== undefined;
+  const createdAtPath = resolveField(m, runtime.timestamps?.createdAt ?? "createdAt");
   // Mongoose auto-bumps `updatedAt` only when the schema opts into timestamps;
   // for a manual `updatedAt` path we stamp it ourselves so every update path
   // bumps it — matching drizzle-pg's forUpdate.
@@ -98,11 +123,15 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     onSkipped: runtime.onSkippedCondition,
   };
 
-  const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag);
+  const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag, createdAtPath);
+  // A bare model (`{ author: User }`) is for typing only and opens nothing (R21).
+  const withOf = (value: unknown) => checkWith(value, config.relations as Relations | undefined, WITH_DIALECT, diag.source) as never;
 
   /** An already built user filter + scope + soft-delete guard. */
   const combineWhere = (userWhere: Query | undefined, withDeleted?: boolean): Query => {
-    const parts = [userWhere, scopeWhere, hasDeletedAt && !withDeleted ? { deletedAt: { $eq: null } } : undefined].filter((p): p is Query => p !== undefined);
+    const parts = [userWhere, scopeWhere, hasDeletedAt && !withDeleted ? { [deletedAtPath]: { $eq: null } } : undefined].filter(
+      (p): p is Query => p !== undefined,
+    );
     if (parts.length === 0) return {};
     if (parts.length === 1) return parts[0]!;
     return { $and: parts };
@@ -143,7 +172,7 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     // `id` is `_id` on the wire, like everywhere else in this adapter.
     fieldOf: key => resolveField(m, key),
     primaryKey: "_id",
-    createdAt: resolveField(m, "createdAt") ?? resolveField(m, "created_at"),
+    createdAt: createdAtConfigured ? createdAtPath : (createdAtPath ?? resolveField(m, "created_at")),
     filterable: config.filterable as never,
     sortable: config.sortable as readonly string[] | undefined,
     allowedColumns: config.allowedColumns as readonly string[] | undefined,
@@ -167,8 +196,10 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     m,
     diag,
     hasDeletedAt,
+    deletedAtPath,
     forUpdate,
     sortSpec,
+    withOf,
     composeWhere,
     mutationWhere,
     withId,
@@ -180,6 +211,16 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
 }
 
 /** `.populate()` every truthy `with` entry. */
+/** Populate options: `select`, nested `populate`, `match` (field-checked), `options.limit` / `options.skip`. */
+const WITH_DIALECT: WithDialect = {
+  columns: "select",
+  nested: "populate",
+  filters: ["match"],
+  logical: ["$and", "$or", "$nor"],
+  paging: ["limit", "skip"],
+  options: "options",
+};
+
 function applyPopulate(q: AnyQuery, withRel?: Record<string, unknown>): AnyQuery {
   if (withRel) {
     for (const key of Object.keys(withRel)) {
@@ -198,19 +239,19 @@ export const toArr = <T>(v?: T | T[]): T[] => (v === undefined ? [] : Array.isAr
 
 /** The scope as a precompiled Mongo query (equality on each field), or `undefined`. */
 function buildScopeWhere<TDoc>(m: AnyModel, config: RepositoryOptions<TDoc>): Query | undefined {
-  const scopeConditions: FieldCondition[] = config.scope
-    ? Object.entries(config.scope).map(([key, value]) => ({ key, operation: "=", value: value as never }))
-    : [];
+  // Task 014: an equality value or `{ in: [...] }`.
+  const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this
   // repository. Fail when it is configured, not per request, and regardless of
   // `strict` — this is a programming error, not bad input.
-  for (const condition of scopeConditions) {
+  for (const condition of conditions) {
     if (!resolveField(m, condition.key)) {
       throw new QueryKitError({ source: m.modelName, site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  return scopeConditions.length ? buildWhere(m, scopeConditions) : undefined;
+  // An empty `in` list matches no row (`$in: []`).
+  return conditions.length ? buildWhere(m, conditions) : undefined;
 }
 
 /** Reads that get a time limit; writes are never cut off half-way. */

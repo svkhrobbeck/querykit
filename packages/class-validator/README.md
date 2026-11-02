@@ -110,6 +110,8 @@ Ikkala flag ham **zarur**, aks holda kafolatlar yarim ishlaydi:
 
 ## Opsiyalar
 
+> ⚠️ Konstanta DTO'lar (`BaseParamsDto`, `OffsetParamsDto`, `InfiniteParamsDto`, `CursorParamsDto`) `@deprecated` (task 014): keyingi major'da olib tashlanadi. Yangi kod uchun `make*ParamsDto`.
+
 `makeOffsetParamsDto` / `makeInfiniteParamsDto` / `makeCursorParamsDto`:
 
 | Opsiya        | Default                           | Ma'nosi                                                                               |

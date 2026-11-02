@@ -1,5 +1,5 @@
 import type { AllRows, MutationOptions } from "@querykitjs/core";
-import { clampPageSize } from "@querykitjs/core/internal";
+import { clampPageSize, scopeDefaults } from "@querykitjs/core/internal";
 
 import type { FieldKey, Filter, Id, Insert, RepositoryOptions, Row, UpsertOptions } from "../types";
 import { resolveField } from "../internal/fields";
@@ -17,16 +17,16 @@ const KEY_SEPARATOR = String.fromCharCode(0);
 
 /** `create*`, `upsert*`, `update*`, `delete*`, `softDelete`, `restore`. */
 export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOptions<TDoc>) {
-  const { runtime, m, hasDeletedAt, forUpdate, composeWhere, mutationWhere, withId, attachSession } = ctx;
+  const { runtime, m, hasDeletedAt, deletedAtPath, forUpdate, composeWhere, mutationWhere, withId, attachSession } = ctx;
 
   /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
   const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
 
   /** Apply scope defaults to insert values — scope wins (can't be overridden). */
   const forInsert = (values: object): Record<string, unknown> => ({
-    ...(config.scope as object),
+    ...scopeDefaults(config.scope as Record<string, unknown> | undefined),
     ...values,
-    ...(config.scope as object),
+    ...scopeDefaults(config.scope as Record<string, unknown> | undefined),
   });
 
   /** Build the `{filter, update}` for an upsert (target → filter, rest → $set/$setOnInsert). */
@@ -130,12 +130,12 @@ export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOp
 
     async softDelete(id: Id, idKey: FieldKey<TDoc> = "id" as FieldKey<TDoc>) {
       if (!hasDeletedAt) throw new Error("softDelete: schema has no deletedAt path.");
-      return updateOne(composeWhere(withId(undefined, idKey as string, id), false), forUpdate({ deletedAt: new Date() }));
+      return updateOne(composeWhere(withId(undefined, idKey as string, id), false), forUpdate({ [deletedAtPath]: new Date() }));
     },
 
     async restore(id: Id, idKey: FieldKey<TDoc> = "id" as FieldKey<TDoc>) {
       if (!hasDeletedAt) throw new Error("restore: schema has no deletedAt path.");
-      return updateOne(composeWhere(withId(undefined, idKey as string, id), true), forUpdate({ deletedAt: null }));
+      return updateOne(composeWhere(withId(undefined, idKey as string, id), true), forUpdate({ [deletedAtPath]: null }));
     },
   };
 }

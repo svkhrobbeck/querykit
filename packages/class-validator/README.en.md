@@ -110,6 +110,8 @@ If you do open a field with `allow`, add the **second layer at the repository**:
 
 ## Options
 
+> ⚠️ The constant DTOs (`BaseParamsDto`, `OffsetParamsDto`, `InfiniteParamsDto`, `CursorParamsDto`) are `@deprecated` (task 014) and go away in the next major. Use `make*ParamsDto` in new code.
+
 `makeOffsetParamsDto` / `makeInfiniteParamsDto` / `makeCursorParamsDto`:
 
 | Option        | Default                           | Meaning                                                                           |

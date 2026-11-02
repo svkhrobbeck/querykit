@@ -1,12 +1,11 @@
 import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta, offsetPageWithoutTotal } from "@querykitjs/core/internal";
 
 import type { ByIdParams, Filter, Id, InfiniteParams, InfiniteResult, OffsetParams, OffsetResult, QueryParams } from "../types";
-import { buildOrderBy } from "../internal/order-by";
 import type { RepoContext } from "./context";
 
 /** `findAll`, `findOne`, `findById`, `findList`, `findInfinite`, `count`, `exists`. */
 export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
-  const { runtime, meta, diag, delegate, projection, policy, composeWhere, withId, countWhere } = ctx;
+  const { runtime, delegate, projection, policy, sortBy, withOf, composeWhere, withId, countWhere } = ctx;
 
   /** The client's filter and sort, checked before Prisma is called. */
   const checked = (params: QueryParams<TDelegate>) => {
@@ -19,8 +18,8 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       checked(params);
       const rows = await delegate().findMany({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(meta, params.sort as never, diag),
-        ...projection(params.columns, params.with),
+        orderBy: sortBy(params.sort as never),
+        ...projection(params.columns, withOf(params.with)),
       });
       return rows as never;
     },
@@ -29,8 +28,8 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       checked(params);
       const row = await delegate().findFirst({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(meta, params.sort as never, diag),
-        ...projection(params.columns, params.with),
+        orderBy: sortBy(params.sort as never),
+        ...projection(params.columns, withOf(params.with)),
       });
       return (row ?? undefined) as never;
     },
@@ -41,7 +40,7 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       policy.checkFilter(filter);
       const row = await delegate().findFirst({
         where: composeWhere(withId(filter, idKey as string, id), params.withDeleted),
-        ...projection(params.columns, params.with),
+        ...projection(params.columns, withOf(params.with)),
       });
       return (row ?? undefined) as never;
     },
@@ -55,10 +54,10 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       const rows = (take: number) =>
         delegate().findMany({
           where,
-          orderBy: buildOrderBy(meta, params.sort as never, diag),
+          orderBy: sortBy(params.sort as never),
           take,
           skip: (page - 1) * perPage,
-          ...projection(params.columns, params.with),
+          ...projection(params.columns, withOf(params.with)),
         });
 
       // Task 013: no count — one extra row tells whether a next page exists.
@@ -75,10 +74,10 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
 
       const rows = await delegate().findMany({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(meta, params.sort as never, diag),
+        orderBy: sortBy(params.sort as never),
         take: limit + 1,
         skip: offset,
-        ...projection(params.columns, params.with),
+        ...projection(params.columns, withOf(params.with)),
       });
 
       return infinitePage(rows, limit, offset) as InfiniteResult<never>;

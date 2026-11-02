@@ -10,7 +10,12 @@ export type SortSpec = Record<string, 1 | -1>;
  * Build a Mongo sort spec from the sort input. Unknown fields are skipped; when
  * nothing valid remains, defaults to newest-first (`createdAt` desc, else `_id`).
  */
-export function buildSort(model: AnyModel, sort?: Sort, diag?: Diagnostics): SortSpec {
+export function buildSort(
+  model: AnyModel,
+  sort?: Sort,
+  diag?: Diagnostics,
+  createdAt: string | undefined = hasPath(model, "createdAt") ? "createdAt" : undefined,
+): SortSpec {
   const spec: SortSpec = {};
   for (const item of normalizeSort(sort, diag)) {
     const field = resolveField(model, item.key);
@@ -20,7 +25,7 @@ export function buildSort(model: AnyModel, sort?: Sort, diag?: Diagnostics): Sor
     else reportSkip(diag, { site: "sort", key: item.key, reason: "unknown-key" });
   }
   if (Object.keys(spec).length === 0) {
-    if (hasPath(model, "createdAt")) spec.createdAt = -1;
+    if (createdAt) spec[createdAt] = -1;
     else spec._id = -1;
   }
   return spec;

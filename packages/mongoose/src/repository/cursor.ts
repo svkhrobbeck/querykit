@@ -9,7 +9,7 @@ import type { AnyQuery, RepoContext } from "./context";
 
 /** `findCursor` — keyset pagination on one field. */
 export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
-  const { runtime, m, diag, guarded, permits, projection, policy, composeWhere, applyPopulate, attachSession } = ctx;
+  const { runtime, m, diag, guarded, permits, projection, policy, withOf, composeWhere, applyPopulate, attachSession } = ctx;
 
   return {
     async findCursor(params: CursorParams<TDoc> = {}) {
@@ -68,7 +68,7 @@ export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
         .find(where, proj)
         .sort(tieBreak ? { [field]: ascInQuery ? 1 : -1, _id: ascInQuery ? 1 : -1 } : { [field]: ascInQuery ? 1 : -1 })
         .limit(limit + 1);
-      q = applyPopulate(q, params.with);
+      q = applyPopulate(q, withOf(params.with));
       const rows = (await attachSession(q).lean().exec()) as Record<string, unknown>[];
 
       const page = await cursorPage(rows, {

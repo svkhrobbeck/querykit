@@ -108,6 +108,12 @@ export const registry = createRegistry(mongoose.connection);
 `maxPerPage`/`maxLimit` — **ikkinchi himoya qatlami**: validatsiya
 (`@querykitjs/zod` factory'lari) chetlab o'tilsa ham repository o'zi clamp qiladi.
 
+`timestamps` — createdAt / deletedAt maydon nomlari (masalan snake_case loyihada): default sort va default `sortable` shu `createdAt`ni, soft-delete (`softDelete`, `restore`, `withDeleted`) shu `deletedAt`ni ishlatadi.
+
+```ts
+export const registry = createRegistry(mongoose.connection, { timestamps: { createdAt: "created_at", deletedAt: "deleted_at" } });
+```
+
 ### 2. Har model uchun repository
 
 ```ts
@@ -300,6 +306,20 @@ export const registry = createRegistry(mongoose.connection, { cursorSecret: proc
 
 ## Tipli relation'lar va maydon tanlash
 
+Mijoz `with` bilan faqat `relations`da yozilgan relation'larni ochadi (task 014, R21):
+
+```ts
+const postsRepository = registry.repository(Post, {
+  relations: { author: { model: User, columns: ["name"] } }, // model — faqat tip uchun
+});
+await postsRepository.findAll({ with: { author: true } }); // author faqat name bilan
+```
+
+- `columns` majburiy — ro'yxat yoki aniq `"*"`. `with: { rel: true }` ham faqat shu ustunlarni tanlaydi.
+- Ro'yxatda yo'q relation, ustun, filtr maydoni yoki ichki relation → `QueryKitError` `reason: "forbidden-key"`, `site: "with"`, `key` — `relation` yoki `relation.field`; drayver chaqirilmaydi.
+- Ruxsat etilgan opsiyalar: `select`, ichki `populate` (`nested` bilan), `match` (maydonlari `filterable`da; `$where` / `$expr` yo'q), `options.limit` / `options.skip`.
+- Qisqa yozuv `{ author: User }` faqat tip uchun: `with: { author: … }` → `forbidden-key`.
+
 O'qish metodlari natija tipini `with` (populate) va `columns`dan chiqaradi — qo'lda generic yo'q:
 
 ```ts
@@ -311,7 +331,7 @@ rows[0].id; // ObjectId
 rows[0].email; // ❌ tip xatosi — tanlanmagan
 ```
 
-Populate qilingan relation'larni runtime'да tiplash uchun ref model'larni bering: `registry.repository(Post, { relations: { author: User } })`.
+Populate qilingan relation'larni tiplash va ochish uchun ref model'ni rule ichida bering: `registry.repository(Post, { relations: { author: { model: User, columns: ["name"] } } })` (qisqa `{ author: User }` faqat tip — `with`ga ruxsat bermaydi).
 
 ## Ommaviy yangilash va o'chirish
 
@@ -357,6 +377,12 @@ Scope'ni `registry.repository(Model, { scope })` bilan ham berish mumkin.
 Noma'lum scope kaliti — repository yaratilishida **xato** (jimgina tashlansa
 RBAC filtri yo'qolib ketardi).
 
+Scope qiymati ro'yxat ham bo'lishi mumkin (task 014): `{ shopId: { in: [1, 2] } }` — har o'qish va yozish shu qiymatlar bilan cheklanadi; bo'sh ro'yxat (`{ in: [] }`) — hech qanday qator (xato emas). `create` faqat tenglik scope'larini to'ldiradi.
+
+```ts
+const mine = repository.scoped({ shopId: { in: user.shopIds } });
+```
+
 ## Qiymatlar, NULL tartibi va bir xillik
 
 Uchala adapter (drizzle-pg, prisma-pg, mongoose) bir xil natija beradi (task 021):
@@ -398,6 +424,9 @@ await usersRepository.findAll({ filter: raw({ age: { $gt: 18 } }) });
 - `updateWhere` / `deleteWhere` endi `Row[]` emas, `{ count }` qaytaradi (task 013); qatorlar kerak bo'lsa `{ returning: { limit } }` → `{ count, rows }`.
 - Filtrsiz `updateWhere` / `deleteWhere` → `empty-filter`; hamma qatorlar uchun `{ all: true }` yozing. Mutatsiya filtri endi `filterable` siyosatidan o'tadi.
 - `OffsetMeta.total_items` / `total_pages` tipi `number | null` (`withTotal: false` bilan `null`).
+- `with` endi faqat `relations` allow-list bilan ishlaydi (task 014): ro'yxatsiz repository'da `with` → `forbidden-key`, `site: "with"`.
+- `relations: { author: User }` → `relations: { author: { model: User, columns: ["name"] } }` (qisqa yozuv endi `with`ga ruxsat bermaydi).
+- Scope qiymati `{ in: [...] }` bo'lishi mumkin; `timestamps` registry opsiyasi createdAt / deletedAt nomlarini beradi.
 
 ## Wire (JSON) qiymatlari va DbService'dan migratsiya
 

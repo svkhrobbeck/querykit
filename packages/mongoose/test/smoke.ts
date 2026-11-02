@@ -38,7 +38,8 @@ async function main() {
 
   const registry = createRegistry(mongoose.connection);
   const usersRepo = registry.repository(User, OPEN_USER);
-  const postsRepo = registry.repository(Post, OPEN_POST);
+  // Task 014 (R21): `with` opens only listed relations.
+  const postsRepo = registry.repository(Post, { ...OPEN_POST, relations: { author: { model: User, columns: "*" } } });
   const uf = createFilters<IUser>();
 
   try {
@@ -223,11 +224,25 @@ async function main() {
     check("extender custom method (findByEmail)", (await uExt.findByEmail("ali@example.com"))?.name === "Ali Valiyev");
 
     // 17. relations + extender together
-    const pRel = registry.repository(Post, { ...OPEN_POST, relations: { author: User } }, base => ({
+    // R21: the bare-model shorthand types `with` but opens nothing.
+    const shorthand = registry.repository(Post, { ...OPEN_POST, relations: { author: User } });
+    let shortErr = "";
+    try {
+      await shorthand.findOne({ with: { author: true } });
+    } catch (err) {
+      shortErr = `${(err as QueryKitError).info?.reason}/${(err as QueryKitError).info?.site}`;
+    }
+    check("R21 relations { author: User } (shorthand) + with → forbidden-key/with", shortErr === "forbidden-key/with", shortErr);
+    const pRel = registry.repository(Post, { ...OPEN_POST, relations: { author: { model: User, columns: ["name"] } } }, base => ({
       byTitle: (t: string) => base.findOne({ filter: [{ key: "title", operation: "=", value: t }] }),
     }));
     const pr = await pRel.findOne({ filter: [{ key: "title", operation: "=", value: "A2" }], with: { author: true } });
-    check("relations repo: with populate", Boolean((pr as { author?: { name?: string } })?.author?.name));
+    const populated = (pr as unknown as { author?: Record<string, unknown> })?.author;
+    check(
+      "relations repo: with populate selects only the listed columns",
+      Boolean(populated?.name) && !("email" in (populated ?? {})),
+      JSON.stringify(populated),
+    );
     check("relations repo: custom method (byTitle)", (await pRel.byTitle("G1"))?.title === "G1");
 
     /* ============================ STAGE 2: writes ========================== */
@@ -375,6 +390,32 @@ async function main() {
     }
     check("A1 tied createdAt with columns { n }: 25 distinct n, no _id in rows", ns.size === 25 && !("_id" in (colPage.data[0] ?? {})), `${ns.size}`);
     check("A1 tied createdAt: walking back reaches the other 20 _id", backIds.size === 20 && [...backIds].every(id => tieSeen.has(id)), `${backIds.size}`);
+    // Task 014 P2: registry timestamps name snake_case paths — default sort, soft delete, restore.
+    // One Model type: mongoose 8 cannot call create on the `models.X ?? model()` union.
+    const Snake = (mongoose.models.Snake ??
+      mongoose.model("Snake", new mongoose.Schema({ title: String, created_at: Date, deleted_at: { type: Date, default: null } }))) as mongoose.Model<{
+      title: string;
+      created_at: Date;
+      deleted_at: Date | null;
+    }>;
+    await Snake.deleteMany({});
+    const [older] = await Snake.create([
+      { title: "older", created_at: new Date("2026-01-01T00:00:00.000Z") },
+      { title: "newer", created_at: new Date("2026-02-01T00:00:00.000Z") },
+    ]);
+    const snakeRepo = createRegistry(mongoose.connection, { timestamps: { createdAt: "created_at", deletedAt: "deleted_at" } }).repository(
+      Snake as never,
+    ) as unknown as {
+      findAll(params?: unknown): Promise<{ title: string }[]>;
+      softDelete(id: unknown): Promise<unknown>;
+      restore(id: unknown): Promise<unknown>;
+    };
+    check("A3 timestamps.createdAt: default sort is created_at desc", (await snakeRepo.findAll()).map(d => d.title).join() === "newer,older");
+    await snakeRepo.softDelete(older!._id);
+    check("A3 timestamps.deletedAt: softDelete sets deleted_at and hides the doc", (await snakeRepo.findAll()).map(d => d.title).join() === "newer");
+    check("A3 …withDeleted shows it", (await snakeRepo.findAll({ withDeleted: true })).length === 2);
+    await snakeRepo.restore(older!._id);
+    check("A3 …restore clears deleted_at", (await snakeRepo.findAll()).length === 2);
 
     /* --------------------------- projection guards -------------------------- */
     /* Parity with drizzle-pg test/sql.ts §13-§17. `email` stands in for `password`. */

@@ -1,7 +1,18 @@
 import { QueryKitError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
-import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import {
+  checkWith,
+  type Diagnostics,
+  isAllRows,
+  isEmptyFilter,
+  type Policy,
+  refuseEmptyFilter,
+  resolvePolicy,
+  scopeConditions,
+  type WithDialect,
+} from "@querykitjs/core/internal";
 
-import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions } from "../types";
+import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
+import { buildOrderBy } from "../internal/order-by";
 import type { AnyExecutor } from "../internal/executor";
 import { readModelMeta, resolveField, type ModelMeta } from "../internal/fields";
 import { buildProjection, truthyKeys, type Projection, type ProjectionGuard } from "../internal/projection";
@@ -29,6 +40,8 @@ export interface RepoRuntime {
   limits?: Partial<QueryLimits>;
   /** Signs cursor tokens (task 012). */
   cursorSecret?: string;
+  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 /** The delegate methods this adapter drives, kept structural on purpose. */
@@ -61,6 +74,18 @@ export interface RepoContext<TDelegate> {
   diag: Diagnostics;
   /** Resolved per call so repositories inside `registry.transaction` use the tx client. */
   delegate: () => RuntimeDelegate;
+  /** The soft-delete field (`timestamps.deletedAt`, default `deletedAt`), when the model has it. */
+  deletedAtField: string | undefined;
+  /** The createdAt field (`timestamps.createdAt`, default `createdAt`), when the model has it. */
+  createdAtField: string | undefined;
+  /** `orderBy` for a sort; none given ⇒ createdAt desc, else the id. */
+  sortBy: (sort?: Sort) => Record<string, unknown>[];
+  /**
+   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
+   * is selected even when the client asks with `true`.
+   */
+  withOf: (value: unknown) => never;
   guard: ProjectionGuard;
   /** `forcedColumns` or `allowedColumns` is configured. */
   guarded: boolean;
@@ -93,12 +118,18 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
     onSkipped: runtime.onSkippedCondition,
   };
 
+  // Task 014: the registry's `timestamps` names these fields.
+  const deletedAtField = resolveField(meta, runtime.timestamps?.deletedAt ?? "deletedAt");
+  const createdAtField = resolveField(meta, runtime.timestamps?.createdAt ?? "createdAt");
+  const sortBy = (sort?: Sort) => buildOrderBy(meta, sort as never, diag, createdAtField) as Record<string, unknown>[];
+  const withOf = (value: unknown) => checkWith(value, config.relations, WITH_DIALECT, diag.source) as never;
+
   const scopeWhere = buildScopeWhere(meta, config);
-  const policy = buildPolicy(meta, config, runtime.limits);
+  const policy = buildPolicy(meta, config, runtime.limits, createdAtField);
 
   /** An already built user `where` + scope + soft-delete guard. */
   const combineWhere = (userWhere: Where | undefined, withDeleted?: boolean): Where | undefined =>
-    andWhere([userWhere, scopeWhere, meta.hasDeletedAt && !withDeleted ? { deletedAt: null } : undefined]);
+    andWhere([userWhere, scopeWhere, deletedAtField && !withDeleted ? { [deletedAtField]: null } : undefined]);
   const composeWhere = (userFilter?: Filter<TDelegate>, withDeleted?: boolean): Where | undefined =>
     combineWhere(buildWhere(meta, userFilter as Filter, diag), withDeleted);
 
@@ -145,6 +176,10 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
     guarded: Boolean(forcedKeys ?? allowed),
     permits,
     projection,
+    deletedAtField,
+    createdAtField,
+    sortBy,
+    withOf,
     composeWhere,
     mutationWhere,
     withId,
@@ -157,19 +192,19 @@ export const toArray = <T>(value: T | T[] | undefined): T[] => (value === undefi
 
 /** The scope as a precompiled `where` (equality on each field), or `undefined`. */
 function buildScopeWhere<TDelegate>(meta: ModelMeta, config: RepositoryOptions<TDelegate>): Where | undefined {
-  const scopeConditions: FieldCondition[] = config.scope
-    ? Object.entries(config.scope).map(([key, value]) => ({ key, operation: "=" as const, value: value as never }))
-    : [];
+  // Task 014: an equality value or `{ in: [...] }`.
+  const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this
   // repository. Fail when it is configured, not per request, and regardless of
   // `strict` — this is a programming error, not bad input.
-  for (const condition of scopeConditions) {
+  for (const condition of conditions) {
     if (!resolveField(meta, condition.key)) {
       throw new QueryKitError({ source: meta.name, site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  return scopeConditions.length ? buildWhere(meta, scopeConditions) : undefined;
+  // An empty `in` list matches no row (`in: []`).
+  return conditions.length ? buildWhere(meta, conditions) : undefined;
 }
 
 /**
@@ -198,7 +233,22 @@ function buildGuard<TDelegate>(config: RepositoryOptions<TDelegate>): Projection
  * `@map`ped column name maps to the field); `relation.field` is a field of its own
  * when `relation` is a relation field, so it can be opened or kept closed.
  */
-function buildPolicy<TDelegate>(meta: ModelMeta, config: RepositoryOptions<TDelegate>, registryLimits?: Partial<QueryLimits>): Policy {
+/** Prisma `include` options: `select`, nested `include`, `where` (field-checked), `take` / `skip`, `orderBy` on allowed columns. */
+const WITH_DIALECT: WithDialect = {
+  columns: "select",
+  nested: "include",
+  filters: ["where"],
+  logical: ["AND", "OR", "NOT"],
+  paging: ["take", "skip"],
+  orderBy: "orderBy",
+};
+
+function buildPolicy<TDelegate>(
+  meta: ModelMeta,
+  config: RepositoryOptions<TDelegate>,
+  registryLimits: Partial<QueryLimits> | undefined,
+  createdAtField: string | undefined,
+): Policy {
   const fieldOf = (key: string): string | undefined => {
     const dot = key.indexOf(".");
     if (dot < 0) return resolveField(meta, key);
@@ -208,7 +258,7 @@ function buildPolicy<TDelegate>(meta: ModelMeta, config: RepositoryOptions<TDele
     source: meta.name,
     fieldOf,
     primaryKey: meta.idField ?? "id",
-    createdAt: resolveField(meta, "createdAt"),
+    createdAt: createdAtField,
     filterable: config.filterable,
     sortable: config.sortable,
     allowedColumns: config.allowedColumns as readonly string[] | undefined,

@@ -52,7 +52,12 @@ const policyOptions = (policy: CaseOptions["policy"]) => (policy === undefined ?
 export const prismaHarness: Harness = {
   name: "prisma-pg",
   async run(call: Call, options: CaseOptions, onSkipped) {
-    const registry = createRegistry(fakeClient as never, { strict: options.strict, onSkippedCondition: onSkipped, cursorSecret: options.cursorSecret });
+    const registry = createRegistry(fakeClient as never, {
+      strict: options.strict,
+      onSkippedCondition: onSkipped,
+      cursorSecret: options.cursorSecret,
+      timestamps: options.timestamps,
+    });
     const repository = registry.repository(
       "user" as never,
       {

@@ -30,10 +30,12 @@ Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — o
 
 ```ts
 import { sValidator } from "@hono/zod-validator";
-import { offsetParamsSchema } from "@querykitjs/zod";
+import { makeOffsetParamsSchema } from "@querykitjs/zod";
 import { buyersRepository } from "@/db/repositories/buyers.repository";
 
-buyersRoute.post("/list", sValidator("json", offsetParamsSchema), async ctx => {
+const listSchema = makeOffsetParamsSchema(); // safe defaults
+
+buyersRoute.post("/list", sValidator("json", listSchema), async ctx => {
   const params = ctx.req.valid("json"); // validatsiyalangan + core-mos
   const { data, meta } = await buyersRepository.findList(params);
   return ctx.json({ data, meta });
@@ -131,6 +133,8 @@ const importList = makeOffsetParamsSchema({ limits: { maxInItems: 500 } });
 - `filterSchema` endi `z.unknown().pipe(...)`: `z.infer` (chiqish) o'zgarmagan, `z.input` esa `unknown`.
 
 ## Schema'lar (konstantalar — legacy parity)
+
+> ⚠️ Bu konstantalar `@deprecated` (task 014): keyingi major'da olib tashlanadi. Yangi kod uchun `make*ParamsSchema` factory'lari.
 
 ⚠️ Quyidagi konstantalarda `perPage`/`limit` **cap yo'q** va `columns`/`with`/`withDeleted`
 **ochiq** (mavjud loyihalar buzilmasligi uchun); [so'rov limitlari](#limits) esa ularda ham bor.

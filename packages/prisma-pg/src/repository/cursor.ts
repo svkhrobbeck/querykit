@@ -10,7 +10,7 @@ import type { RepoContext } from "./context";
 
 /** `findCursor` — keyset pagination on one field. */
 export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
-  const { runtime, meta, diag, delegate, guard, guarded, permits, projection, policy, composeWhere } = ctx;
+  const { runtime, meta, diag, delegate, guard, guarded, permits, projection, policy, withOf, composeWhere } = ctx;
 
   return {
     async findCursor(params: CursorParams<TDelegate> = {}) {
@@ -73,7 +73,7 @@ export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
         where,
         orderBy: tieBreak ? [{ [field]: ascInQuery ? "asc" : "desc" }, { [idField]: ascInQuery ? "asc" : "desc" }] : [{ [field]: ascInQuery ? "asc" : "desc" }],
         take: limit + 1,
-        ...projection(params.columns, params.with, [field, idField]),
+        ...projection(params.columns, withOf(params.with), [field, idField]),
       });
 
       const page = await cursorPage(rows, { limit, direction, hasCursor: token !== undefined, cursorField: field, idField, secret: runtime.cursorSecret });

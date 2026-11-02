@@ -1,3 +1,4 @@
+import type { RelationRule } from "@querykitjs/core";
 import type * as Core from "@querykitjs/core";
 import type { Model } from "mongoose";
 import type { AllRows, MutationCount, MutationRows } from "@querykitjs/core";
@@ -21,10 +22,14 @@ import type { CursorParams, CursorResult, InfiniteParams, InfiniteResult, Offset
 
 /* ------------------------------- relations -------------------------------- */
 
-/** Map of relation field name → the Mongoose model it refers to. */
-export type RelationMap = Record<string, Model<any>>;
+/**
+ * Relation field → its rule (task 014, R21): `{ model?, columns, filterable?, nested? }` opens it for a
+ * client `with` (`columns` required — a list or `"*"`). A bare model (`{ author: User }`) still types
+ * `with`, but opens nothing: `with: { author: … }` is `forbidden-key`, `site: "with"`.
+ */
+export type RelationMap = Record<string, Model<any> | (RelationRule & { model?: Model<any> })>;
 
-type DocOf<M> = M extends Model<infer T> ? T : never;
+type DocOf<M> = M extends Model<infer T> ? T : M extends { model: Model<infer T> } ? T : Record<string, unknown>;
 
 /** Resolve a {@link RelationMap} to `{ field: <its document type> }`. */
 export type RelationDocs<TRel extends RelationMap> = { [K in keyof TRel]: DocOf<TRel[K]> };
@@ -44,7 +49,7 @@ export type RelationDocs<TRel extends RelationMap> = { [K in keyof TRel]: DocOf<
  * result to a client.
  */
 export interface RepositoryOptions<TDoc = any, TRel extends RelationMap = RelationMap> {
-  /** Declare populatable relations (field → model) so `with` types the result. */
+  /** Populatable relations: field → `{ model?, columns, filterable?, nested? }` (R21), or a bare model (typing only). */
   relations?: TRel;
   /** Constant equality filter added to every read/write (RBAC / multi-tenancy). */
   scope?: Scope<TDoc>;

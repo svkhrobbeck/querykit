@@ -77,6 +77,12 @@ export const registry = createRegistry(prisma);
 // export const registry = createRegistry(prisma, { defaultPerPage: 20, defaultLimit: 20 });
 ```
 
+`timestamps` — createdAt / deletedAt maydon nomlari (masalan snake_case loyihada): default sort va default `sortable` shu `createdAt`ni, soft-delete (`softDelete`, `restore`, `withDeleted`) shu `deletedAt`ni ishlatadi.
+
+```ts
+export const registry = createRegistry(prisma, { timestamps: { createdAt: "created_at", deletedAt: "deleted_at" } });
+```
+
 ### 2. Repository (model bo'yicha)
 
 Model **handle** bilan olinadi — `drizzle-pg` jadval obyektini, `mongoose` esa `Model`ni qabul qilgani kabi. Nom (delegate kaliti, camelCase) ham qabul qilinadi: `User` → `"user"`, `LegalEntity` → `"legalEntity"`.
@@ -303,6 +309,19 @@ export const registry = createRegistry(prisma, { cursorSecret: process.env.CURSO
 
 ## Tipli `columns` va `with`
 
+Mijoz `with` bilan faqat `relations`da yozilgan relation'larni ochadi (task 014, R21):
+
+```ts
+const usersRepository = registry.repository("user", {
+  relations: { posts: { columns: ["id", "title"], filterable: { published: "*" } } },
+});
+await usersRepository.findAll({ with: { posts: { where: { published: true }, take: 5 } } }); // posts: id, title
+```
+
+- `columns` majburiy — ro'yxat yoki aniq `"*"`. `with: { rel: true }` ham faqat shu ustunlarni tanlaydi.
+- Ro'yxatda yo'q relation, ustun, filtr maydoni yoki ichki relation → `QueryKitError` `reason: "forbidden-key"`, `site: "with"`, `key` — `relation` yoki `relation.field`; drayver chaqirilmaydi.
+- Ruxsat etilgan opsiyalar: `select`, ichki `include` (`nested` bilan), `where` (maydonlari `filterable`da), `take` / `skip`, ruxsat etilgan ustunlar bo'yicha `orderBy`.
+
 ```ts
 const picked = await usersRepository.findAll({ columns: { id: true, email: true } });
 //    ^? { id: number; email: string }[]   — `name` tipda ham yo'q
@@ -365,6 +384,12 @@ await mine.create({ title: "Yangi" }); // authorId avtomatik qo'yiladi
 ```
 
 Scope har bir o'qish/yozishga `AND` bilan qo'shiladi va insert'larga singdiriladi (scope ustun keladi). Scope kaliti model'da topilmasa repository **yaratilishida** xato beradi — jimgina tushib qolsa filtr yo'qolardi.
+
+Scope qiymati ro'yxat ham bo'lishi mumkin (task 014): `{ shopId: { in: [1, 2] } }` — har o'qish va yozish shu qiymatlar bilan cheklanadi; bo'sh ro'yxat (`{ in: [] }`) — hech qanday qator (xato emas). `create` faqat tenglik scope'larini to'ldiradi.
+
+```ts
+const mine = repository.scoped({ shopId: { in: user.shopIds } });
+```
 
 ## Projeksiya guard'lari
 
@@ -446,6 +471,8 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 - `updateWhere` / `deleteWhere` endi `Row[]` emas, `{ count }` qaytaradi (task 013); qatorlar kerak bo'lsa `{ returning: { limit } }` → `{ count, rows }`.
 - Filtrsiz `updateWhere` / `deleteWhere` → `empty-filter`; hamma qatorlar uchun `{ all: true }` yozing. Mutatsiya filtri endi `filterable` siyosatidan o'tadi.
 - `OffsetMeta.total_items` / `total_pages` tipi `number | null` (`withTotal: false` bilan `null`).
+- `with` endi faqat `relations` allow-list bilan ishlaydi (task 014): ro'yxatsiz repository'da `with` → `forbidden-key`, `site: "with"`.
+- Scope qiymati `{ in: [...] }` bo'lishi mumkin; `timestamps` registry opsiyasi createdAt / deletedAt nomlarini beradi.
 
 ## Cheklovlar
 

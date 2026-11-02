@@ -110,7 +110,11 @@ const offsetField = (maxOffset: number) =>
 
 /* -------------------------------- params ---------------------------------- */
 
-/** Umumiy params (paginatsiyasiz): filter/sort/columns/with/withDeleted. */
+/**
+ * Umumiy params (paginatsiyasiz): filter/sort/columns/with/withDeleted.
+ *
+ * @deprecated Use `makeOffsetParamsSchema` / `makeInfiniteParamsSchema` / `makeCursorParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
+ */
 export const baseParamsSchema = z.object({
   filter: filterSchema.optional(),
   sort: sortSchema.optional(),
@@ -119,7 +123,11 @@ export const baseParamsSchema = z.object({
   withDeleted: z.boolean().optional(),
 });
 
-/** Offset (sahifali) params — `page` + `perPage`; `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`. */
+/**
+ * Offset (sahifali) params — `page` + `perPage`; `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`.
+ *
+ * @deprecated Use `makeOffsetParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
+ */
 export const offsetParamsSchema = baseParamsSchema
   .extend({
     page: z.number().int().positive().optional(),
@@ -127,7 +135,11 @@ export const offsetParamsSchema = baseParamsSchema
   })
   .superRefine(offsetDepthCheck(DEFAULT_QUERY_LIMITS.maxOffset));
 
-/** Infinite-scroll params — `limit` + `offset` (`offset` ≤ `DEFAULT_MAX_OFFSET`). */
+/**
+ * Infinite-scroll params — `limit` + `offset` (`offset` ≤ `DEFAULT_MAX_OFFSET`).
+ *
+ * @deprecated Use `makeInfiniteParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
+ */
 export const infiniteParamsSchema = baseParamsSchema.extend({
   limit: z.number().int().positive().optional(),
   offset: offsetField(DEFAULT_QUERY_LIMITS.maxOffset),
@@ -136,6 +148,8 @@ export const infiniteParamsSchema = baseParamsSchema.extend({
 /**
  * Cursor (keyset) params — `limit`/`cursor`/`cursorKey`/`order`/`direction`.
  * No `sort`: cursor pagination is driven by `order` + `direction`, not `sort`.
+ *
+ * @deprecated Use `makeCursorParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
  */
 export const cursorParamsSchema = baseParamsSchema.omit({ sort: true }).extend({
   limit: z.number().int().positive().optional(),
