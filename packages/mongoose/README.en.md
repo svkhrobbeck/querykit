@@ -324,6 +324,16 @@ A scope can also be given as `registry.repository(Model, { scope })`. An unknown
 scope key **throws** when the repository is built — dropping it silently would
 remove the RBAC filter.
 
+## Values, NULL order and parity
+
+All three adapters (drizzle-pg, prisma-pg, mongoose) return the same result (task 021):
+
+- **Literal value operators.** `contains`, `startsWith` and `endsWith` match their value literally: `startsWith "%"` finds only rows starting with `%`, `contains "_"` a real `_`. Wildcards belong to `like` / `ilike` / `notLike` only.
+- **Type casting.** Every value is cast to its field type (number, boolean, date, ObjectId, enum). A mismatch (`age = "abc"`) is `invalid-value`: the condition is dropped and `onSkippedCondition` is called, a `QueryKitError` under `strict`; the driver is not called.
+- **`not`** follows SQL three-valued logic: `not(and(…))` / `not(or(…))` over a NULL field agree on every adapter.
+- **NULL order.** NULL first on `asc`, last on `desc` (MongoDB's order).
+- **A malformed sort item** (`null`, `{}`) is dropped and reported as `invalid-value` (`site: "sort"`), an error under `strict`.
+
 ## Migrating to 3.0
 
 In 3.0 a repository without a policy is **narrow**: `=` and `in` on `allowedColumns` / `forcedColumns` / `_id` only, sorting by `_id` and `createdAt`. To bring back the 2.x behaviour for one repository on purpose:

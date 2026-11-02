@@ -58,7 +58,10 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "id", operation: "=", value: 2 }] } },
     options: { policy: "default" },
     expect: { names: ["Bob"] },
-    knownDifference: { mongoose: "the fixture id maps to `_id` (an ObjectId), so the numeric `id = 2` fails to cast — a fixture difference, not a policy one" },
+    // MongoDB ids are ObjectIds: a numeric id is invalid-value there (B8), a documented driver difference.
+    expectFor: {
+      mongoose: { names: ["Alice", "Bob", "Carol", "dave", "Eve_Ann", "Frank", "Alina"], skipped: [{ site: "filter", key: "id", reason: "invalid-value" }] },
+    },
   },
   {
     name: "R19: a JSON-shaped driver object is refused (no raw() brand)",

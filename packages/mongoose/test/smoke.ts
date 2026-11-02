@@ -16,6 +16,14 @@ import { createRegistry, createFilters } from "../src/index";
 import { User, type IUser } from "./user.model";
 import { Post } from "./post.model";
 
+/** The 2.x behaviour (task 011 "Migrating to 3.0"): every schema path filterable with every operator and sortable. */
+const openPolicy = (model: { schema: { paths: Record<string, unknown> } }) => {
+  const paths = Object.keys(model.schema.paths);
+  return { filterable: Object.fromEntries(paths.map(path => [path, "*"])), sortable: paths };
+};
+const OPEN_USER = openPolicy(User) as unknown as Record<string, never>;
+const OPEN_POST = openPolicy(Post) as unknown as Record<string, never>;
+
 let passed = 0;
 let failed = 0;
 function check(label: string, ok: boolean, extra = "") {
@@ -29,8 +37,8 @@ async function main() {
   await mongoose.connect(replset.getUri(), { dbName: "qk_smoke" });
 
   const registry = createRegistry(mongoose.connection);
-  const usersRepo = registry.repository(User);
-  const postsRepo = registry.repository(Post);
+  const usersRepo = registry.repository(User, OPEN_USER);
+  const postsRepo = registry.repository(Post, OPEN_POST);
   const uf = createFilters<IUser>();
 
   try {
@@ -73,7 +81,7 @@ async function main() {
     // 3b. default perPage = 20 (core); configurable via registry options
     const defList = await usersRepo.findList({});
     check("default perPage = 20 (core)", defList.meta.per_page === 20);
-    const cfgRepo = createRegistry(mongoose.connection, { defaultPerPage: 25 }).repository(User);
+    const cfgRepo = createRegistry(mongoose.connection, { defaultPerPage: 25 }).repository(User, OPEN_USER);
     check("registry option overrides default perPage", (await cfgRepo.findList({})).meta.per_page === 25);
 
     // 4. infinite
@@ -209,13 +217,13 @@ async function main() {
     /* ---- extender (custom methods) + typed relations at runtime ---- */
 
     // 16. extender fn adds a custom method (drizzle-pg style)
-    const uExt = registry.repository(User, base => ({
+    const uExt = registry.repository(User, OPEN_USER, base => ({
       findByEmail: (email: string) => base.findOne({ filter: [{ key: "email", operation: "=", value: email }] }),
     }));
     check("extender custom method (findByEmail)", (await uExt.findByEmail("ali@example.com"))?.name === "Ali Valiyev");
 
     // 17. relations + extender together
-    const pRel = registry.repository(Post, { relations: { author: User } }, base => ({
+    const pRel = registry.repository(Post, { ...OPEN_POST, relations: { author: User } }, base => ({
       byTitle: (t: string) => base.findOne({ filter: [{ key: "title", operation: "=", value: t }] }),
     }));
     const pr = await pRel.findOne({ filter: [{ key: "title", operation: "=", value: "A2" }], with: { author: true } });
@@ -336,14 +344,14 @@ async function main() {
     /* Parity with drizzle-pg test/sql.ts §13-§17. `email` stands in for `password`. */
     const keysOf = (doc: unknown) => Object.keys(doc as object).sort();
 
-    const forcedRepo = registry.repository(User, { forcedColumns: { _id: true, name: true } });
+    const forcedRepo = registry.repository(User, { ...OPEN_USER, forcedColumns: { _id: true, name: true } });
     const forcedDoc = (await forcedRepo.findAll({ columns: { email: true } }))[0];
     check("forcedColumns: client selection ignored", !keysOf(forcedDoc).includes("email"), keysOf(forcedDoc).join());
     check("forcedColumns: keeps the forced fields", keysOf(forcedDoc).includes("name") && keysOf(forcedDoc).includes("_id"), keysOf(forcedDoc).join());
     const forcedNoColumns = (await forcedRepo.findList({})).data[0];
     check("forcedColumns: applied when the client sends nothing", !keysOf(forcedNoColumns).includes("email"), keysOf(forcedNoColumns).join());
 
-    const allowRepo = registry.repository(User, { allowedColumns: ["_id", "name"] });
+    const allowRepo = registry.repository(User, { ...OPEN_USER, allowedColumns: ["_id", "name"] });
     const intersected = (await allowRepo.findAll({ columns: { name: true, email: true } }))[0];
     check("allowedColumns: intersects the client selection", keysOf(intersected).join() === "name", keysOf(intersected).join());
     const rejectedSel = (await allowRepo.findAll({ columns: { email: true } }))[0];
@@ -391,7 +399,7 @@ async function main() {
     check("perPage is capped at 200 by default", (await usersRepo.findList({ perPage: 10_000 })).meta.per_page === 200);
     check("infinite limit is capped at 200", (await usersRepo.findInfinite({ limit: 10_000 })).meta.limit === 200);
     check("cursor limit is capped at 200", (await usersRepo.findCursor({ limit: 10_000 })).meta.limit === 200);
-    const cappedRepo = createRegistry(mongoose.connection, { maxPerPage: 50, maxLimit: 25 }).repository(User);
+    const cappedRepo = createRegistry(mongoose.connection, { maxPerPage: 50, maxLimit: 25 }).repository(User, OPEN_USER);
     check("registry maxPerPage is honoured", (await cappedRepo.findList({ perPage: 10_000 })).meta.per_page === 50);
     check("registry maxLimit is honoured", (await cappedRepo.findInfinite({ limit: 10_000 })).meta.limit === 25);
     check("a request under the cap is untouched", (await usersRepo.findList({ perPage: 15 })).meta.per_page === 15);
@@ -399,7 +407,7 @@ async function main() {
 
     /* --------------------------- registry arities --------------------------- */
     check("arity: repository(model)", typeof registry.repository(User).findAll === "function");
-    const extendedRepo = registry.repository(User, base => ({ byName: (name: string) => base.findAll({ filter: [uf.eq("name", name)] }) }));
+    const extendedRepo = registry.repository(User, OPEN_USER, base => ({ byName: (name: string) => base.findAll({ filter: [uf.eq("name", name)] }) }));
     check("arity: repository(model, extend)", typeof extendedRepo.byName === "function" && typeof extendedRepo.findAll === "function");
     check("arity: repository(model, options)", typeof registry.repository(User, { allowedColumns: ["_id"] }).findAll === "function");
     const bothRepo = registry.repository(User, { allowedColumns: ["_id", "name"] }, base => ({ first: () => base.findOne({}) }));
@@ -432,7 +440,7 @@ async function main() {
     );
 
     const seen: SkippedCondition[] = [];
-    const watchedRepo = createRegistry(mongoose.connection, { onSkippedCondition: info => seen.push(info) }).repository(User);
+    const watchedRepo = createRegistry(mongoose.connection, { onSkippedCondition: info => seen.push(info) }).repository(User, OPEN_USER);
 
     seen.length = 0;
     await watchedRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] });
@@ -466,7 +474,7 @@ async function main() {
     });
     check("hook: a valid request reports nothing", seen.length === 0, JSON.stringify(seen));
 
-    const strictRepo = createRegistry(mongoose.connection, { strict: true }).repository(User);
+    const strictRepo = createRegistry(mongoose.connection, { strict: true }).repository(User, OPEN_USER);
     const rejects = async (fn: () => Promise<unknown>) => {
       try {
         await fn();

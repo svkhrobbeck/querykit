@@ -21,6 +21,7 @@ import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 import { createRegistry, createFilters } from "../src/index";
 import type { AnyDb } from "../src/types";
 import "./policy";
+import "./cast";
 
 /* -------------------------------- schema ---------------------------------- */
 
@@ -235,9 +236,15 @@ async function main() {
   const invalidDate = await capture(() => usersRepo.findAll({ filter: [uf.gte("createdAt", new Date("nope"))] as never }));
   check("Invalid Date object is skipped too", allOk(invalidDate) && firstParams(invalidDate).length === 0, firstError(invalidDate));
 
-  /* 8. non-date columns are untouched (PG casts them itself) */
+  /* 8. task 021 B8: a numeric column casts a numeric string; a non-numeric one is invalid-value */
   const numeric = await capture(() => usersRepo.findAll({ filter: [uf.eq("id", "5")] as never }));
-  check("numeric column keeps the string value", allOk(numeric) && firstParams(numeric)[0] === "5", JSON.stringify(firstParams(numeric)));
+  check("numeric column casts a numeric string to a number", allOk(numeric) && firstParams(numeric)[0] === 5, JSON.stringify(firstParams(numeric)));
+  const badNumber = await capture(() => usersRepo.findAll({ filter: [uf.eq("age", "abc")] as never }));
+  check(
+    "numeric column: 'abc' is dropped before SQL (invalid-value, no 22P02)",
+    allOk(badNumber) && firstParams(badNumber).length === 0,
+    JSON.stringify(firstParams(badNumber)),
+  );
 
   /* 9. nested groups — coercion sits below the tree walk, so it applies everywhere */
   const nested = await capture(() =>

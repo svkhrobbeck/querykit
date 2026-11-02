@@ -24,7 +24,7 @@ export const SORT_CASES: ConformanceCase[] = [
     expect: { names: ["dave", "Alice", "Bob", "Eve_Ann", "Frank"], ordered: true },
   },
   {
-    name: "sort on a nullable field puts NULL last on asc",
+    name: "sort on a nullable field puts NULL first on asc (B11)",
     group: "sort",
     call: {
       method: "findAll",
@@ -35,8 +35,7 @@ export const SORT_CASES: ConformanceCase[] = [
         ],
       },
     },
-    expect: { names: ["Frank", "Eve_Ann", "Bob", "Alice", "dave", "Alina", "Carol"], ordered: true },
-    knownDifference: { mongoose: "MongoDB sorts null lowest, so NULL rows come first on asc" },
+    expect: { names: ["Alina", "Carol", "Frank", "Eve_Ann", "Bob", "Alice", "dave"], ordered: true },
   },
   {
     name: "unknown sort key is skipped and reported",
@@ -45,17 +44,26 @@ export const SORT_CASES: ConformanceCase[] = [
     expect: { names: ALL, skipped: [{ site: "sort", key: "nope", reason: "unknown-key" }] },
   },
   {
-    name: "malformed sort items (null, no key) are dropped silently",
+    name: "malformed sort items (null, no key) are skipped and reported (B14)",
+    notBuiltByWeb: "the web builders drop sort items without a key",
     group: "sort",
     call: { method: "findAll", params: { sort: [null, {}, ...byCreated] as unknown as typeof byCreated } },
-    expect: { names: BY_CREATED, ordered: true },
+    expect: {
+      names: BY_CREATED,
+      ordered: true,
+      skipped: [
+        { site: "sort", key: "", reason: "invalid-value" },
+        { site: "sort", key: "", reason: "invalid-value" },
+      ],
+    },
   },
   {
-    name: "strict: malformed sort items are dropped, not thrown",
+    name: "strict: a malformed sort item throws (B14)",
+    notBuiltByWeb: "the web builders drop sort items without a key",
     group: "sort",
     call: { method: "findAll", params: { sort: [null, {}, ...byCreated] as unknown as typeof byCreated } },
     options: { strict: true },
-    expect: { names: BY_CREATED, ordered: true },
+    expect: { error: { site: "sort", key: "", reason: "invalid-value" } },
   },
 ];
 
@@ -152,10 +160,6 @@ export const DIAGNOSTIC_CASES: ConformanceCase[] = [
     group: "diagnostics",
     ...where([{ key: "age", operation: "=", value: "abc" }], ALL),
     expect: { names: ALL, skipped: [{ site: "filter", key: "age", reason: "invalid-value" }] },
-    knownDifference: {
-      "drizzle-pg": "only date columns are cast; `age = 'abc'` reaches PostgreSQL, which rejects the query (500)",
-      mongoose: "number fields are not cast by the adapter; mongoose throws a CastError at exec (500)",
-    },
   },
   {
     name: "a skipped condition leaves the others in force",
@@ -182,10 +186,6 @@ export const DIAGNOSTIC_CASES: ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "age", operation: "=", value: "abc" }] } },
     options: { strict: true },
     expect: { error: { site: "filter", key: "age", reason: "invalid-value" } },
-    knownDifference: {
-      "drizzle-pg": "only date columns are cast; strict mode does not see `age = 'abc'`, PostgreSQL rejects it (500)",
-      mongoose: "number fields are not cast by the adapter; strict mode does not see it, mongoose throws a CastError (500)",
-    },
   },
   {
     name: "strict: unknown sort key throws",

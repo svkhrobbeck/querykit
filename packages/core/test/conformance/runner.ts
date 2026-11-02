@@ -70,8 +70,8 @@ const skipLabel = (info: SkipExpectation) => `${info.site}:${info.key}:${info.re
 const sortedLabels = (list: readonly SkipExpectation[]) => list.map(skipLabel).sort();
 
 /** Every way the outcome differs from the case's expectation (empty = conforms). */
-export function compare(testCase: ConformanceCase, outcome: Outcome): string[] {
-  const { expect } = testCase;
+export function compare(testCase: ConformanceCase, outcome: Outcome, adapter?: AdapterName): string[] {
+  const expect = (adapter && testCase.expectFor?.[adapter]) ?? testCase.expect;
   if (outcome.kind === "crash") return [`crashed: ${outcome.message}`];
   if (expect.error) {
     if (outcome.kind !== "error") return [`expected QueryKitError ${skipLabel(expect.error)}, got rows`];
@@ -104,7 +104,7 @@ export function compare(testCase: ConformanceCase, outcome: Outcome): string[] {
 export async function runConformance(harness: Harness, cases: readonly ConformanceCase[] = CASES): Promise<Summary> {
   const summary: Summary = { adapter: harness.name, passed: 0, failed: 0, known: 0 };
   for (const testCase of cases) {
-    const problems = compare(testCase, await execute(harness, testCase.call, testCase.options));
+    const problems = compare(testCase, await execute(harness, testCase.call, testCase.options), harness.name);
     const known = testCase.knownDifference?.[harness.name];
     if (problems.length === 0 && known) {
       summary.failed++;

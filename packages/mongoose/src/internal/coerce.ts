@@ -39,16 +39,27 @@ export function isDatePath(model: AnyModel, field: string): boolean {
  */
 export function castForPath(model: AnyModel, field: string, value: unknown): unknown | typeof INVALID_VALUE {
   const path = model.schema.path(field);
-  if (!path || path.instance !== "Date" || value === null || value === undefined) return value;
+  if (!path || value === null || value === undefined || !CAST_INSTANCES.has(path.instance)) return value;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? INVALID_VALUE : value;
   try {
     const cast = path.cast(value) as unknown;
     if (cast instanceof Date) return Number.isNaN(cast.getTime()) ? INVALID_VALUE : cast;
-    return cast ?? INVALID_VALUE;
+    if (cast === null || cast === undefined) return INVALID_VALUE;
+    // `cast` does not check an enum; a value outside it can never match (task 021 B8).
+    const enumValues = (path as unknown as { enumValues?: readonly unknown[] }).enumValues;
+    if (path.instance === "String" && enumValues && enumValues.length > 0 && !enumValues.includes(cast)) return INVALID_VALUE;
+    return cast;
   } catch {
     return INVALID_VALUE;
   }
 }
+
+/**
+ * Paths cast here (task 021 B8): a value their type rejects — `age = "abc"`, a
+ * malformed ObjectId, `"maybe"` for a Boolean, a String outside its enum — is
+ * invalid-value before the query runs, instead of a CastError 500 at exec.
+ */
+const CAST_INSTANCES: ReadonlySet<string> = new Set(["Date", "Number", "Boolean", "ObjectId", "String", "Decimal128"]);
 
 /**
  * Bring one condition's value in line with the path's type before it reaches an

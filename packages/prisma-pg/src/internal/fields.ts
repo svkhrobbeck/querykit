@@ -25,6 +25,12 @@ export interface FieldMeta {
   isList: boolean;
   /** The `@map`ped database column, when it differs from the field name. */
   dbName?: string;
+  /** `false` for an optional (nullable) field — Prisma accepts `nulls` in `orderBy` only there (task 021 B11). */
+  isRequired?: boolean;
+  /** The database type (`"Uuid"` for `@db.Uuid`) — from the runtime model when it has one, or the `fields` override (task 021 B8). */
+  nativeType?: string;
+  /** An enum field's values (from the runtime data model), for the task 021 B8 cast. */
+  enumValues?: readonly string[];
 }
 
 /** Everything the repository needs to know about one model. */
@@ -82,6 +88,8 @@ interface RuntimeField {
   isUpdatedAt?: unknown;
   isList?: unknown;
   dbName?: unknown;
+  isRequired?: unknown;
+  nativeType?: unknown;
 }
 
 const KINDS = new Set(["scalar", "enum", "object", "unsupported"]);
@@ -98,7 +106,11 @@ function fromRuntimeDataModel(
   delegateKey: string,
 ): { name: string; fields: FieldMeta[]; primaryKey?: { name?: unknown; fields?: unknown } | null } | undefined {
   const rdm = client._runtimeDataModel as
-    { models?: Record<string, { fields?: RuntimeField[]; primaryKey?: { name?: unknown; fields?: unknown } | null }> } | undefined;
+    | {
+        models?: Record<string, { fields?: RuntimeField[]; primaryKey?: { name?: unknown; fields?: unknown } | null }>;
+        enums?: Record<string, { values?: Array<{ name?: unknown }> }>;
+      }
+    | undefined;
   const models = rdm?.models;
   if (!models || typeof models !== "object") return undefined;
 
@@ -119,6 +131,9 @@ function fromRuntimeDataModel(
       isUpdatedAt: field.isUpdatedAt === true,
       isList: field.isList === true,
       ...(typeof field.dbName === "string" && field.dbName ? { dbName: field.dbName } : {}),
+      ...enumValuesOf(rdm?.enums, field),
+      ...(typeof field.isRequired === "boolean" ? { isRequired: field.isRequired } : {}),
+      ...nativeTypeOf(field.nativeType),
     });
   }
   return fields.length ? { name: modelName, fields, primaryKey: models[modelName]?.primaryKey ?? null } : undefined;
@@ -162,7 +177,10 @@ function fromDelegateFields(delegate: unknown, delegateKey: string): { name: str
  * schema" error: a repository built on unknown metadata would silently skip
  * *every* filter key and return the whole table.
  */
-export function readModelMeta(client: Record<string, unknown>, delegateKey: string, override?: readonly FieldMeta[]): ModelMeta {
+/** A `fields` override entry: a full field, or a patch of a discovered one by `name` (e.g. `{ name: "age", isRequired: false }`). */
+export type FieldOverride = Pick<FieldMeta, "name"> & Partial<FieldMeta>;
+
+export function readModelMeta(client: Record<string, unknown>, delegateKey: string, override?: readonly FieldOverride[]): ModelMeta {
   const delegate = client[delegateKey];
   if (!isDelegate(delegate)) {
     const available = delegateKeys(client);
@@ -173,9 +191,11 @@ export function readModelMeta(client: Record<string, unknown>, delegateKey: stri
   }
 
   const discovered = fromRuntimeDataModel(client, delegateKey) ?? fromDelegateFields(delegate, delegateKey);
-  // An explicit `fields` override replaces the field list, but the model name is
-  // still worth discovering — it is what diagnostics report as `source`.
-  const source = override?.length ? { name: discovered?.name ?? delegateKey, fields: [...override] } : discovered;
+  // A `fields` override patches the discovered fields by name (task 021: e.g. the
+  // nullability Prisma 7's runtime model no longer carries); with nothing
+  // discovered it is the field list itself. The model name is still worth
+  // discovering — it is what diagnostics report as `source`.
+  const source = override?.length ? { name: discovered?.name ?? delegateKey, fields: mergeFields(discovered?.fields ?? [], override) } : discovered;
 
   if (!source) {
     throw new Error(
@@ -265,4 +285,28 @@ export function castValue(meta: ModelMeta, field: string, value: unknown): unkno
   if (typeof value !== "string" && typeof value !== "number") return value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date;
+}
+
+/** `{ enumValues }` for an enum field whose values the runtime data model lists, else nothing. */
+function enumValuesOf(enums: Record<string, { values?: Array<{ name?: unknown }> }> | undefined, field: RuntimeField): { enumValues?: readonly string[] } {
+  if (field.kind !== "enum" || typeof field.type !== "string") return {};
+  const values = enums?.[field.type]?.values?.map(value => value.name).filter((name): name is string => typeof name === "string");
+  return values && values.length > 0 ? { enumValues: values } : {};
+}
+
+/** Discovered fields patched by the override (by name); an override for an undiscovered field is added. */
+function mergeFields(discovered: readonly FieldMeta[], override: readonly FieldOverride[]): FieldMeta[] {
+  const byName = new Map(override.map(entry => [entry.name, entry]));
+  const merged = discovered.map(field => ({ ...field, ...byName.get(field.name) }));
+  const known = new Set(discovered.map(field => field.name));
+  for (const entry of override) {
+    if (!known.has(entry.name)) merged.push({ type: "", kind: "scalar", isId: false, isUpdatedAt: false, isList: false, ...entry });
+  }
+  return merged;
+}
+
+/** `{ nativeType }` from the runtime model's `nativeType` (`"Uuid"` or `["Uuid", []]`), else nothing. */
+function nativeTypeOf(nativeType: unknown): { nativeType?: string } {
+  const name = Array.isArray(nativeType) ? nativeType[0] : nativeType;
+  return typeof name === "string" && name ? { nativeType: name } : {};
 }

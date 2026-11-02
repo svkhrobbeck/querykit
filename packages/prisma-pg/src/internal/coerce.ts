@@ -34,6 +34,8 @@ export const isTextOperator = (operator: FilterOperator): boolean => TEXT_OPERAT
  * have performed, and a value that genuinely cannot be represented is dropped
  * and reported instead of crashing the request.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function castForField(meta: ModelMeta, field: string, value: unknown): unknown | typeof INVALID_VALUE {
   if (value === null || value === undefined) return value;
   const type = fieldMeta(meta, field)?.type;
@@ -71,7 +73,15 @@ export function castForField(meta: ModelMeta, field: string, value: unknown): un
     return INVALID_VALUE;
   }
 
-  // String / enum / Json / everything else: left alone. Postgres would not have
+  // Task 021 B8: a `@db.Uuid` field (known from the runtime model or the `fields`
+  // override) takes only a uuid — Postgres would answer 22P02 / Prisma P2023.
+  if (meta.fields.get(field)?.nativeType === "Uuid") return typeof value === "string" && UUID.test(value) ? value : INVALID_VALUE;
+
+  // Task 021 B8: an enum value outside the enum can never match — invalid-value.
+  const enumValues = meta.fields.get(field)?.enumValues;
+  if (enumValues) return typeof value === "string" && enumValues.includes(value) ? value : INVALID_VALUE;
+
+  // String / Json / everything else: left alone. Postgres would not have
   // cast an int to text either, so this matches drizzle-pg's behaviour.
   return value;
 }

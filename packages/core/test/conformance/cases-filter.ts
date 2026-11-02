@@ -17,15 +17,15 @@ export const OPERATOR_CASES: ConformanceCase[] = [
   op("like is case-sensitive", "name", "like", "A%", ["Alice", "Alina"]),
   op("like with a lowercase pattern", "name", "like", "%a%", ["Carol", "dave", "Frank", "Alina"]),
   op("like _ is a one-character wildcard", "name", "like", "A_i%", ["Alice", "Alina"], {
-    knownDifference: { "prisma-pg": "an anchored LIKE becomes `startsWith`, so `_` is matched literally" },
+    // B9: Prisma cannot express a one-character wildcard, so the condition is dropped and reported (README Limitations).
+    expectFor: { "prisma-pg": { names: ALL, skipped: [{ site: "filter", key: "name", reason: "invalid-value" }] } },
   }),
+  op("startsWith treats % literally (B7)", "name", "startsWith", "%", []),
   op("ilike is case-insensitive", "name", "ilike", "%A%", ["Alice", "Carol", "dave", "Eve_Ann", "Frank", "Alina"]),
   op("notLike drops matches", "name", "notLike", "%a%", ["Alice", "Bob", "Eve_Ann"]),
   op("contains is case-insensitive", "name", "contains", "AL", ["Alice", "Alina"]),
   op("%_% token = contains", "name", "%_%", "ar", ["Carol"]),
-  op("contains treats _ literally", "name", "contains", "_", ["Eve_Ann"], {
-    knownDifference: { "drizzle-pg": "the value is not LIKE-escaped, so `_` matches any character" },
-  }),
+  op("contains treats _ literally", "name", "contains", "_", ["Eve_Ann"]),
   op("startsWith is case-insensitive", "name", "startsWith", "a", ["Alice", "Alina"]),
   op("%_ token = startsWith", "name", "%_", "D", ["dave"]),
   op("endsWith is case-insensitive", "name", "endsWith", "E", ["Alice", "dave"]),
@@ -103,7 +103,38 @@ export const GROUP_CASES: ConformanceCase[] = [
       },
       ["Alice", "Bob", "dave", "Eve_Ann", "Frank", "Alina"],
     ),
-    knownDifference: { mongoose: "a multi-field `not` is a bare `$nor`, which keeps documents where the inner group is unknown (Carol, age null)" },
+  },
+  {
+    name: "not(and) over a NULL field is TRUE when the other side is FALSE (B10)",
+    group: "group",
+    // Carol: age NULL (unknown) AND name = Bob (false) = false → NOT = true.
+    ...where(
+      {
+        not: {
+          and: [
+            { key: "age", operation: "=", value: 1 },
+            { key: "name", operation: "=", value: "Bob" },
+          ],
+        },
+      },
+      ALL,
+    ),
+  },
+  {
+    name: "not(or) over a NULL field is FALSE when the other side is TRUE (B10)",
+    group: "group",
+    // Carol: age NULL (unknown) OR name = Carol (true) = true → NOT = false.
+    ...where(
+      {
+        not: {
+          or: [
+            { key: "age", operation: "=", value: 1 },
+            { key: "name", operation: "=", value: "Carol" },
+          ],
+        },
+      },
+      ["Alice", "Bob", "dave", "Eve_Ann", "Frank"],
+    ),
   },
   {
     name: "nested or / and / not",

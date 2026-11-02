@@ -9,6 +9,7 @@ import {
   escapeLike,
   not3,
   or3,
+  mongoOrder,
   pgOrder,
   pick,
   sortRows,
@@ -86,9 +87,12 @@ export function evalWhere(where: Filter | undefined, row: Row): Tri {
   return and3(parts);
 }
 
+/** A Prisma orderBy value: a direction, or `{ sort, nulls }` on an optional field. */
+type OrderValue = Direction | { sort: Direction; nulls?: "first" | "last" };
+
 export interface FindManyArgs {
   where?: Filter;
-  orderBy?: Record<string, Direction> | Array<Record<string, Direction>>;
+  orderBy?: Record<string, OrderValue> | Array<Record<string, OrderValue>>;
   skip?: number;
   take?: number;
   select?: Record<string, boolean>;
@@ -98,9 +102,14 @@ export interface FindManyArgs {
 export function findMany<T extends Row>(rows: readonly T[], args: FindManyArgs = {}): Row[] {
   const filtered = rows.filter(row => evalWhere(args.where, row) === true);
   const keys = (args.orderBy ? asList(args.orderBy) : []).flatMap(item =>
-    Object.entries(item as Record<string, Direction>).map(([key, direction]) => ({ key, direction })),
+    Object.entries(item as Record<string, OrderValue>).map(([key, value]) =>
+      typeof value === "string" ? { key, direction: value, nulls: undefined } : { key, direction: value.sort, nulls: value.nulls },
+    ),
   );
-  const ordered = sortRows(filtered, keys, pgOrder);
+  // `{ sort, nulls }` in MongoDB's order (task 021 B11) on every key, or Postgres' default on none.
+  const explicit = keys.filter(k => k.nulls !== undefined).length;
+  if (keys.some(k => k.nulls !== undefined && (k.direction === "asc") !== (k.nulls === "first"))) throw new Error("fake-prisma: unsupported nulls order");
+  const ordered = sortRows(filtered, keys, explicit ? mongoOrder : pgOrder);
   const skip = args.skip ?? 0;
   const page = ordered.slice(skip, args.take === undefined ? undefined : skip + args.take);
   const selected = Object.keys(args.select ?? {}).filter(key => args.select![key]);

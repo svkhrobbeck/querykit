@@ -194,14 +194,28 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
     eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }]), { AND: [{ name: { startsWith: "a%b" } }, { name: { endsWith: "b" } }] }),
     show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }])),
   );
-  // `LIKE 'a_b'` ≡ `LIKE 'a_b%' AND NOT LIKE 'a_b_%'` — pins the length exactly.
-  check(
-    "_ wildcard → exact length-pinned construction",
-    eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }]), {
-      AND: [{ name: { startsWith: "a_b" } }, { NOT: { name: { startsWith: "a_b_" } } }],
-    }),
-    show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }])),
-  );
+  // Task 021 B9: an unescaped `_` cannot be relied on in Prisma — refused as invalid-value.
+  {
+    const { diag: underscoreDiag, seen: underscoreSeen } = spy();
+    const refused = buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }], underscoreDiag);
+    check(
+      "unescaped _ in like → dropped and reported invalid-value (B9)",
+      refused === undefined && underscoreSeen[0] === "filter:name:invalid-value",
+      show(underscoreSeen),
+    );
+    let strictReason = "";
+    try {
+      buildWhere(userMeta, [{ key: "name", operation: "like", value: "A_i%" }], { source: "User", strict: true });
+    } catch (err) {
+      strictReason = err instanceof QueryKitError ? err.info.reason : String(err);
+    }
+    check("strict: like 'A_i%' → QueryKitError invalid-value (B9)", strictReason === "invalid-value", strictReason);
+    check(
+      "escaped \\_ is a literal underscore",
+      eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "A\\_i%" }]), { name: { startsWith: "A\\_i" } }),
+      show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "A\\_i%" }])),
+    );
+  }
   check(
     "a pattern already ending in % needs a single filter",
     eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b%" }]), { name: { startsWith: "a%b" } }),
@@ -293,8 +307,16 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
   ];
   const subjects = ["", "a", "ab", "aba", "abab", "ali", "Ali", "aXb", "aXbXc", "a_b", "a%b", "%50", "50%", "vali ali", "abba", "aXbba", "ali_", "_ali", "aab"];
 
+  /** Patterns with an unescaped `_` are refused (B9), so only the rest must translate exactly. */
+  const hasWildcardUnderscore = (pattern: string) => /(^|[^\\])_/.test(pattern);
+  const refusedPatterns = patterns.filter(hasWildcardUnderscore);
+  check(
+    `every pattern with an unescaped _ is refused (${refusedPatterns.length})`,
+    refusedPatterns.every(pattern => buildWhere(userMeta, [{ key: "name", operation: "like", value: pattern }]) === undefined),
+  );
+
   let mismatches: string[] = [];
-  for (const pattern of patterns) {
+  for (const pattern of patterns.filter(pattern => !hasWildcardUnderscore(pattern))) {
     const node = buildWhere(userMeta, [{ key: "name", operation: "like", value: pattern }]);
     for (const subject of subjects) {
       const expected = likeMatches(pattern, subject);
@@ -310,7 +332,7 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
 
   // The same proof for notLike, which must also exclude NULLs (SQL NOT LIKE).
   mismatches = [];
-  for (const pattern of patterns) {
+  for (const pattern of patterns.filter(pattern => !hasWildcardUnderscore(pattern))) {
     const node = buildWhere(userMeta, [{ key: "name", operation: "notLike", value: pattern }]);
     for (const subject of subjects) {
       const expected = !likeMatches(pattern, subject);
@@ -417,6 +439,30 @@ console.log("\n=== 5. orderBy ===");
     ),
   );
   check("direction defaults to asc", eq(buildOrderBy(userMeta, [{ key: "name" }]), [{ name: "asc" }]));
+  // Task 021 B11: `nulls` only where nullability is known — the runtime model (Prisma 6.19)
+  // or a `fields` override. Prisma 7's runtime model has no `isRequired`: plain order.
+  {
+    const rdmAge = (
+      prisma as unknown as { _runtimeDataModel: { models: Record<string, { fields: Array<Record<string, unknown>> }> } }
+    )._runtimeDataModel.models.User!.fields.find(field => field.name === "age");
+    const knowsNullability = rdmAge?.isRequired === false;
+    check(
+      `undeclared nullable field: ${knowsNullability ? "runtime model knows it (Prisma 6) → nulls first" : "Prisma 7 runtime model is silent → plain asc"}`,
+      eq(buildOrderBy(userMeta, [{ key: "age" }]), [{ age: knowsNullability ? { sort: "asc", nulls: "first" } : "asc" }]),
+      show(buildOrderBy(userMeta, [{ key: "age" }])),
+    );
+    const declared = readModelMeta(prisma as never, "user", [{ name: "age", isRequired: false }]);
+    check(
+      "fields override { name: 'age', isRequired: false } → asc nulls first, desc nulls last",
+      eq(buildOrderBy(declared, [{ key: "age" }, { key: "name", direction: "desc" }]), [{ age: { sort: "asc", nulls: "first" } }, { name: "desc" }]) &&
+        eq(buildOrderBy(declared, [{ key: "age", direction: "desc" }]), [{ age: { sort: "desc", nulls: "last" } }]),
+      show(buildOrderBy(declared, [{ key: "age" }])),
+    );
+    check(
+      "override patches by name: other fields keep their discovered metadata",
+      declared.fields.get("createdAt")?.dbName === "created_at" && declared.fields.size === userMeta.fields.size,
+    );
+  }
 
   const { diag, seen } = spy();
   check(
@@ -443,6 +489,32 @@ console.log("\n=== 6. value coercion ===");
     (coerceCondition(userMeta, "createdAt", "in", [iso, iso]) as Date[]).every(d => d instanceof Date),
   );
   check("text operators keep their raw string", coerceCondition(userMeta, "createdAt", "contains", "2026") === "2026");
+  // Task 021 B8: Boolean and enum fields are cast too (synthetic meta: the fixture schema has neither).
+  const castMeta = {
+    ...userMeta,
+    fields: new Map([
+      ...userMeta.fields,
+      ["active", { name: "active", type: "Boolean", kind: "scalar", isId: false, isUpdatedAt: false, isList: false }],
+      ["role", { name: "role", type: "Role", kind: "enum", isId: false, isUpdatedAt: false, isList: false, enumValues: ["ADMIN", "USER"] }],
+    ]),
+  } as ModelMeta;
+  check(
+    "Boolean: 'maybe' is invalid-value, 'true' → true",
+    coerceCondition(castMeta, "active", "=", "maybe") === INVALID_VALUE && coerceCondition(castMeta, "active", "=", "true") === true,
+  );
+  check(
+    "enum: a value outside the enum is invalid-value",
+    coerceCondition(castMeta, "role", "=", "OWNER") === INVALID_VALUE && coerceCondition(castMeta, "role", "=", "ADMIN") === "ADMIN",
+  );
+  check("Int: 'abc' is invalid-value", coerceCondition(userMeta, "age", "=", "abc") === INVALID_VALUE);
+  // Task 021 B8: a @db.Uuid field is cast when its native type is known — the runtime model or the fields override.
+  const uuidMeta = readModelMeta(prisma as never, "user", [{ name: "email", nativeType: "Uuid" }]);
+  check(
+    "declared Uuid: a malformed uuid is invalid-value, a uuid passes",
+    coerceCondition(uuidMeta, "email", "=", "not-a-uuid") === INVALID_VALUE &&
+      coerceCondition(uuidMeta, "email", "=", "0f8fad5b-d9cb-469f-a165-70867728950e") === "0f8fad5b-d9cb-469f-a165-70867728950e",
+  );
+  check("undeclared String field: not uuid-checked (README Limitations)", coerceCondition(userMeta, "email", "=", "not-a-uuid") === "not-a-uuid");
   check("castValue leaves unparseable values alone", castValue(userMeta, "createdAt", "nope") === "nope");
 
   // Prisma type-checks arguments client-side, so a wire string on an Int field

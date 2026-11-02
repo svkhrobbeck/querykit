@@ -52,6 +52,11 @@ export interface ConformanceCase {
   options?: CaseOptions;
   expect: Expectation;
   knownDifference?: Partial<Record<AdapterName, string>>;
+  /**
+   * A driver-specific result documented in that adapter's README (R11) — used instead of
+   * `expect` for that adapter. Not a gap: it does not count as a known difference.
+   */
+  expectFor?: Partial<Record<AdapterName, Expectation>>;
   /** A payload the `@querykitjs/web` builders never produce (they normalize it away), so the web runner skips it. */
   notBuiltByWeb?: string;
 }

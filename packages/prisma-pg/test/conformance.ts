@@ -39,7 +39,13 @@ export const prismaHarness: Harness = {
     const registry = createRegistry(fakeClient as never, { strict: options.strict, onSkippedCondition: onSkipped });
     const repository = registry.repository(
       "user" as never,
-      { ...policyOptions(options.policy), forcedColumns: options.forcedColumns, allowedColumns: options.allowedColumns } as never,
+      {
+        ...policyOptions(options.policy),
+        forcedColumns: options.forcedColumns,
+        allowedColumns: options.allowedColumns,
+        // Task 021 B11: Prisma 7's runtime model has no nullability, so the fixture declares it.
+        fields: [{ name: "age", isRequired: false }],
+      } as never,
     ) as unknown as Record<string, (params: unknown) => Promise<unknown>>;
     const result = (await repository[call.method]!(call.params)) as
       Record<string, unknown>[] | { data: Record<string, unknown>[]; meta: Record<string, unknown> };
