@@ -18,6 +18,7 @@ You usually **don't install this directly** — it's the shared foundation used 
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomic builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server response, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
 - **`Filterable`** and the skip / refusal reasons (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`; `SkipSite` + `page`) — policy reasons are never dropped silently, always a `QueryKitError`.
+- **`QueryKitTimeoutError`** (`code: "QUERYKIT_TIMEOUT"`) — a read ran past its time limit (mongoose `maxTimeMS`). Kept apart from `QueryKitError`: the request was valid, the database was slow — map it to 503/504.
 - **`raw(value)`** — the brand for a driver's own filter object (a Prisma `where`, a Mongo filter) (R19). An adapter accepts a raw node only when it is branded with `raw()`; an unbranded plain object (it can come from a JSON body) → `QueryKitError` `forbidden-key`. ⚠️ A raw node is server code — `filterable` does not look inside it; never build one from request data.
 - **Request limits** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` and one constant per limit (table below).
 
@@ -27,14 +28,15 @@ You usually **don't install this directly** — it's the shared foundation used 
 
 Every filter and pagination request is bounded in size at parse time. `@querykitjs/zod` and `@querykitjs/class-validator` reject a payload past any limit; `@querykitjs/web` does not build a payload past the offset or sort limit.
 
-| Limit             | Constant                    | Default  | What counts                                                                       |
-| ----------------- | --------------------------- | -------- | --------------------------------------------------------------------------------- |
-| `maxDepth`        | `DEFAULT_MAX_FILTER_DEPTH`  | `5`      | root-to-leaf nodes: the root is 1, every `and`/`or`/`not` and the condition add 1 |
-| `maxConditions`   | `DEFAULT_MAX_CONDITIONS`    | `30`     | `FieldCondition` leaves across all groups                                         |
-| `maxInItems`      | `DEFAULT_MAX_IN_ITEMS`      | `200`    | items in one array value (`in`, `notIn`, …)                                       |
-| `maxStringLength` | `DEFAULT_MAX_STRING_LENGTH` | `256`    | characters in one string value, also inside an array                              |
-| `maxOffset`       | `DEFAULT_MAX_OFFSET`        | `10 000` | offset: `(page - 1) × perPage`; infinite: `offset`. Deeper — use a cursor         |
-| `maxSortFields`   | `DEFAULT_MAX_SORT_FIELDS`   | `3`      | fields in the `sort` array                                                        |
+| Limit              | Constant                     | Default  | What counts                                                                             |
+| ------------------ | ---------------------------- | -------- | --------------------------------------------------------------------------------------- |
+| `maxDepth`         | `DEFAULT_MAX_FILTER_DEPTH`   | `5`      | root-to-leaf nodes: the root is 1, every `and`/`or`/`not` and the condition add 1       |
+| `maxConditions`    | `DEFAULT_MAX_CONDITIONS`     | `30`     | `FieldCondition` leaves across all groups                                               |
+| `maxInItems`       | `DEFAULT_MAX_IN_ITEMS`       | `200`    | items in one array value (`in`, `notIn`, …)                                             |
+| `maxStringLength`  | `DEFAULT_MAX_STRING_LENGTH`  | `256`    | characters in one string value, also inside an array                                    |
+| `maxOffset`        | `DEFAULT_MAX_OFFSET`         | `10 000` | offset: `(page - 1) × perPage`; infinite: `offset`. Deeper — use a cursor               |
+| `maxSortFields`    | `DEFAULT_MAX_SORT_FIELDS`    | `3`      | fields in the `sort` array                                                              |
+| `maxLikeWildcards` | `DEFAULT_MAX_LIKE_WILDCARDS` | `2`      | `%`/`_` in one `like`/`ilike`/`notLike` pattern (a run of `%%` is one) — adapter policy |
 
 ```ts
 import { resolveLimits } from "@querykitjs/core";

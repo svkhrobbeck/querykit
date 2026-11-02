@@ -208,6 +208,41 @@ A `scope` or `cursorKey` key is **always** fatal, regardless of `strict`.
 - **Cursor** keys on `_id` by default (override with `cursorKey`) — stable under inserts.
 - **Transactions need a replica set** — a single-node one is enough for local dev (`mongod --replSet rs0` then `rs.initiate()`, or [`mongodb-memory-server`](https://github.com/typegoose/mongodb-memory-server) in tests).
 
+- **Indexes and operators.** `startsWith` is an anchored (`^`) but case-insensitive (`i`) regex: MongoDB uses an index poorly for it. On a large collection keep a lowercase shadow field (`nameLower`) and give that `=` / `startsWith`. `contains`, `endsWith`, `!=` and `notIn` cannot use an index (COLLSCAN) — closed in the default `filterable`, open them only for small collections. Use `in` for enum fields.
+
+## Safe by default — `filterable`, `sortable`, `limits`
+
+A client filters and sorts only by the paths the server allows, and only with the operators it allows. A refused request stops with a `QueryKitError` before it reaches MongoDB — whatever `strict` and `onSkippedCondition` say. Option names, defaults and `reason`/`site` are the same as drizzle-pg's and prisma-pg's (`id` ≡ `_id`).
+
+```ts
+const usersRepository = registry.repository(User, {
+  forcedColumns: { _id: true, name: true, status: true, createdAt: true },
+  filterable: {
+    status: ["=", "in"],
+    createdAt: ["between", ">=", "<="],
+    name: ["startsWith"], // open only where listed
+  },
+  sortable: ["_id", "createdAt", "name"],
+  limits: { maxInItems: 500 },
+  maxTimeMS: 1000,
+});
+```
+
+| Option       | When not given (default)                                                                                | When refused                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `filterable` | `allowedColumns` (else the `forcedColumns` keys, else only the primary key), with `"="` and `"in"` only | `reason: "forbidden-key"` / `"forbidden-operator"`, `site: "filter"` |
+| `sortable`   | the primary key and `createdAt` (when the table has it); a client-sent `cursorKey` too                  | `reason: "forbidden-key"`, `site: "sort"` / `"cursorKey"`            |
+| `limits`     | core `DEFAULT_QUERY_LIMITS` (depth 5, conditions 30, array 200, string 256, offset 10 000, sort 3)      | `reason: "limit-exceeded"`, `site: "filter"` / `"sort"` / `"page"`   |
+
+- `aggregate`: the `filter` and every `groupBy`/`sum`/`avg`/`min`/`max` column must be in `filterable` (`site: "aggregate"`).
+- `findById`: only the client `filter` is checked; `idKey` is the server's choice.
+- A key the table does **not** have (`nope`) stays `unknown-key` — skipped, or an error under `strict`.
+- Mutation filters (`updateMany`, `deleteMany`, …) count as server code and are not checked.
+- Operator aliases are one: `["="]` also admits `eq`, `["contains"]` also `%_%`. `"*"` admits every operator.
+- An unbranded raw Mongo filter (`{ $where: … }`, `{ secret: { $regex: … } }`, `{ $expr: … }`) can come from a JSON body — `forbidden-key`, nothing is sent (R19). Server code brands it with `raw({...})`; ⚠️ `raw()` is not checked by `filterable`.
+- LIKE patterns: more than `maxLikeWildcards` (2) `%`/`_` → `limit-exceeded`; a run of `%%` counts once.
+- Every read (`find`, `findOne`, `countDocuments`, `aggregate`) carries `maxTimeMS` (default 2 000); past it ⇒ `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`) — map it to 503/504, not 400.
+
 ## Advanced filters
 
 A filter is a tree of field conditions and logical groups (`and`/`or`/`not`). A flat array is treated as implicit `AND`. `id` resolves to `_id`.
@@ -288,6 +323,34 @@ await mine.create({ ... });        // supervisorId forced to user.id
 A scope can also be given as `registry.repository(Model, { scope })`. An unknown
 scope key **throws** when the repository is built — dropping it silently would
 remove the RBAC filter.
+
+## Migrating to 3.0
+
+In 3.0 a repository without a policy is **narrow**: `=` and `in` on `allowedColumns` / `forcedColumns` / `_id` only, sorting by `_id` and `createdAt`. To bring back the 2.x behaviour for one repository on purpose:
+
+```ts
+const open = registry.repository(User, {
+  filterable: { _id: "*", name: "*", email: "*", status: "*", createdAt: "*" },
+  sortable: ["_id", "name", "email", "status", "createdAt"],
+});
+```
+
+A raw Mongo filter now needs `raw()` (R19):
+
+```ts
+import { raw } from "@querykitjs/core";
+
+// 2.x — forbidden-key in 3.0:
+// await usersRepository.findAll({ filter: { age: { $gt: 18 } } });
+
+// 3.0:
+await usersRepository.findAll({ filter: raw({ age: { $gt: 18 } }) });
+```
+
+- New reasons: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; new site: `page` — return them as 400.
+- Pages deeper than offset 10 000 are refused — use `findCursor`, or raise `limits: { maxOffset }`.
+- Every read runs with `maxTimeMS: 2000`; raise `maxTimeMS` on the repository for long report queries. A timeout throws `QueryKitTimeoutError`.
+- A LIKE pattern with more than 2 wildcards is refused (`maxLikeWildcards`).
 
 ## Wire (JSON) values and migrating from DbService
 

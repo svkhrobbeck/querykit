@@ -18,6 +18,7 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle
 - **`createFilters<TKey, TRaw>()`** + **`f`** — ergonomik builder (eq/ne/…, contains/…, like/ilike/notLike, in/notIn, between, range, isNull/isNotNull, and/or/not).
 - **Wire meta** (server javobi, snake_case) — `OffsetMeta`, `InfiniteMeta`, `CursorMeta`.
 - **`Filterable`** va skip/rad etish sabablari (`SkipReason`: `unknown-key`, `invalid-value`, `forbidden-key`, `forbidden-operator`, `limit-exceeded`; `SkipSite` + `page`) — siyosat sabablari hech qachon jim tashlanmaydi, har doim `QueryKitError`.
+- **`QueryKitTimeoutError`** (`code: "QUERYKIT_TIMEOUT"`) — o'qish vaqt chegarasidan oshdi (mongoose `maxTimeMS`). `QueryKitError`dan alohida: so'rov to'g'ri, baza sekin — 503/504 qiling.
 - **`raw(value)`** — drayverning o'z filtr obyekti (Prisma `where`, Mongo filtri) uchun brend (R19). Adapter raw tugunni faqat `raw()` bilan belgilangan bo'lsa qabul qiladi; brendsiz oddiy obyekt (JSON body'dan kelishi mumkin) → `QueryKitError` `forbidden-key`. ⚠️ Raw tugun — server kodi, `filterable` uni tekshirmaydi; uni hech qachon so'rov ma'lumotidan qurmang.
 - **So'rov limitlari** — `QueryLimits`, `DEFAULT_QUERY_LIMITS`, `resolveLimits(partial)` va alohida konstantalar (pastdagi jadval).
 
@@ -27,14 +28,15 @@ Bu paketni odatda **to'g'ridan-to'g'ri o'rnatmaysiz** — u `@querykitjs/drizzle
 
 Har filtr va paginatsiya so'rovi parse paytida hajm bo'yicha chegaralanadi. `@querykitjs/zod` va `@querykitjs/class-validator` limitdan oshgan payload'ni rad etadi; `@querykitjs/web` offset va sort limitidan oshgan payload'ni yasamaydi.
 
-| Limit             | Konstanta                   | Default  | Nima sanaladi                                                            |
-| ----------------- | --------------------------- | -------- | ------------------------------------------------------------------------ |
-| `maxDepth`        | `DEFAULT_MAX_FILTER_DEPTH`  | `5`      | ildizdan bargacha tugunlar: ildiz 1, har `and`/`or`/`not` va shart +1    |
-| `maxConditions`   | `DEFAULT_MAX_CONDITIONS`    | `30`     | barcha guruhlardagi `FieldCondition` barglari                            |
-| `maxInItems`      | `DEFAULT_MAX_IN_ITEMS`      | `200`    | bitta massiv qiymatdagi elementlar (`in`, `notIn`, …)                    |
-| `maxStringLength` | `DEFAULT_MAX_STRING_LENGTH` | `256`    | bitta satr qiymatdagi belgilar (massiv ichida ham)                       |
-| `maxOffset`       | `DEFAULT_MAX_OFFSET`        | `10 000` | offset: `(page - 1) × perPage`; infinite: `offset`. Chuqurrog'i — cursor |
-| `maxSortFields`   | `DEFAULT_MAX_SORT_FIELDS`   | `3`      | `sort` massividagi maydonlar                                             |
+| Limit              | Konstanta                    | Default  | Nima sanaladi                                                                               |
+| ------------------ | ---------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `maxDepth`         | `DEFAULT_MAX_FILTER_DEPTH`   | `5`      | ildizdan bargacha tugunlar: ildiz 1, har `and`/`or`/`not` va shart +1                       |
+| `maxConditions`    | `DEFAULT_MAX_CONDITIONS`     | `30`     | barcha guruhlardagi `FieldCondition` barglari                                               |
+| `maxInItems`       | `DEFAULT_MAX_IN_ITEMS`       | `200`    | bitta massiv qiymatdagi elementlar (`in`, `notIn`, …)                                       |
+| `maxStringLength`  | `DEFAULT_MAX_STRING_LENGTH`  | `256`    | bitta satr qiymatdagi belgilar (massiv ichida ham)                                          |
+| `maxOffset`        | `DEFAULT_MAX_OFFSET`         | `10 000` | offset: `(page - 1) × perPage`; infinite: `offset`. Chuqurrog'i — cursor                    |
+| `maxSortFields`    | `DEFAULT_MAX_SORT_FIELDS`    | `3`      | `sort` massividagi maydonlar                                                                |
+| `maxLikeWildcards` | `DEFAULT_MAX_LIKE_WILDCARDS` | `2`      | bitta `like`/`ilike`/`notLike` naqshidagi `%`/`_` (ketma-ket `%%` bitta) — adapter siyosati |
 
 ```ts
 import { resolveLimits } from "@querykitjs/core";
