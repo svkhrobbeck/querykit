@@ -103,7 +103,38 @@ export const GROUP_CASES: ConformanceCase[] = [
       },
       ["Alice", "Bob", "dave", "Eve_Ann", "Frank", "Alina"],
     ),
-    knownDifference: { mongoose: "a multi-field `not` is a bare `$nor`, which keeps documents where the inner group is unknown (Carol, age null)" },
+  },
+  {
+    name: "not(and) over a NULL field is TRUE when the other side is FALSE (B10)",
+    group: "group",
+    // Carol: age NULL (unknown) AND name = Bob (false) = false → NOT = true.
+    ...where(
+      {
+        not: {
+          and: [
+            { key: "age", operation: "=", value: 1 },
+            { key: "name", operation: "=", value: "Bob" },
+          ],
+        },
+      },
+      ALL,
+    ),
+  },
+  {
+    name: "not(or) over a NULL field is FALSE when the other side is TRUE (B10)",
+    group: "group",
+    // Carol: age NULL (unknown) OR name = Carol (true) = true → NOT = false.
+    ...where(
+      {
+        not: {
+          or: [
+            { key: "age", operation: "=", value: 1 },
+            { key: "name", operation: "=", value: "Carol" },
+          ],
+        },
+      },
+      ["Alice", "Bob", "dave", "Eve_Ann", "Frank"],
+    ),
   },
   {
     name: "nested or / and / not",

@@ -75,24 +75,7 @@ function buildNode(model: AnyModel, node: FilterNode, diag?: Diagnostics): Query
         "$or",
         (node.or as FilterNode[]).map(n => buildNode(model, n, diag)),
       );
-    if ("not" in node) {
-      const notNode = node.not as FilterNode;
-      const inner = buildNode(model, notNode, diag);
-      if (!inner) return undefined;
-      // SQL `NOT(pred)` drops NULL rows (three-valued logic), but Mongo `$nor`
-      // includes null/missing. For a single-field comparison predicate, also
-      // require the field non-null so results match drizzle. `isNull`/`isNotNull`
-      // are two-valued (never NULL) → no guard, else `not(isNotNull)` would
-      // wrongly return nothing. Multi-field `not` groups keep bare `$nor`.
-      if (isFieldCondition(notNode)) {
-        const op = notNode.operation ?? "=";
-        if (op !== "isNull" && op !== "isNotNull") {
-          const field = resolveField(model, notNode.key);
-          if (field) return { $and: [{ [field]: { $ne: null } }, { $nor: [inner] }] };
-        }
-      }
-      return { $nor: [inner] };
-    }
+    if ("not" in node) return buildFalse(model, node.not as FilterNode, diag);
     // Raw escape hatch — a Mongo filter object, used as-is only when server code
     // branded it with core `raw()` (R19). A plain object can come from a JSON body
     // (`{ $where: … }`), so it is refused whatever `strict` says — mutations included.
@@ -100,6 +83,40 @@ function buildNode(model: AnyModel, node: FilterNode, diag?: Diagnostics): Query
     throw new QueryKitError({ source: model.modelName, site: "filter", key: Object.keys(node as object)[0] ?? "", reason: "forbidden-key" });
   }
   return undefined;
+}
+
+/**
+ * The rows where `node` is FALSE — SQL three-valued logic, so drizzle-pg and
+ * prisma-pg agree (task 021 B10). MongoDB's `$nor` is two-valued: it also keeps
+ * rows where the predicate is UNKNOWN (a null / missing field). So:
+ * `isFalse(and(…))` = `or(isFalse(…))`, `isFalse(or(…))` = `and(isFalse(…))`,
+ * `isFalse(not(q))` = `isTrue(q)`, and a comparison is FALSE only on a non-null
+ * field. `isNull` / `isNotNull` are two-valued (never UNKNOWN) and need no guard.
+ */
+function buildFalse(model: AnyModel, node: FilterNode, diag?: Diagnostics): Query | undefined {
+  if (isFieldCondition(node)) {
+    const inner = buildCondition(model, node, diag);
+    if (!inner) return undefined;
+    const op = node.operation ?? "=";
+    const field = op === "isNull" || op === "isNotNull" ? undefined : resolveField(model, node.key);
+    return field ? { $and: [{ [field]: { $ne: null } }, { $nor: [inner] }] } : { $nor: [inner] };
+  }
+  if (isObject(node)) {
+    if ("and" in node)
+      return combine(
+        "$or",
+        (node.and as FilterNode[]).map(n => buildFalse(model, n, diag)),
+      );
+    if ("or" in node)
+      return combine(
+        "$and",
+        (node.or as FilterNode[]).map(n => buildFalse(model, n, diag)),
+      );
+    if ("not" in node) return buildNode(model, node.not as FilterNode, diag);
+  }
+  // A branded raw node (or a refusal for an unbranded one) — its own truth value.
+  const inner = buildNode(model, node, diag);
+  return inner ? { $nor: [inner] } : undefined;
 }
 
 /**
