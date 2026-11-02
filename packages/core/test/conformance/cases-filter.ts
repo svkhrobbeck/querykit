@@ -17,7 +17,10 @@ export const OPERATOR_CASES: ConformanceCase[] = [
   op("like is case-sensitive", "name", "like", "A%", ["Alice", "Alina"]),
   op("like with a lowercase pattern", "name", "like", "%a%", ["Carol", "dave", "Frank", "Alina"]),
   op("like _ is a one-character wildcard", "name", "like", "A_i%", ["Alice", "Alina"], {
-    knownDifference: { "prisma-pg": "an anchored LIKE becomes `startsWith`, so `_` is matched literally" },
+    knownDifference: { "prisma-pg": "B9 (021 p2): an unescaped `_` in a Prisma LIKE becomes invalid-value; this row moves to a per-adapter expectation" },
+  }),
+  op("startsWith treats % literally (B7)", "name", "startsWith", "%", [], {
+    knownDifference: { "drizzle-pg": "B7 (021 p2): the value is not LIKE-escaped yet, so `%` matches every row" },
   }),
   op("ilike is case-insensitive", "name", "ilike", "%A%", ["Alice", "Carol", "dave", "Eve_Ann", "Frank", "Alina"]),
   op("notLike drops matches", "name", "notLike", "%a%", ["Alice", "Bob", "Eve_Ann"]),

@@ -1,6 +1,9 @@
 /** Query cases: sort, the three pagination modes, diagnostics, projection guard. */
 import { ALL, BY_CREATED, byCreated, cursorToken, where, type ConformanceCase } from "./case-types";
 
+/** 021 p5 lands the report; until then every adapter drops these items silently. */
+const B14 = "B14 (021 p5): malformed sort items are still dropped silently";
+
 export const SORT_CASES: ConformanceCase[] = [
   {
     name: "sort by one field",
@@ -24,7 +27,7 @@ export const SORT_CASES: ConformanceCase[] = [
     expect: { names: ["dave", "Alice", "Bob", "Eve_Ann", "Frank"], ordered: true },
   },
   {
-    name: "sort on a nullable field puts NULL last on asc",
+    name: "sort on a nullable field puts NULL first on asc (B11)",
     group: "sort",
     call: {
       method: "findAll",
@@ -35,8 +38,11 @@ export const SORT_CASES: ConformanceCase[] = [
         ],
       },
     },
-    expect: { names: ["Frank", "Eve_Ann", "Bob", "Alice", "dave", "Alina", "Carol"], ordered: true },
-    knownDifference: { mongoose: "MongoDB sorts null lowest, so NULL rows come first on asc" },
+    expect: { names: ["Alina", "Carol", "Frank", "Eve_Ann", "Bob", "Alice", "dave"], ordered: true },
+    knownDifference: {
+      "drizzle-pg": "B11 (021 p5): PostgreSQL puts NULL last on asc until NULLS FIRST is emitted",
+      "prisma-pg": "B11 (021 p5): PostgreSQL puts NULL last on asc until nulls: 'first' is emitted",
+    },
   },
   {
     name: "unknown sort key is skipped and reported",
@@ -45,17 +51,26 @@ export const SORT_CASES: ConformanceCase[] = [
     expect: { names: ALL, skipped: [{ site: "sort", key: "nope", reason: "unknown-key" }] },
   },
   {
-    name: "malformed sort items (null, no key) are dropped silently",
+    name: "malformed sort items (null, no key) are skipped and reported (B14)",
     group: "sort",
     call: { method: "findAll", params: { sort: [null, {}, ...byCreated] as unknown as typeof byCreated } },
-    expect: { names: BY_CREATED, ordered: true },
+    expect: {
+      names: BY_CREATED,
+      ordered: true,
+      skipped: [
+        { site: "sort", key: "", reason: "invalid-value" },
+        { site: "sort", key: "", reason: "invalid-value" },
+      ],
+    },
+    knownDifference: { "drizzle-pg": B14, "prisma-pg": B14, mongoose: B14 },
   },
   {
-    name: "strict: malformed sort items are dropped, not thrown",
+    name: "strict: a malformed sort item throws (B14)",
     group: "sort",
     call: { method: "findAll", params: { sort: [null, {}, ...byCreated] as unknown as typeof byCreated } },
     options: { strict: true },
-    expect: { names: BY_CREATED, ordered: true },
+    expect: { error: { site: "sort", key: "", reason: "invalid-value" } },
+    knownDifference: { "drizzle-pg": B14, "prisma-pg": B14, mongoose: B14 },
   },
 ];
 

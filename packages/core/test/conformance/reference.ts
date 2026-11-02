@@ -1,7 +1,7 @@
 /**
  * The reference meaning of a wire request, evaluated in memory: which fixture
  * rows a filter selects (SQL three-valued logic), in which order a sort puts
- * them (PostgreSQL null ordering). Every case's `expect` is checked against it
+ * them (NULL ordering: first on asc, last on desc — task 021 B11). Every case's `expect` is checked against it
  * (`self-check.ts`), so the table cannot drift from what the contract says.
  *
  * Text operators: `contains` / `startsWith` / `endsWith` / `ilike` are
@@ -10,7 +10,7 @@
  */
 import type { FieldCondition, Filter, FilterNode, Sort } from "../../src/types";
 
-import { and3, escapeLike, not3, or3, pgOrder, sortRows, sqlCompare, sqlIn, sqlLike, type Tri } from "./semantics";
+import { and3, escapeLike, mongoOrder, not3, or3, sortRows, sqlCompare, sqlIn, sqlLike, type Tri } from "./semantics";
 
 type Row = Record<string, unknown>;
 
@@ -84,7 +84,7 @@ export function referenceFilter<T extends Row>(rows: readonly T[], filter: Filte
 }
 
 /**
- * Rows in sort order (PostgreSQL null ordering; ties keep fixture order). Items
+ * Rows in sort order (task 021 B11: NULL first on asc, last on desc — MongoDB's order, on every adapter; ties keep fixture order). Items
  * without a `key` (`null`, `{}`) are dropped, as every adapter does.
  */
 export function referenceSort<T extends Row>(rows: readonly T[], sort: Sort | undefined): T[] {
@@ -93,6 +93,6 @@ export function referenceSort<T extends Row>(rows: readonly T[], sort: Sort | un
   return sortRows(
     rows,
     items.map(item => ({ key: item.key, direction: item.direction ?? "asc" })),
-    pgOrder,
+    mongoOrder,
   );
 }
