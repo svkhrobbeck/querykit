@@ -1,7 +1,7 @@
 /**
  * Web ↔ backend conformance — **no database required**.
  *
- *   bun --preload ./packages/mongoose/test/_bun-v8-shim.ts packages/web/test/conformance.ts
+ *   bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/web/test/conformance.ts
  *
  * Every table case is rebuilt with the `@querykitjs/web` builder for its
  * pagination mode (`buildListParams` / `buildInfiniteParams` /

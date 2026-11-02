@@ -45,7 +45,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test:smoke": "bun --preload ./test/_bun-v8-shim.ts test/smoke.ts"
+    "test:smoke": "bun --preload ./test/bun-v8-shim.ts test/smoke.ts"
   },
   "dependencies": {
     "@querykitjs/core": "workspace:*"

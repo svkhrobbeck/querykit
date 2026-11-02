@@ -15,6 +15,7 @@
  * deliberately the same, because the two adapters must agree.
  */
 import { createTestClient } from "./prisma/client";
+import { Prisma } from "./prisma/generated/client";
 
 import { createRegistry, createFilters } from "../src/index";
 
@@ -23,6 +24,8 @@ if (!url) throw new Error("Set DATABASE_URL to run the smoke test.");
 
 /** An isolated schema, handed to the driver adapter, so the test never touches real tables. */
 const SCHEMA = "qk_prisma_smoke";
+/** The schema as a raw SQL identifier — a compile-time constant, never user input (SEC-06/BE-PRISMA-05). */
+const SCHEMA_ID = Prisma.raw(SCHEMA);
 
 /* -------------------------------- runner ---------------------------------- */
 
@@ -44,17 +47,19 @@ async function main() {
   const postsRepo = registry.repository("post");
   const uf = createFilters<typeof prisma.user>();
 
-  // Fresh isolated schema (no `prisma migrate` dependency).
-  await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
-  await prisma.$executeRawUnsafe(`CREATE SCHEMA ${SCHEMA}`);
-  await prisma.$executeRawUnsafe(`CREATE TABLE ${SCHEMA}.users (
+  // Fresh isolated schema (no `prisma migrate` dependency). Tagged templates only (SEC-06);
+  // the schema is an identifier, which cannot be a bind parameter, so it goes in as Prisma.raw —
+  // identifier, compile-time constant; not user input — SEC-06/BE-PRISMA-05.
+  await prisma.$executeRaw`DROP SCHEMA IF EXISTS ${SCHEMA_ID} CASCADE`;
+  await prisma.$executeRaw`CREATE SCHEMA ${SCHEMA_ID}`;
+  await prisma.$executeRaw`CREATE TABLE ${SCHEMA_ID}.users (
     id serial PRIMARY KEY, name text NOT NULL, email text NOT NULL UNIQUE, age integer, secret text,
-    created_at timestamptz NOT NULL DEFAULT now())`);
-  await prisma.$executeRawUnsafe(`CREATE TABLE ${SCHEMA}.posts (
+    created_at timestamptz NOT NULL DEFAULT now())`;
+  await prisma.$executeRaw`CREATE TABLE ${SCHEMA_ID}.posts (
     id serial PRIMARY KEY, title text NOT NULL,
-    author_id integer NOT NULL REFERENCES ${SCHEMA}.users(id) ON DELETE CASCADE,
+    author_id integer NOT NULL REFERENCES ${SCHEMA_ID}.users(id) ON DELETE CASCADE,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz, deleted_at timestamptz)`);
+    updated_at timestamptz, deleted_at timestamptz)`;
 
   try {
     /* --------------------------------- seed -------------------------------- */
@@ -283,7 +288,7 @@ async function main() {
     const wiped = await postsRepo.deleteWhere([{ key: "title", operation: "%_%", value: "A" }]);
     check("deleteWhere → { count }", wiped.count >= 1, `${wiped.count}`);
   } finally {
-    await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
+    await prisma.$executeRaw`DROP SCHEMA IF EXISTS ${SCHEMA_ID} CASCADE`;
     await prisma.$disconnect();
   }
 

@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TSC = { 5.9: join(ROOT, "node_modules", "typescript-59", "bin", "tsc"), "6.0": join(ROOT, "node_modules", "typescript", "bin", "tsc") };
 const WORK = join(tmpdir(), "qk-matrix");
-const MONGO_SHIM = "../mongoose/test/_bun-v8-shim.ts";
+const MONGO_SHIM = "../mongoose/test/bun-v8-shim.ts";
 const SKIP_DIRS = new Set(["node_modules", "dist", ".cache", "generated"]);
 
 /** `script:<name>` runs a package.json script; anything else is a test file run with bun. */
@@ -43,9 +43,9 @@ const EDGES = [
     label: "mongoose 8.24.7",
     deps: { mongoose: "8.24.7" },
     runs: ["test/conformance.ts", "test/smoke.ts"],
-    preload: "./test/_bun-v8-shim.ts",
+    preload: "./test/bun-v8-shim.ts",
   },
-  { pkg: "mongoose", label: "mongoose 9.11.4", runs: ["test/conformance.ts", "test/smoke.ts"], preload: "./test/_bun-v8-shim.ts" },
+  { pkg: "mongoose", label: "mongoose 9.11.4", runs: ["test/conformance.ts", "test/smoke.ts"], preload: "./test/bun-v8-shim.ts" },
   {
     pkg: "class-validator",
     label: "class-validator 0.14.4 + reflect-metadata 0.1.14",
@@ -113,7 +113,7 @@ function oldEndWorkspace(edge) {
   // package exports (dist) — so the old end gets the dist built at the start of the run.
   cpSync(join(ROOT, "packages", "core", "dist"), join(dir, "packages", "core", "dist"), { recursive: true });
   if (!(edge.extra ?? []).includes("mongoose") && (edge.pkg === "mongoose" || edge.pkg === "drizzle-pg"))
-    cpSync(join(ROOT, "packages", "mongoose", "test", "_bun-v8-shim.ts"), join(dir, MONGO_SHIM.replace("..", "packages")));
+    cpSync(join(ROOT, "packages", "mongoose", "test", "bun-v8-shim.ts"), join(dir, MONGO_SHIM.replace("..", "packages")));
   cpSync(join(ROOT, "tsconfig.base.json"), join(dir, "tsconfig.base.json"));
 
   const manifestPath = join(dir, "packages", edge.pkg, "package.json");

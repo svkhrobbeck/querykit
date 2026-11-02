@@ -1,7 +1,7 @@
 /**
  * Conformance runner for @querykitjs/mongoose — **no database, no connection**.
  *
- *   bun --preload ./packages/mongoose/test/_bun-v8-shim.ts packages/mongoose/test/conformance.ts
+ *   bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/mongoose/test/conformance.ts
  *
  * The real repository builds real mongoose queries; `Query.prototype.exec` is
  * replaced for the fixture model: the filter is cast by mongoose itself

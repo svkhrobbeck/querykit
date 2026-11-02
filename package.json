@@ -17,7 +17,7 @@
     "format:check": "prettier --check \"packages/*/{src,test}/**/*.{ts,json,md}\" \"packages/*/skills/**/*.md\" \"*.{md,json}\"",
     "test:skills": "node scripts/check-skills.mjs",
     "test:matrix": "node scripts/test-matrix.mjs",
-    "test:conformance": "bun run packages/core/test/conformance/self-check.ts && bun run packages/drizzle-pg/test/conformance.ts && bun run packages/prisma-pg/test/conformance.ts && bun --preload ./packages/mongoose/test/_bun-v8-shim.ts packages/mongoose/test/conformance.ts && bun --preload ./packages/mongoose/test/_bun-v8-shim.ts packages/web/test/conformance.ts",
+    "test:conformance": "bun run packages/core/test/conformance/self-check.ts && bun run packages/drizzle-pg/test/conformance.ts && bun run packages/prisma-pg/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/mongoose/test/conformance.ts && bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/web/test/conformance.ts",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "bun run build && node scripts/pin-workspace-deps.mjs && node scripts/ci-publish.mjs",
