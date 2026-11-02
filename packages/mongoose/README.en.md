@@ -286,6 +286,16 @@ const p2 = await usersRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 const back = await usersRepository.findCursor({ cursor: p2.meta.prev_cursor, direction: "backward" });
 ```
 
+### Cursor: ties and signing
+
+- The seek key is `(cursorKey, _id)`: with a non-unique `cursorKey` (for example a shared `createdAt`) no row is skipped or repeated. When `cursorKey` is the primary key itself the seek uses that one field.
+- A token (v2) holds only scalar values (string, number, boolean, ISO date) and they are cast to the field type; an object, an array or a value that does not fit → `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` (the driver is not called).
+- The registry option `cursorSecret` signs tokens with HMAC-SHA256; an unsigned or altered token → `invalid-value`. Without it tokens are unsigned — a client can build one itself (still only within the allowed `sortable` keys and the filter).
+
+```ts
+export const registry = createRegistry(mongoose.connection, { cursorSecret: process.env.CURSOR_SECRET });
+```
+
 ## Typed relations & field selection
 
 Read methods infer their return type from `with` (populate) and `columns` — no manual generics:
@@ -361,6 +371,7 @@ await usersRepository.findAll({ filter: raw({ age: { $gt: 18 } }) });
 - Pages deeper than offset 10 000 are refused — use `findCursor`, or raise `limits: { maxOffset }`.
 - Every read runs with `maxTimeMS: 2000`; raise `maxTimeMS` on the repository for long report queries. A timeout throws `QueryKitTimeoutError`.
 - A LIKE pattern with more than 2 wildcards is refused (`maxLikeWildcards`).
+- Cursor tokens are v2 now (task 012): an old (v1) `next_cursor` / `prev_cursor` is refused with `invalid-value` — after the upgrade start paging from the first page again.
 
 ## Wire (JSON) values and migrating from DbService
 

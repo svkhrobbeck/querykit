@@ -285,6 +285,16 @@ const p2 = await postsRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 p1.meta; // { limit, has_next, has_prev, next_cursor, prev_cursor }
 ```
 
+### Cursor: teng qiymatlar va imzo
+
+- Seek kaliti `(cursorKey, @id)`: `cursorKey` unikal bo'lmasa ham (masalan bir xil `createdAt`) hech bir qator tushib qolmaydi va takrorlanmaydi. `cursorKey` primary key'ning o'zi bo'lsa — bitta maydonli seek.
+- Token (v2) ichida faqat skalyar qiymat (satr, son, boolean, ISO sana) bo'ladi va maydon tipiga cast qilinadi; obyekt, massiv yoki mos kelmaydigan qiymat → `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` (drayver chaqirilmaydi).
+- Registry opsiyasi `cursorSecret` token'ni HMAC-SHA256 bilan imzolaydi; imzosiz yoki o'zgartirilgan token → `invalid-value`. Usiz token imzosiz — mijoz uni o'zi yasay oladi (faqat ruxsat etilgan `sortable` kalit va filter doirasida).
+
+```ts
+export const registry = createRegistry(prisma, { cursorSecret: process.env.CURSOR_SECRET });
+```
+
 `perPage`/`limit` **cheklangan** (`DEFAULT_MAX_PER_PAGE` = 200) — validatsiya chetlab o'tilsa ham repository o'zi clamp qiladi.
 
 > Cursor tokeni `drizzle-pg` va `mongoose` adapterlari bilan **bayt-ma-bayt bir xil** — backend ORM'i almashsa ham eski token ishlayveradi.
@@ -409,6 +419,7 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 - Avval `onSkippedCondition` loglaridan ishlatilayotgan maydon/operatorlarni yig'ing, keyin `filterable`ni aynan shularga toraytiring — `"*"` vaqtinchalik yo'l.
 - `QueryKitError`ning yangi `reason`lari: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; yangi `site`: `page`. Ularni 400 qilib qaytaring.
 - Offset 10 000 dan chuqur sahifalar endi rad etiladi — `findCursor` ishlating yoki `limits: { maxOffset }` bilan oshiring.
+- Cursor token formati v2 (task 012): eski (v1) `next_cursor` / `prev_cursor` endi `invalid-value` bilan rad etiladi — yangilashdan keyin paginatsiyani birinchi sahifadan boshlang.
 
 ## Cheklovlar
 
