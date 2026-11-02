@@ -1,5 +1,5 @@
 import { QueryKitError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
-import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
 
 import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions } from "../types";
 import type { AnyExecutor } from "../internal/executor";
@@ -40,6 +40,8 @@ export interface RuntimeDelegate {
   createManyAndReturn?(args: Record<string, unknown>): Promise<Record<string, unknown>[]>;
   update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
   updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  /** Prisma ≥ 6.2 on PostgreSQL (the peer range is ^6.19 || ^7.10): the updated rows of one statement. */
+  updateManyAndReturn(args: Record<string, unknown>): Promise<Record<string, unknown>[]>;
   delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
   deleteMany(args: Record<string, unknown>): Promise<{ count: number }>;
   upsert(args: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -69,6 +71,12 @@ export interface RepoContext<TDelegate> {
   policy: Policy;
   /** User filter + scope + soft-delete guard as one `where`. */
   composeWhere: (userFilter?: Filter<TDelegate>, withDeleted?: boolean) => Where | undefined;
+  /**
+   * The WHERE of `updateWhere` / `deleteWhere` (task 013): `{ all: true }` → scope and
+   * soft-delete guard only; an empty filter — also one whose every condition was skipped —
+   * is `empty-filter`; the filter passes the request policy like a read's.
+   */
+  mutationWhere: (filter: unknown, method: "updateWhere" | "deleteWhere") => Where | undefined;
   /** `filter AND idKey = id`; an unresolvable `idKey` throws. */
   withId: (filter: Filter<TDelegate> | undefined, idKey: string, id: Id) => Filter<TDelegate>;
   countWhere: (where?: Where) => Promise<number>;
@@ -88,8 +96,19 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
   const scopeWhere = buildScopeWhere(meta, config);
   const policy = buildPolicy(meta, config, runtime.limits);
 
+  /** An already built user `where` + scope + soft-delete guard. */
+  const combineWhere = (userWhere: Where | undefined, withDeleted?: boolean): Where | undefined =>
+    andWhere([userWhere, scopeWhere, meta.hasDeletedAt && !withDeleted ? { deletedAt: null } : undefined]);
   const composeWhere = (userFilter?: Filter<TDelegate>, withDeleted?: boolean): Where | undefined =>
-    andWhere([buildWhere(meta, userFilter as Filter, diag), scopeWhere, meta.hasDeletedAt && !withDeleted ? { deletedAt: null } : undefined]);
+    combineWhere(buildWhere(meta, userFilter as Filter, diag), withDeleted);
+
+  const mutationWhere = (filter: unknown, method: "updateWhere" | "deleteWhere"): Where | undefined => {
+    if (isAllRows(filter)) return combineWhere(undefined);
+    if (isEmptyFilter(filter)) refuseEmptyFilter(diag.source, method);
+    policy.checkFilter(filter as Filter<TDelegate>);
+    const userWhere = buildWhere(meta, filter as Filter, diag);
+    return userWhere === undefined ? refuseEmptyFilter(diag.source, method) : combineWhere(userWhere);
+  };
 
   /*
    * An unresolvable `idKey` is **fatal**, never skipped: the normal "drop the
@@ -127,6 +146,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
     permits,
     projection,
     composeWhere,
+    mutationWhere,
     withId,
     countWhere,
   };

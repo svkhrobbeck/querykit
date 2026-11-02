@@ -1,7 +1,7 @@
 import { and, getTableName, isNull, isSQLWrapper, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
-import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
 import type { QueryLimits } from "@querykitjs/core";
 
 import type { AnyDb, ColumnKey, FieldCondition, Filter, Id, RepositoryOptions } from "../types";
@@ -57,6 +57,12 @@ export interface RepoContext<TTable extends AnyPgTable> {
   policy: Policy;
   /** User filter + scope + soft-delete guard as one WHERE. */
   composeWhere: (userFilter?: Filter<TTable>, withDeleted?: boolean) => SQL | undefined;
+  /**
+   * The WHERE of `updateWhere` / `deleteWhere` (task 013): `{ all: true }` → scope and
+   * soft-delete guard only; an empty filter — also one whose every condition was skipped —
+   * is `empty-filter`; the filter passes the request policy like a read's.
+   */
+  mutationWhere: (filter: unknown, method: "updateWhere" | "deleteWhere") => SQL | undefined;
   /** `filter AND idKey = id`. */
   withId: (filter: Filter<TTable> | undefined, idKey: string, id: Id) => Filter<TTable>;
   countWhere: (where?: SQL) => Promise<number>;
@@ -89,13 +95,21 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
   const projection = buildProjection(config);
   const policy = buildPolicy(table, config, runtime.limits);
 
-  const composeWhere = (userFilter?: Filter<TTable>, withDeleted?: boolean): SQL | undefined => {
-    const parts = [buildWhere(table, userFilter, diag), scopeWhere, deletedAtCol && !withDeleted ? isNull(deletedAtCol) : undefined].filter(
-      (part): part is SQL => part !== undefined,
-    );
+  /** An already built user WHERE + scope + soft-delete guard. */
+  const combineWhere = (userWhere: SQL | undefined, withDeleted?: boolean): SQL | undefined => {
+    const parts = [userWhere, scopeWhere, deletedAtCol && !withDeleted ? isNull(deletedAtCol) : undefined].filter((part): part is SQL => part !== undefined);
     if (parts.length === 0) return undefined;
     if (parts.length === 1) return parts[0];
     return and(...parts);
+  };
+  const composeWhere = (userFilter?: Filter<TTable>, withDeleted?: boolean): SQL | undefined => combineWhere(buildWhere(table, userFilter, diag), withDeleted);
+
+  const mutationWhere = (filter: unknown, method: "updateWhere" | "deleteWhere"): SQL | undefined => {
+    if (isAllRows(filter)) return combineWhere(undefined);
+    if (isEmptyFilter(filter)) refuseEmptyFilter(diag.source, method);
+    policy.checkFilter(filter as Filter<TTable>);
+    const userWhere = buildWhere(table, filter as Filter<TTable>, diag);
+    return userWhere === undefined ? refuseEmptyFilter(diag.source, method) : combineWhere(userWhere);
   };
 
   const withId = (filter: Filter<TTable> | undefined, idKey: string, id: Id): Filter<TTable> => {
@@ -113,7 +127,7 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
     return rows[0]?.value ?? 0;
   };
 
-  return { runtime, table, diag, executor, handle, updatedAtCol, deletedAtCol, projection, policy, composeWhere, withId, countWhere };
+  return { runtime, table, diag, executor, handle, updatedAtCol, deletedAtCol, projection, policy, composeWhere, mutationWhere, withId, countWhere };
 }
 
 /** The table's request policy. Fields are named by JS property; a DB column name maps to the same field. */

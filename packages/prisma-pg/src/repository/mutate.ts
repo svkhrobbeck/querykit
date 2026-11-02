@@ -1,15 +1,21 @@
+import type { AllRows, MutationOptions } from "@querykitjs/core";
+import { clampPageSize } from "@querykitjs/core/internal";
+
 import type { Filter, Id, Insert, RepositoryOptions, Row, UpsertOptions } from "../types";
 import { resolveField } from "../internal/fields";
 import type { Where } from "../internal/where";
 import { toArray, type RepoContext } from "./context";
-import { keyedIn, keySelect, requirePrimaryKey, uniqueWhere } from "./keys";
+import { keySelect, requirePrimaryKey, uniqueWhere } from "./keys";
 
 /** Rows per batch in `upsertMany` (bounds the promise pressure of the sequential loop). */
 const CHUNK_SIZE = 1000;
 
 /** `create*`, `upsert*`, `update*`, `delete*`, `softDelete`, `restore`. */
 export function mutateMethods<TDelegate>(ctx: RepoContext<TDelegate>, config: RepositoryOptions<TDelegate>) {
-  const { meta, delegate, composeWhere, withId } = ctx;
+  const { runtime, meta, delegate, composeWhere, mutationWhere, withId } = ctx;
+
+  /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
+  const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
 
   /** Apply scope defaults to insert values — scope wins (can't be overridden). */
   const forInsert = (values: object): Record<string, unknown> => ({
@@ -117,17 +123,14 @@ export function mutateMethods<TDelegate>(ctx: RepoContext<TDelegate>, config: Re
       return updateOne(composeWhere(withId(undefined, idKey, id)), forUpdate(patch as object), "updateById");
     },
 
-    async updateWhere(filter: Filter<TDelegate>, patch: Partial<Insert<TDelegate>>) {
-      const key = requirePrimaryKey(meta, "updateWhere");
-      const where = composeWhere(filter);
-      const d = delegate();
-      // Prisma's `updateMany` returns a count, so the affected keys are collected
-      // first and re-read afterwards (the same shape the mongoose adapter uses).
-      const found = await d.findMany({ where, select: keySelect(key) });
-      if (found.length === 0) return [];
-      const keyed = keyedIn(key, found);
-      await d.updateMany({ where: keyed, data: forUpdate(patch as object) });
-      return (await d.findMany({ where: keyed })) as Row<TDelegate>[];
+    async updateWhere(filter: Filter<TDelegate> | AllRows, patch: Partial<Insert<TDelegate>>, options: MutationOptions = {}) {
+      // Task 013: one atomic statement — no read before the write, so a row that stops
+      // matching between a read and the write can never be updated.
+      const where = mutationWhere(filter, "updateWhere");
+      const data = forUpdate(patch as object);
+      if (!options.returning) return { count: (await delegate().updateMany({ where, data })).count };
+      const rows = (await delegate().updateManyAndReturn({ where, data })) as Row<TDelegate>[];
+      return { count: rows.length, rows: rows.slice(0, returningLimit(options.returning)) };
     },
 
     async deleteById(id: Id, idKey: string = "id") {
@@ -138,13 +141,12 @@ export function mutateMethods<TDelegate>(ctx: RepoContext<TDelegate>, config: Re
       return (await d.delete({ where: uniqueWhere(meta, key, target) })) as Row<TDelegate>;
     },
 
-    async deleteWhere(filter: Filter<TDelegate>) {
-      const key = requirePrimaryKey(meta, "deleteWhere");
-      const d = delegate();
-      const rows = await d.findMany({ where: composeWhere(filter) });
-      if (rows.length === 0) return [];
-      await d.deleteMany({ where: keyedIn(key, rows) });
-      return rows as Row<TDelegate>[];
+    async deleteWhere(filter: Filter<TDelegate> | AllRows, options: MutationOptions = {}) {
+      const where = mutationWhere(filter, "deleteWhere");
+      // Prisma has no deleteManyAndReturn: the rows are read just before the delete (not atomic, README).
+      const rows = options.returning ? ((await delegate().findMany({ where, take: returningLimit(options.returning) })) as Row<TDelegate>[]) : undefined;
+      const { count } = await delegate().deleteMany({ where });
+      return rows ? { count, rows } : { count };
     },
 
     async softDelete(id: Id, idKey: string = "id") {

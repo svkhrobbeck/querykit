@@ -274,6 +274,8 @@ Noma'lum kalit skip qilinadi; yaroqli sort qolmasa `createdAt desc`, u ham bo'lm
 // 1) Offset — total_items/total_pages bilan
 const list = await usersRepository.findList({ page: 2, perPage: 20 });
 list.meta; // { total_items, total_pages, current_page, per_page, has_next, has_prev }
+// withTotal: false — count so'ralmaydi (katta jadval): perPage + 1 qator, total_items / total_pages = null
+const fast = await usersRepository.findList({ page: 2, perPage: 20, withTotal: false });
 
 // 2) Infinite-scroll — COUNT'siz
 const feed = await postsRepository.findInfinite({ limit: 20, offset: 40 });
@@ -320,7 +322,28 @@ const both = await usersRepository.findAll({ columns: { id: true }, with: { post
 await usersRepository.findAll({ with: { posts: { select: { title: true }, take: 5, orderBy: { createdAt: "desc" } } } });
 ```
 
+## Ommaviy yangilash va o'chirish
+
+`updateWhere` / `deleteWhere` — bitta yozish so'rovi (oldin o'qish yo'q), natija `{ count }`:
+
+```ts
+const { count } = await usersRepository.updateWhere([{ key: "status", value: "trial" }], { status: "expired" });
+await usersRepository.deleteWhere([{ key: "status", value: "expired" }]); // { count }
+
+// returning: { limit } — `{ count, rows }`, ko'pi bilan limit ta qator (maxLimit, default 200)
+const { rows } = await usersRepository.updateWhere(filter, patch, { returning: { limit: 50 } });
+
+// filtrsiz — faqat aniq ko'rsatilsa (scope baribir qo'llanadi)
+await usersRepository.deleteWhere({ all: true });
+```
+
+- Bo'sh filtr (`undefined`, `{}`, `[]`) yoki hamma sharti tashlab yuborilgan filtr (masalan faqat noma'lum kalit) → `QueryKitError` `reason: "empty-filter"`, `site: "mutation"` — drayver chaqirilmaydi, jadval jim o'chmaydi.
+- Mutatsiya filtri o'qishdagidek `filterable` va `limits`dan o'tadi (`forbidden-key`, `forbidden-operator`, `limit-exceeded`). Server'ning o'z filtri ham.
+- `updateWhere` `rows` — bitta `updateManyAndReturn` natijasi (atomar). `deleteWhere` `rows` — o'chirishdan **oldin** o'qiladi (Prisma'da `deleteManyAndReturn` yo'q) — atomar emas: orada o'zgargan qator ro'yxatda bo'lishi yoki bo'lmasligi mumkin.
+
 ## Tranzaksiyalar
+
+> ⚠️ Callback ichida **faqat DB amallari**. Tashqi amallar (HTTP, xabar, email) — outbox orqali: drayver tranzaksiyani qayta urinishi mumkin, tashqi amal esa takrorlanadi va qaytarib bo'lmaydi.
 
 ```ts
 await registry.transaction(async () => {
@@ -420,6 +443,9 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 - `QueryKitError`ning yangi `reason`lari: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; yangi `site`: `page`. Ularni 400 qilib qaytaring.
 - Offset 10 000 dan chuqur sahifalar endi rad etiladi — `findCursor` ishlating yoki `limits: { maxOffset }` bilan oshiring.
 - Cursor token formati v2 (task 012): eski (v1) `next_cursor` / `prev_cursor` endi `invalid-value` bilan rad etiladi — yangilashdan keyin paginatsiyani birinchi sahifadan boshlang.
+- `updateWhere` / `deleteWhere` endi `Row[]` emas, `{ count }` qaytaradi (task 013); qatorlar kerak bo'lsa `{ returning: { limit } }` → `{ count, rows }`.
+- Filtrsiz `updateWhere` / `deleteWhere` → `empty-filter`; hamma qatorlar uchun `{ all: true }` yozing. Mutatsiya filtri endi `filterable` siyosatidan o'tadi.
+- `OffsetMeta.total_items` / `total_pages` tipi `number | null` (`withTotal: false` bilan `null`).
 
 ## Cheklovlar
 

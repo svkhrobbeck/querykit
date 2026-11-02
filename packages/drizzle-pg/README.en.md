@@ -249,6 +249,8 @@ Falls back to `createdAt DESC`, then `id DESC`, when no sort is given — a dete
 ```ts
 // 1. Offset — total_items / total_pages
 const page = await usersRepository.findList({ page: 2, perPage: 20, filter, sort });
+// withTotal: false — no count query (large tables): perPage + 1 rows, total_items / total_pages = null
+const fast = await usersRepository.findList({ page: 2, perPage: 20, withTotal: false });
 
 // 2. Infinite scroll (limit + offset, no COUNT) — has_more / next_offset
 const feed = await usersRepository.findInfinite({ limit: 20, offset: 40 });
@@ -282,7 +284,28 @@ rows[0].id; // number
 rows[0].email; // ❌ type error — not selected
 ```
 
+## Bulk update and delete
+
+`updateWhere` / `deleteWhere` are one write (no read before it) and return `{ count }`:
+
+```ts
+const { count } = await usersRepository.updateWhere([{ key: "status", value: "trial" }], { status: "expired" });
+await usersRepository.deleteWhere([{ key: "status", value: "expired" }]); // { count }
+
+// returning: { limit } — { count, rows }, at most limit rows (maxLimit, default 200)
+const { rows } = await usersRepository.updateWhere(filter, patch, { returning: { limit: 50 } });
+
+// no filter — only when you say so (the scope still applies)
+await usersRepository.deleteWhere({ all: true });
+```
+
+- An empty filter (`undefined`, `{}`, `[]`) or one whose every condition was skipped (for example only an unknown key) → `QueryKitError` `reason: "empty-filter"`, `site: "mutation"` — the driver is not called, the table is never wiped silently.
+- A mutation filter passes `filterable` and `limits` like a read's (`forbidden-key`, `forbidden-operator`, `limit-exceeded`) — the server's own filters too.
+- `rows` come from the same single `UPDATE … RETURNING` / `DELETE … RETURNING` (atomic), cut to `limit`.
+
 ## Transactions
+
+> ⚠️ Only **database work** inside the callback. External effects (HTTP calls, messages, email) go through an outbox: the driver may retry the transaction, and an external effect would run again and cannot be rolled back.
 
 ```ts
 await registry.transaction(async () => {
@@ -330,6 +353,9 @@ const open = db.repository(users, {
 - New `QueryKitError` reasons: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; new site: `page`. Return them as 400.
 - Pages deeper than offset 10 000 are now refused — use `findCursor`, or raise it with `limits: { maxOffset }`.
 - Cursor tokens are v2 now (task 012): an old (v1) `next_cursor` / `prev_cursor` is refused with `invalid-value` — after the upgrade start paging from the first page again.
+- `updateWhere` / `deleteWhere` return `{ count }` instead of `Row[]` (task 013); for rows pass `{ returning: { limit } }` → `{ count, rows }`.
+- A filterless `updateWhere` / `deleteWhere` is `empty-filter`; write `{ all: true }` for every row. A mutation filter now passes the `filterable` policy.
+- `OffsetMeta.total_items` / `total_pages` are typed `number | null` (`null` with `withTotal: false`).
 
 ## Wire (JSON) values and migrating from DbService
 
@@ -377,22 +403,22 @@ await ordersRepository.aggregate({ sum: "amount", groupBy: "region" });
 
 ## API reference
 
-| Method                                                         | Returns                      |
-| -------------------------------------------------------------- | ---------------------------- |
-| `findAll(params?)`                                             | `Row[]`                      |
-| `findOne(params?)` / `findById(id, params?)`                   | `Row \| undefined`           |
-| `findList(params?)`                                            | `{ data, meta }` offset      |
-| `findInfinite(params?)`                                        | `{ data, meta }` infinite    |
-| `findCursor(params?)`                                          | `{ data, meta }` cursor      |
-| `count(filter?)` / `exists(filter?)`                           | `number` / `boolean`         |
-| `aggregate(spec)`                                              | `AggregateRow[]`             |
-| `create(values)` / `createMany(values)`                        | `Row` / `Row[]`              |
-| `upsert(values, opts)` / `upsertMany(values, opts)`            | `Row` / `Row[]`              |
-| `updateById(id, patch, idKey?)` / `updateWhere(filter, patch)` | `Row \| undefined` / `Row[]` |
-| `deleteById(id, idKey?)` / `deleteWhere(filter)`               | `Row \| undefined` / `Row[]` |
-| `softDelete(id)` / `restore(id)`                               | `Row \| undefined`           |
-| `scoped(scope)`                                                | scoped `Repository`          |
-| `registry.transaction(fn)`                                     | result of `fn`               |
+| Method                                                                   | Returns                                                               |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `findAll(params?)`                                                       | `Row[]`                                                               |
+| `findOne(params?)` / `findById(id, params?)`                             | `Row \| undefined`                                                    |
+| `findList(params?)`                                                      | `{ data, meta }` offset                                               |
+| `findInfinite(params?)`                                                  | `{ data, meta }` infinite                                             |
+| `findCursor(params?)`                                                    | `{ data, meta }` cursor                                               |
+| `count(filter?)` / `exists(filter?)`                                     | `number` / `boolean`                                                  |
+| `aggregate(spec)`                                                        | `AggregateRow[]`                                                      |
+| `create(values)` / `createMany(values)`                                  | `Row` / `Row[]`                                                       |
+| `upsert(values, opts)` / `upsertMany(values, opts)`                      | `Row` / `Row[]`                                                       |
+| `updateById(id, patch, idKey?)` / `updateWhere(filter, patch, options?)` | `Row \| undefined` / `{ count }` (`{ count, rows }` with `returning`) |
+| `deleteById(id, idKey?)` / `deleteWhere(filter, options?)`               | `Row \| undefined` / `{ count }` (`{ count, rows }` with `returning`) |
+| `softDelete(id)` / `restore(id)`                                         | `Row \| undefined`                                                    |
+| `scoped(scope)`                                                          | scoped `Repository`                                                   |
+| `registry.transaction(fn)`                                               | result of `fn`                                                        |
 
 ## Development
 

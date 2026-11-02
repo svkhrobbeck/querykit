@@ -5,7 +5,6 @@
  * written by key. Works for a single `@id` and for a composite `@@id` alike.
  */
 import type { ModelMeta } from "../internal/fields";
-import type { Where } from "../internal/where";
 
 /** The model's primary key fields; throws when it has none. */
 export function requirePrimaryKey(meta: ModelMeta, method: string): string[] {
@@ -29,10 +28,4 @@ export const keySelect = (key: string[]): Record<string, true> => Object.fromEnt
 export function uniqueWhere(meta: ModelMeta, key: string[], row: Record<string, unknown>): Record<string, unknown> {
   if (key.length === 1) return { [key[0]!]: row[key[0]!] };
   return { [meta.primaryKeyName ?? key.join("_")]: Object.fromEntries(key.map(field => [field, row[field]])) };
-}
-
-/** A `where` matching exactly the given rows by key (used for bulk re-reads). */
-export function keyedIn(key: string[], rows: Record<string, unknown>[]): Where {
-  if (key.length === 1) return { [key[0]!]: { in: rows.map(row => row[key[0]!]) } };
-  return { OR: rows.map(row => Object.fromEntries(key.map(field => [field, row[field]]))) };
 }

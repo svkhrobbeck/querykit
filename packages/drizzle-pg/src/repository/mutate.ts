@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
+import type { MutationOptions } from "@querykitjs/core";
+import { clampPageSize } from "@querykitjs/core/internal";
 
+import type { AllRows } from "@querykitjs/core";
 import type { ColumnKey, Filter, Id, Insert, RepositoryOptions, Row, UpsertOptions } from "../types";
 import { resolveColumn } from "../internal/columns";
 import { buildWhere } from "../internal/where";
@@ -11,7 +14,20 @@ const CHUNK_SIZE = 1000;
 
 /** `create*`, `upsert*`, `update*`, `delete*`, `softDelete`, `restore`. */
 export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>, config: RepositoryOptions<TTable>) {
-  const { table, executor, handle, updatedAtCol, deletedAtCol, composeWhere, withId } = ctx;
+  const { runtime, table, executor, handle, updatedAtCol, deletedAtCol, composeWhere, mutationWhere, withId } = ctx;
+
+  /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
+  const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
+
+  /** One atomic statement → `{ count }`, or `{ count, rows }` cut to the limit (task 013). */
+  const counted = async (
+    query: { returning(selection?: Record<string, unknown>): Promise<unknown[]> },
+    options: MutationOptions,
+  ): Promise<{ count: number; rows?: Row<TTable>[] }> => {
+    if (!options.returning) return { count: (await query.returning({ affected: sql`1` })).length };
+    const rows = (await query.returning()) as Row<TTable>[];
+    return { count: rows.length, rows: rows.slice(0, returningLimit(options.returning)) };
+  };
 
   /** Apply scope defaults to insert values (scope wins). */
   const forInsert = (values: object): object => ({
@@ -124,12 +140,15 @@ export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       return updateOne(id, idKey, patch);
     },
 
-    async updateWhere(filter: Filter<TTable>, patch: Partial<Insert<TTable>>) {
-      return (await executor()
-        .update(table)
-        .set(forUpdate(patch) as never)
-        .where(composeWhere(filter))
-        .returning()) as Row<TTable>[];
+    async updateWhere(filter: Filter<TTable> | AllRows, patch: Partial<Insert<TTable>>, options: MutationOptions = {}) {
+      const where = mutationWhere(filter, "updateWhere");
+      return counted(
+        executor()
+          .update(table)
+          .set(forUpdate(patch) as never)
+          .where(where) as never,
+        options,
+      );
     },
 
     async deleteById(id: Id, idKey: ColumnKey<TTable> = "id" as ColumnKey<TTable>) {
@@ -138,8 +157,9 @@ export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       return (row ?? undefined) as Row<TTable> | undefined;
     },
 
-    async deleteWhere(filter: Filter<TTable>) {
-      return (await executor().delete(table).where(composeWhere(filter)).returning()) as Row<TTable>[];
+    async deleteWhere(filter: Filter<TTable> | AllRows, options: MutationOptions = {}) {
+      const where = mutationWhere(filter, "deleteWhere");
+      return counted(executor().delete(table).where(where) as never, options);
     },
 
     async softDelete(id: Id, idKey: ColumnKey<TTable> = "id" as ColumnKey<TTable>) {

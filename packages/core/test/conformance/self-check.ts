@@ -23,7 +23,7 @@ const problems: string[] = [];
 function referenceNames(testCase: ConformanceCase): string[] | undefined {
   const { call, expect } = testCase;
   if (expect.error || (expect.skipped?.length ?? 0) > 0) return undefined;
-  const filtered = referenceFilter<Row>(ROWS, call.params.filter);
+  const filtered = referenceFilter<Row>(ROWS, call.params.filter as Filter | undefined);
   const names = (rows: Row[]) => rows.map(row => row.name);
   switch (call.method) {
     case "findAll":
@@ -70,7 +70,7 @@ const walkFilter = (filter: Filter | undefined) => (Array.isArray(filter) ? filt
 const sortSizes = new Set<number>();
 const methods = new Set<string>();
 for (const { call } of CASES) {
-  walkFilter(call.params.filter);
+  walkFilter(call.params.filter as Filter | undefined);
   methods.add(call.method);
   const sort = (call.params as { sort?: SortItem[] }).sort;
   if (sort) sortSizes.add(sort.length);

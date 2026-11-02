@@ -280,7 +280,7 @@ async function main() {
     const deleted = await usersRepo.deleteById(up2.id);
     check("deleteById returns the deleted row", deleted?.email === "new@example.com");
     const wiped = await postsRepo.deleteWhere([{ key: "title", operation: "%_%", value: "A" }]);
-    check("deleteWhere returns the deleted rows", wiped.length >= 1, `${wiped.length}`);
+    check("deleteWhere → { count }", wiped.count >= 1, `${wiped.count}`);
   } finally {
     await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
     await prisma.$disconnect();

@@ -83,6 +83,8 @@ function toWebCase(testCase: ConformanceCase): WebCase {
       const input = { ...call.params, page: 1, perPage: ONE_PAGE } as Record<string, unknown>;
       return { testCase, builder: "buildListParams", input, payload: overTheWire(buildListParams(input as never)) as never };
     }
+    default:
+      throw new Error(`web conformance: ${call.method} is not built by web (mark it notBuiltByWeb)`);
   }
 }
 
