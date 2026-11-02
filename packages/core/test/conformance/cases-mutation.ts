@@ -7,8 +7,6 @@
  */
 import { ALL, byCreated, type ConformanceCase } from "./case-types";
 
-/** Red until 013 phase 4 (withTotal) lands; removed there. */
-const TOTAL = { "drizzle-pg": "013 p4", "prisma-pg": "013 p4", mongoose: "013 p4" } as const;
 const WEB = "a mutation is a repository call, not built by web";
 const AGE_17_UP = [{ key: "age", operation: ">=", value: 17 }];
 const UNDER_17_OR_NULL = ["Carol", "Alina"];
@@ -133,7 +131,6 @@ export const MUTATION_CASES: readonly ConformanceCase[] = [
       calls: ["find:4"],
     },
     notBuiltByWeb: "withTotal is a server-side option (web meta follows in 015)",
-    knownDifference: TOTAL,
   },
   {
     name: "A6: withTotal: false on the last page → has_next false",
@@ -145,7 +142,6 @@ export const MUTATION_CASES: readonly ConformanceCase[] = [
       calls: ["find:4"],
     },
     notBuiltByWeb: "withTotal is a server-side option (web meta follows in 015)",
-    knownDifference: TOTAL,
   },
   {
     name: "A6: withTotal: false with exactly perPage rows → has_next false",
@@ -153,7 +149,6 @@ export const MUTATION_CASES: readonly ConformanceCase[] = [
     call: { method: "findList", params: { sort: byCreated, page: 1, perPage: 7, withTotal: false } },
     expect: { names: ALL, meta: { total_items: null, total_pages: null, current_page: 1, per_page: 7, has_next: false, has_prev: false } },
     notBuiltByWeb: "withTotal is a server-side option (web meta follows in 015)",
-    knownDifference: TOTAL,
   },
   {
     name: "A7: findList without withTotal counts as before",

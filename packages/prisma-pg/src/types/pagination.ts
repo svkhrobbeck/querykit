@@ -6,6 +6,8 @@ import type { AnyDelegate, LooseFieldKey, QueryParams, SortDirection } from "./c
 export interface OffsetParams<TDelegate = AnyDelegate> extends QueryParams<TDelegate> {
   page?: number;
   perPage?: number;
+  /** `false` — no count query: `perPage + 1` rows are read, `total_items` / `total_pages` are `null` (task 013). Default `true`. */
+  withTotal?: boolean;
 }
 
 export type OffsetMeta = Core.OffsetMeta;

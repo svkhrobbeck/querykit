@@ -1,4 +1,4 @@
-import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta } from "@querykitjs/core/internal";
+import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta, offsetPageWithoutTotal } from "@querykitjs/core/internal";
 
 import type { ByIdParams, Filter, Id, InfiniteParams, InfiniteResult, OffsetParams, OffsetResult, QueryParams } from "../types";
 import type { AnyQuery, RepoContext } from "./context";
@@ -49,12 +49,12 @@ export function readMethods<TDoc>(ctx: RepoContext<TDoc>) {
       const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
       policy.checkPage({ page, perPage });
       const where = composeWhere(params.filter, params.withDeleted);
+      const rows = (limit: number) =>
+        runFind(where, { sort: sortSpec(params.sort), columns: params.columns, with: params.with, limit, skip: (page - 1) * perPage });
 
-      const [data, totalItems] = await Promise.all([
-        runFind(where, { sort: sortSpec(params.sort), columns: params.columns, with: params.with, limit: perPage, skip: (page - 1) * perPage }),
-        countWhere(where),
-      ]);
-
+      // Task 013: no count — one extra row tells whether a next page exists.
+      if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
+      const [data, totalItems] = await Promise.all([rows(perPage), countWhere(where)]);
       return { data, meta: offsetMeta(page, perPage, totalItems) } as OffsetResult<never>;
     },
 

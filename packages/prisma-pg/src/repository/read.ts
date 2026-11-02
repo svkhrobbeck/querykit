@@ -1,4 +1,4 @@
-import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta } from "@querykitjs/core/internal";
+import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta, offsetPageWithoutTotal } from "@querykitjs/core/internal";
 
 import type { ByIdParams, Filter, Id, InfiniteParams, InfiniteResult, OffsetParams, OffsetResult, QueryParams } from "../types";
 import { buildOrderBy } from "../internal/order-by";
@@ -52,18 +52,18 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
       policy.checkPage({ page, perPage });
       const where = composeWhere(params.filter, params.withDeleted);
-
-      const [data, totalItems] = await Promise.all([
+      const rows = (take: number) =>
         delegate().findMany({
           where,
           orderBy: buildOrderBy(meta, params.sort as never, diag),
-          take: perPage,
+          take,
           skip: (page - 1) * perPage,
           ...projection(params.columns, params.with),
-        }),
-        countWhere(where),
-      ]);
+        });
 
+      // Task 013: no count — one extra row tells whether a next page exists.
+      if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
+      const [data, totalItems] = await Promise.all([rows(perPage), countWhere(where)]);
       return { data, meta: offsetMeta(page, perPage, totalItems) } as OffsetResult<never>;
     },
 

@@ -1,5 +1,5 @@
 import type { AnyPgTable } from "drizzle-orm/pg-core";
-import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta } from "@querykitjs/core/internal";
+import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta, offsetPageWithoutTotal } from "@querykitjs/core/internal";
 
 import type { ByIdParams, Filter, Id, InfiniteParams, InfiniteResult, OffsetParams, OffsetResult, QueryParams } from "../types";
 import { buildOrderBy } from "../internal/order-by";
@@ -57,19 +57,19 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
       const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
       policy.checkPage({ page, perPage });
       const where = composeWhere(params.filter, params.withDeleted);
-
-      const [data, totalItems] = await Promise.all([
+      const rows = (limit: number) =>
         handle().findMany({
           where,
           orderBy: buildOrderBy(table, params.sort, diag),
-          limit: perPage,
+          limit,
           offset: (page - 1) * perPage,
           columns: pickColumns(params.columns),
           with: params.with,
-        }),
-        countWhere(where),
-      ]);
+        });
 
+      // Task 013: no count — one extra row tells whether a next page exists.
+      if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
+      const [data, totalItems] = await Promise.all([rows(perPage), countWhere(where)]);
       return { data, meta: offsetMeta(page, perPage, totalItems) } as OffsetResult<never>;
     },
 

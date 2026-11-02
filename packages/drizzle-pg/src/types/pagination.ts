@@ -7,6 +7,8 @@ import type { LooseColumnKey, QueryParams, SortDirection } from "./common";
 export interface OffsetParams<TTable extends AnyPgTable> extends QueryParams<TTable> {
   page?: number;
   perPage?: number;
+  /** `false` — count so'ralmaydi: `perPage + 1` qator o'qiladi, `total_items` / `total_pages` = `null` (task 013). Default `true`. */
+  withTotal?: boolean;
 }
 
 export type OffsetMeta = Core.OffsetMeta;
