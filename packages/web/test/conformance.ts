@@ -102,7 +102,7 @@ async function loadHarness(path: string, exportName: string): Promise<Harness> {
   return module[exportName]!;
 }
 
-const webCases = CASES.map(toWebCase);
+const webCases = CASES.filter(testCase => !testCase.notBuiltByWeb).map(toWebCase);
 let shapeFailures = 0;
 for (const webCase of webCases) {
   const problems = payloadMismatches(webCase.input, webCase.payload);

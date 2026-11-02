@@ -3,6 +3,10 @@
  * a client may filter by and with which operators (`filterable`), which it may
  * sort and page by (`sortable`), and the request limits (`limits`, task 008).
  *
+ * A plain object that is not a condition, a group, a branded `raw()` node or a
+ * driver-native object (`isNative`) is refused as well (R19): it would otherwise
+ * reach the driver as its own `where`, past `filterable`.
+ *
  * A refused request never reaches the driver and is never dropped silently:
  * every check throws `QueryKitError`, whatever `strict` / `onSkippedCondition`
  * say. A key the model does not have is **not** the policy's business — it goes
@@ -11,6 +15,7 @@
 import { resolveLimits, type QueryLimits } from "../defaults";
 import { QueryKitError } from "../errors";
 import type { Filterable, SkipReason, SkipSite } from "../types";
+import { isRaw } from "../raw";
 import { findFilterLimitViolation, offsetOf } from "./limits";
 
 export interface PolicyOptions {
@@ -27,6 +32,11 @@ export interface PolicyOptions {
   allowedColumns?: readonly string[];
   forcedColumns?: Readonly<Record<string, unknown>>;
   limits?: Partial<QueryLimits>;
+  /**
+   * A driver object that cannot come from JSON and stands for itself (drizzle `SQL`).
+   * Anything else that is not a condition, a group or a {@link isRaw} node is refused (R19).
+   */
+  isNative?: (node: object) => boolean;
 }
 
 export interface Policy {
@@ -119,6 +129,8 @@ export function resolvePolicy(options: PolicyOptions): Policy {
         else if (Array.isArray(node.and)) pending.push(...node.and);
         else if (Array.isArray(node.or)) pending.push(...node.or);
         else if ("not" in node) pending.push(node.not);
+        // R19: a JSON body cannot brand a node, so an unbranded driver object is refused.
+        else if (!isRaw(node) && !options.isNative?.(node)) refuse("filter", Object.keys(node)[0] ?? "", "forbidden-key");
       }
     },
 

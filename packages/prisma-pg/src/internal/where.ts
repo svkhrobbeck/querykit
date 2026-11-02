@@ -1,6 +1,7 @@
 import type { FieldCondition, Filter, FilterNode } from "../types";
 import { coerceCondition, INVALID_VALUE, isTextOperator } from "./coerce";
-import { reportSkip, type Diagnostics } from "@querykitjs/core/internal";
+import { QueryKitError } from "@querykitjs/core";
+import { isRaw, reportSkip, type Diagnostics } from "@querykitjs/core/internal";
 import { isStringField, resolveField, type ModelMeta } from "./fields";
 import { isWhereFragment, operators } from "./operators";
 
@@ -91,8 +92,11 @@ function buildNode(meta: ModelMeta, node: FilterNode, diag?: Diagnostics): Where
     return inner ? { NOT: inner } : undefined;
   }
 
-  // Raw escape hatch — a plain Prisma `where` object, used as-is.
-  return node as Where;
+  // Raw escape hatch — a Prisma `where` object, used as-is only when server code
+  // branded it with core `raw()` (R19). A plain object can come from a JSON body,
+  // so it is refused whatever `strict` says — on mutations too.
+  if (isRaw(node)) return node as Where;
+  throw new QueryKitError({ source: meta.name, site: "filter", key: Object.keys(node)[0] ?? "", reason: "forbidden-key" });
 }
 
 /**

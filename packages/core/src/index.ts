@@ -20,6 +20,7 @@
  */
 export { createFilters, f } from "./filters";
 export * from "./defaults";
+export { raw } from "./raw";
 export * from "./errors";
 export * from "./operators";
 export * from "./types";

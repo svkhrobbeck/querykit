@@ -4,13 +4,13 @@
  * filters. The delegates are spies: a refused request must never reach them.
  * Imported by `query.ts` (offline, in the gate); sets `process.exitCode` on failure.
  */
-import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
+import { QueryKitError, raw, type SkippedCondition } from "@querykitjs/core";
 
 import { createRegistry } from "../src/index";
 import { createTestClient } from "./prisma/client";
 
-/** The policy is not built yet (phase 01): every mismatch is a todo, not a failure. */
-const PENDING = true;
+/** The policy is built: a mismatch fails. */
+const PENDING = false;
 
 const prisma = createTestClient();
 
@@ -195,6 +195,25 @@ refused(
   "filter",
 );
 allowed("A6 default: created_at (@map) sorts like createdAt", await attempt(() => repositoryOf().findAll!({ sort: [{ key: "created_at" }] })));
+
+/* R19 — the raw escape hatch needs the raw() brand; a JSON-shaped driver object is refused. */
+const jsonAttack = JSON.parse('{ "secret": { "startsWith": "a" } }') as unknown;
+refused(
+  "R19 JSON raw where { secret: { startsWith } } → forbidden-key, 0 delegate calls",
+  await attempt(() => repositoryOf({ filterable: { secret: "*" } }).findAll!({ filter: jsonAttack })),
+  "forbidden-key",
+  "filter",
+);
+refused(
+  "R19 JSON raw where nested in and → forbidden-key",
+  await attempt(() => repositoryOf(nameOnly).findAll!({ filter: { and: [{ key: "name", value: "x" }, jsonAttack] } })),
+  "forbidden-key",
+  "filter",
+);
+allowed(
+  "R19 raw({ secret: { startsWith } }) → passes (server-owned, not policy-checked)",
+  await attempt(() => repositoryOf(nameOnly).findAll!({ filter: raw({ secret: { startsWith: "a" } }) })),
+);
 
 /* Unknown keys keep unknown-key; findById's idKey is the server's. */
 const unknown = await attempt(() => repositoryOf(nameOnly, { strict: true }).findAll!({ filter: [{ key: "nope", value: 1 }] }));

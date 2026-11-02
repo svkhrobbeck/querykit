@@ -3,7 +3,7 @@
  *
  *   bun run test/internal.ts
  */
-import { DEFAULT_QUERY_LIMITS, QueryKitError, resolveLimits, type SkippedCondition } from "../src/index";
+import { DEFAULT_QUERY_LIMITS, QueryKitError, raw, resolveLimits, type SkippedCondition } from "../src/index";
 import {
   clampOffset,
   clampPage,
@@ -15,6 +15,7 @@ import {
   findFilterLimitViolation,
   formatLimit,
   infinitePage,
+  isRaw,
   normalizeSort,
   offsetMeta,
   offsetOf,
@@ -170,7 +171,23 @@ check(
   "policy: DB column name maps to the field",
   refusal(() => policyOf({ filterable: { createdAt: [">="] } }).checkFilter([{ key: "created_at", operation: ">=" }])) === "ok",
 );
-check("policy: raw / malformed nodes are skipped", refusal(() => statusPolicy.checkFilter([null, 3, { sql: "x" }] as never)) === "ok");
+check("policy: non-object nodes are left to the validator", refusal(() => statusPolicy.checkFilter([null, 3] as never)) === "ok");
+check(
+  "policy R19: an unbranded driver object → forbidden-key (first key)",
+  refusal(() => statusPolicy.checkFilter([{ secret: { startsWith: "a" } }] as never)) === "forbidden-key/filter/secret",
+);
+check(
+  "policy R19: a raw() node is server code, not checked",
+  refusal(() => statusPolicy.checkFilter([raw({ secret: { startsWith: "a" } })] as never)) === "ok",
+);
+check(
+  "policy R19: isNative admits the adapter's own objects",
+  refusal(() => policyOf({ filterable: { status: ["="] }, isNative: node => "queryChunks" in node }).checkFilter([{ queryChunks: [] }] as never)) === "ok",
+);
+check(
+  "isRaw: brand is a Symbol, JSON drops it",
+  isRaw(raw({ a: 1 })) && !isRaw(JSON.parse(JSON.stringify(raw({ a: 1 })))) && Object.keys(raw({ a: 1 })).length === 1,
+);
 check("policy: filter limit → limit-exceeded", refusal(() => statusPolicy.checkFilter(notChain(6))) === "limit-exceeded/filter/maxDepth");
 check(
   "policy default: allowedColumns, equality only",

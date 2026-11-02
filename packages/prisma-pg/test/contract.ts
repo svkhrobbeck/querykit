@@ -42,6 +42,12 @@ import { buildListParams, buildInfiniteParams, buildCursorParams, createQuery } 
 import { users as usersTable, renderSql } from "../../drizzle-pg/test/fixtures";
 import { User as UserModel } from "../../mongoose/test/user.model";
 
+/** The 1.x behaviour (task 010 "Migrating to 2.0"): every scalar field filterable with every operator, every field sortable. */
+const OPEN = {
+  filterable: { id: "*", name: "*", email: "*", age: "*", secret: "*", createdAt: "*", title: "*", authorId: "*", updatedAt: "*", deletedAt: "*" },
+  sortable: ["id", "name", "email", "age", "secret", "createdAt", "title", "authorId", "updatedAt", "deletedAt"],
+} as const;
+
 /* -------------------------------- runner ---------------------------------- */
 
 let passed = 0;
@@ -189,7 +195,7 @@ console.log("\n=== A1/A3. every operator is accepted by all three compilers ==="
 console.log("\n=== A4. the exact edge shapes @querykitjs/web emits ===");
 {
   const { client, calls } = spyClient();
-  const repo = createRegistry(client as never).repository("user" as never);
+  const repo = createRegistry(client as never).repository("user" as never, OPEN as never);
 
   // web always sends these, even when the user selected nothing.
   await repo.findAll({ filter: [], columns: {}, with: {} } as never);
@@ -249,7 +255,7 @@ console.log("\n=== B1/B4. exports and repository surface ===");
   );
 
   const { client } = spyClient();
-  const repo = createRegistry(client as never).repository("user" as never);
+  const repo = createRegistry(client as never).repository("user" as never, OPEN as never);
   const methods = Object.keys(repo)
     .filter(k => typeof (repo as Record<string, unknown>)[k] === "function")
     .sort();
@@ -288,11 +294,11 @@ console.log("\n=== B1/B4. exports and repository surface ===");
   // B5 — the model handle. drizzle takes a table object, mongoose a Model; this
   // adapter accepts the delegate object too, so the call site reads the same.
   const byHandle = spyClient();
-  const handleRepo = createRegistry(byHandle.client as never).repository(byHandle.client.user as never);
+  const handleRepo = createRegistry(byHandle.client as never).repository(byHandle.client.user as never, OPEN as never);
   await handleRepo.findAll({ filter: [{ key: "name", value: "ali" }] } as never);
   const byKey = spyClient();
   await createRegistry(byKey.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findAll({ filter: [{ key: "name", value: "ali" }] } as never);
   check(
     "repository(prisma.user) and repository('user') are equivalent",
@@ -351,7 +357,7 @@ console.log("\n=== C1–C3. real web payloads, over the wire, into the repositor
   );
 
   const { client, calls } = spyClient({ count: 42 });
-  const repo = createRegistry(client as never).repository("user" as never);
+  const repo = createRegistry(client as never).repository("user" as never, OPEN as never);
 
   // The payload goes in with no cast and no massaging — that is the contract.
   const list = await repo.findList(listPayload as OffsetParams);
@@ -396,7 +402,7 @@ console.log("\n=== C1–C3. real web payloads, over the wire, into the repositor
 
   // A second page: the token this adapter issues must survive the wire and come back.
   const s2 = spyClient({ findMany: [{ id: 7 }, { id: 8 }, { id: 9 }] });
-  const repo2 = createRegistry(s2.client as never).repository("user" as never);
+  const repo2 = createRegistry(s2.client as never).repository("user" as never, OPEN as never);
   const p1 = await repo2.findCursor(overTheWire(buildCursorParams({ limit: 2 })) as CursorParams);
   const p2Payload = overTheWire(buildCursorParams({ limit: 2, cursor: p1.meta.next_cursor }));
   await repo2.findCursor(p2Payload as CursorParams);
@@ -418,7 +424,7 @@ console.log("\n=== C1–C3. real web payloads, over the wire, into the repositor
 console.log("\n=== C5. PrismaInclude (web's typed `with` for this adapter) ===");
 {
   const { client, calls } = spyClient();
-  const repo = createRegistry(client as never).repository("user" as never);
+  const repo = createRegistry(client as never).repository("user" as never, OPEN as never);
 
   // Every field web's `PrismaInclude` allows must survive into the query.
   const include = { posts: { select: { title: true }, where: { published: true }, orderBy: { createdAt: "desc" }, take: 5, skip: 1 } };

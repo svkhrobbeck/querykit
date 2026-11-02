@@ -21,10 +21,17 @@ import { coerceCondition, INVALID_VALUE } from "../src/internal/coerce";
 import { decodeCursor, encodeCursor, type Diagnostics } from "@querykitjs/core/internal";
 import type { Filter, FilterOperator } from "../src/types";
 import { createRegistry } from "../src/index";
+import { QueryKitError, raw } from "@querykitjs/core";
 
 /* Cross-adapter cursor tokens must be interchangeable: drizzle-pg and mongoose issue theirs with the shared core encoder. */
 import { encodeCursor as drizzleEncode, encodeCursor as mongooseEncode } from "@querykitjs/core/internal";
 import "./policy";
+
+/** The 1.x behaviour (task 010 "Migrating to 2.0"): every scalar field filterable with every operator, every field sortable. */
+const OPEN = {
+  filterable: { id: "*", name: "*", email: "*", age: "*", secret: "*", createdAt: "*", title: "*", authorId: "*", updatedAt: "*", deletedAt: "*" },
+  sortable: ["id", "name", "email", "age", "secret", "createdAt", "title", "authorId", "updatedAt", "deletedAt"],
+} as const;
 
 /* -------------------------------- runner ---------------------------------- */
 
@@ -367,11 +374,19 @@ console.log("\n=== 4. where tree ===");
     ),
   );
 
-  // Raw escape hatch — a plain Prisma where object passes through untouched.
+  // Raw escape hatch (R19) — a raw() branded Prisma where passes through untouched…
   check(
-    "raw where object passes through",
-    eq(buildWhere(userMeta, { posts: { some: { title: { contains: "x" } } } } as never), { posts: { some: { title: { contains: "x" } } } }),
+    "raw() where object passes through",
+    eq(buildWhere(userMeta, raw({ posts: { some: { title: { contains: "x" } } } }) as never), { posts: { some: { title: { contains: "x" } } } }),
   );
+  // …and a plain object (it could come from a JSON body) is refused, strict or not.
+  let rawReason = "";
+  try {
+    buildWhere(userMeta, { posts: { some: { title: { contains: "x" } } } } as never);
+  } catch (err) {
+    rawReason = err instanceof QueryKitError ? `${err.info.reason}/${err.info.key}` : String(err);
+  }
+  check("unbranded raw where object → forbidden-key", rawReason === "forbidden-key/posts", rawReason);
 
   // strict mode turns every drop into a QueryKitError the route maps to a 400.
   let threw = "";
@@ -529,7 +544,7 @@ const lastArgs = (calls: Call[], method: string): Record<string, any> => [...cal
 console.log("\n=== 8. projection: columns → select, with → include (D8) ===");
 {
   const { client, calls } = spyClient();
-  const repo = createRegistry(client as never).repository("user" as never);
+  const repo = createRegistry(client as never).repository("user" as never, OPEN as never);
 
   await repo.findAll({ columns: { id: true, email: true } });
   check("columns → select", eq(lastArgs(calls, "findMany").select, { id: true, email: true }));
@@ -561,7 +576,7 @@ console.log("\n=== 9. pagination arguments and meta ===");
 {
   const rows = Array.from({ length: 21 }, (_, i) => ({ id: i + 1 }));
   const { client, calls } = spyClient({ findMany: rows.slice(0, 3), count: 7 });
-  const repo = createRegistry(client as never).repository("user" as never);
+  const repo = createRegistry(client as never).repository("user" as never, OPEN as never);
 
   const list = await repo.findList({ page: 2, perPage: 3 });
   const listArgs = lastArgs(calls, "findMany");
@@ -581,19 +596,19 @@ console.log("\n=== 9. pagination arguments and meta ===");
   const capped = await repo.findList({ perPage: 5000 });
   check("findList: perPage capped at 200 (core max)", capped.meta.per_page === 200);
   const configured = await createRegistry(client as never, { defaultPerPage: 25, maxPerPage: 30 })
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findList({ perPage: 999 });
   check("findList: registry options override default and cap", configured.meta.per_page === 30);
 
   // Infinite fetches limit+1 to learn `has_more` without a COUNT.
   const inf = await createRegistry(spyOf(rows.slice(0, 4)).client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findInfinite({ limit: 3, offset: 6 });
   check("findInfinite: meta", eq(inf.meta, { limit: 3, offset: 6, count: 3, has_more: true, next_offset: 9 }), show(inf.meta));
 
   const shortSpy = spyOf(rows.slice(0, 2));
   const tail = await createRegistry(shortSpy.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findInfinite({ limit: 3, offset: 0 });
   check("findInfinite: last page → has_more false, next_offset null", !tail.meta.has_more && tail.meta.next_offset === null && tail.data.length === 2);
   const infArgs = lastArgs(shortSpy.calls, "findMany");
@@ -604,7 +619,7 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
 {
   const rows = [{ id: 10 }, { id: 11 }, { id: 12 }];
   const s = spyOf(rows);
-  const repo = createRegistry(s.client as never).repository("user" as never);
+  const repo = createRegistry(s.client as never).repository("user" as never, OPEN as never);
 
   const page1 = await repo.findCursor({ limit: 2 });
   const args1 = lastArgs(s.calls, "findMany");
@@ -616,20 +631,20 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
 
   const s2 = spyOf(rows);
   await createRegistry(s2.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findCursor({ limit: 2, cursor: page1.meta.next_cursor });
   check("forward+asc seeks with gt", eq(lastArgs(s2.calls, "findMany").where, { id: { gt: 11 } }), show(lastArgs(s2.calls, "findMany").where));
 
   const s3 = spyOf(rows);
   await createRegistry(s3.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findCursor({ limit: 2, cursor: encodeCursor(11), direction: "backward" });
   const back = lastArgs(s3.calls, "findMany");
   check("backward+asc seeks with lt and flips orderBy", eq(back.where, { id: { lt: 11 } }) && eq(back.orderBy, [{ id: "desc" }]));
 
   const s4 = spyOf(rows);
   const backward = await createRegistry(s4.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findCursor({ limit: 2, cursor: encodeCursor(11), direction: "backward" });
   check(
     "backward page is reversed back into ascending order",
@@ -642,21 +657,21 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
 
   const s5 = spyOf(rows);
   await createRegistry(s5.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findCursor({ limit: 2, cursorKey: "createdAt", cursor: encodeCursor("2026-07-30T10:00:00.000Z") });
   const dated = lastArgs(s5.calls, "findMany").where as { createdAt: { gt: Date } };
   check("cursor value is re-cast to the field type (ISO → Date)", dated.createdAt.gt instanceof Date, String(dated.createdAt.gt));
 
   const s6 = spyOf(rows);
   await createRegistry(s6.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findCursor({ limit: 2, columns: { name: true } });
   check("cursor field is forced into the select", eq(lastArgs(s6.calls, "findMany").select, { name: true, id: true }));
 
   let cursorErr = "";
   try {
     await createRegistry(spyOf(rows).client as never)
-      .repository("user" as never)
+      .repository("user" as never, OPEN as never)
       .findCursor({ cursorKey: "nope" });
   } catch (err) {
     cursorErr = (err as { code?: string }).code ?? "";
@@ -665,7 +680,7 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
 
   const s7 = spyOf(rows);
   const filtered = await createRegistry(s7.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findCursor({ limit: 2, cursor: encodeCursor(11), filter: [{ key: "name", value: "ali" }] });
   check(
     "seek is ANDed with the base filter",
@@ -678,7 +693,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
 {
   // Soft delete: reads exclude deletedAt rows unless withDeleted.
   const s = spyOf([{ id: 1 }]);
-  const posts = createRegistry(s.client as never).repository("post" as never);
+  const posts = createRegistry(s.client as never).repository("post" as never, OPEN as never);
   await posts.findAll({});
   check("soft-delete guard is applied to reads", eq(lastArgs(s.calls, "findMany").where, { deletedAt: null }));
   await posts.findAll({ withDeleted: true });
@@ -689,13 +704,13 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
   // users has no deletedAt → no guard at all.
   const su = spyOf([{ id: 1 }]);
   await createRegistry(su.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .findAll({});
   check("model without deletedAt gets no guard", lastArgs(su.calls, "findMany").where === undefined);
 
   // Scope.
   const ss = spyOf([{ id: 1 }]);
-  const scoped = createRegistry(ss.client as never).repository("user" as never, { scope: { name: "ali" } });
+  const scoped = createRegistry(ss.client as never).repository("user" as never, { ...OPEN, scope: { name: "ali" } });
   await scoped.findAll({ filter: [{ key: "email", value: "x" }] });
   check("scope is ANDed into every read", eq(lastArgs(ss.calls, "findMany").where, { AND: [{ email: { equals: "x" } }, { name: { equals: "ali" } }] }));
   await scoped.create({ email: "y" } as never);
@@ -705,7 +720,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
 
   let scopeErr = "";
   try {
-    createRegistry(spyOf([]).client as never).repository("user" as never, { scope: { nope: 1 } as never });
+    createRegistry(spyOf([]).client as never).repository("user" as never, { ...OPEN, scope: { nope: 1 } as never });
   } catch (err) {
     scopeErr = (err as { code?: string }).code ?? "";
   }
@@ -713,12 +728,12 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
 
   // Projection guards.
   const sf = spyOf([{ id: 1 }]);
-  const forced = createRegistry(sf.client as never).repository("user" as never, { forcedColumns: { id: true, name: true } });
+  const forced = createRegistry(sf.client as never).repository("user" as never, { ...OPEN, forcedColumns: { id: true, name: true } });
   await forced.findAll({ columns: { email: true } });
   check("forcedColumns ignores the client selection entirely", eq(lastArgs(sf.calls, "findMany").select, { id: true, name: true }));
 
   const sa = spyOf([{ id: 1 }]);
-  const allowlisted = createRegistry(sa.client as never).repository("user" as never, { allowedColumns: ["id", "name"] });
+  const allowlisted = createRegistry(sa.client as never).repository("user" as never, { ...OPEN, allowedColumns: ["id", "name"] });
   await allowlisted.findAll({ columns: { name: true, email: true } });
   check("allowedColumns intersects the client selection", eq(lastArgs(sa.calls, "findMany").select, { name: true }));
   await allowlisted.findAll({ columns: { email: true } });
@@ -740,7 +755,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
     { id: 2, name: "vali" },
   ]);
   const guardedCursor = await createRegistry(sc.client as never)
-    .repository("user" as never, { allowedColumns: ["name"] })
+    .repository("user" as never, { ...OPEN, allowedColumns: ["name"] })
     .findCursor({ limit: 5, cursorKey: "id" });
   check(
     "cursor key is queried but stripped from guarded rows",
@@ -752,7 +767,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
   // updatedAt bump (the fixture's `updatedAt` is a plain field, not @updatedAt).
   const su2 = spyOf([{ id: 1 }], { findFirst: { id: 1 } });
   await createRegistry(su2.client as never)
-    .repository("post" as never)
+    .repository("post" as never, OPEN as never)
     .updateById(1, { title: "x" } as never);
   const patched = lastArgs(su2.calls, "update").data as Record<string, unknown>;
   check("updateById bumps updatedAt", patched.title === "x" && patched.updatedAt instanceof Date, show(Object.keys(patched)));
@@ -760,7 +775,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
 
   const su3 = spyOf([{ id: 1 }], { findFirst: { id: 1 } });
   await createRegistry(su3.client as never)
-    .repository("post" as never)
+    .repository("post" as never, OPEN as never)
     .softDelete(1);
   const soft = lastArgs(su3.calls, "update").data as Record<string, unknown>;
   check("softDelete sets deletedAt", soft.deletedAt instanceof Date);
@@ -768,7 +783,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
 
   const su4 = spyOf([{ id: 1 }], { findFirst: { id: 1 } });
   await createRegistry(su4.client as never)
-    .repository("post" as never)
+    .repository("post" as never, OPEN as never)
     .restore(1);
   check(
     "restore clears deletedAt and searches among deleted rows",
@@ -778,7 +793,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
   let softErr = "";
   try {
     await createRegistry(spyOf([]).client as never)
-      .repository("user" as never)
+      .repository("user" as never, OPEN as never)
       .softDelete(1);
   } catch (err) {
     softErr = (err as Error).message;
@@ -788,7 +803,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
   // An unresolvable idKey must never degrade into "no predicate" — that would
   // let updateById/deleteById hit an arbitrary row.
   const idGuard = spyOf([{ id: 1 }], { findFirst: { id: 1 } });
-  const idRepo = createRegistry(idGuard.client as never).repository("user" as never);
+  const idRepo = createRegistry(idGuard.client as never).repository("user" as never, OPEN as never);
   let idErr = "";
   try {
     await idRepo.updateById(1, {} as never, "nope" as never);
@@ -801,7 +816,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
   check(
     "updateById returns undefined when nothing matches",
     (await createRegistry(miss.client as never)
-      .repository("user" as never)
+      .repository("user" as never, OPEN as never)
       .updateById(9, {} as never)) === undefined,
   );
 }
@@ -809,7 +824,7 @@ console.log("\n=== 11. guards: scope, soft-delete, projection, updatedAt ===");
 console.log("\n=== 12. writes and aggregate ===");
 {
   const s = spyOf([]);
-  const repo = createRegistry(s.client as never).repository("user" as never);
+  const repo = createRegistry(s.client as never).repository("user" as never, OPEN as never);
 
   await repo.upsert({ email: "a@b.c", name: "Ali" } as never, { target: "email" } as never);
   const up = lastArgs(s.calls, "upsert");
@@ -833,7 +848,7 @@ console.log("\n=== 12. writes and aggregate ===");
   // Aggregate: Prisma's `_count`/`_sum` shape is flattened to drizzle's.
   const sg = spyOf([], { groupBy: [{ name: "ali", _count: 3, _sum: { age: 60 } }] });
   const grouped = await createRegistry(sg.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .aggregate({ groupBy: "name", count: true, sum: "age" } as never);
   check(
     "aggregate: groupBy args",
@@ -843,13 +858,13 @@ console.log("\n=== 12. writes and aggregate ===");
 
   const sa = spyOf([], { aggregate: { _count: 9, _avg: { age: 21.5 } } });
   const plain = await createRegistry(sa.client as never)
-    .repository("user" as never)
+    .repository("user" as never, OPEN as never)
     .aggregate({ count: true, avg: "age" } as never);
   check("aggregate: without groupBy → a single row via aggregate()", eq(plain, [{ count: 9, avg_age: 21.5 }]), show(plain));
 
   const sh = spyOf([], { groupBy: [] });
   await createRegistry(sh.client as never)
-    .repository("user" as never, { allowedColumns: ["name"] })
+    .repository("user" as never, { ...OPEN, allowedColumns: ["name"] })
     .aggregate({ groupBy: "email", count: true } as never);
   check(
     "aggregate: a forbidden groupBy field is dropped (no leak via aggregation)",
@@ -862,7 +877,7 @@ console.log("\n=== 13. transactions (ambient context) ===");
 {
   const s = spyOf([{ id: 1 }]);
   const registry = createRegistry(s.client as never);
-  const repo = registry.repository("user" as never);
+  const repo = registry.repository("user" as never, OPEN as never);
 
   await repo.findAll({});
   check("outside a transaction the base client is used", s.calls.length === 1 && s.txCalls.length === 0);
