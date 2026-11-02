@@ -6,7 +6,7 @@ import { QueryKitError } from "../src/index";
 import * as internal from "../src/internal/index";
 
 /** Token v2 is not built yet (phase 01): every mismatch is a todo, not a failure. */
-const PENDING = true;
+const PENDING = false;
 
 type Codec = {
   encodeCursorToken?: (payload: { k: unknown; id: unknown }, secret?: string) => Promise<string>;

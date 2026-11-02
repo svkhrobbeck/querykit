@@ -5,7 +5,7 @@
  * metas, the request-limit walk and the request policy. Not part of the application-facing API; it
  * may change in a minor release.
  */
-export { decodeCursor, encodeCursor } from "./cursor";
+export { decodeCursor, decodeCursorToken, encodeCursor, encodeCursorToken, type CursorToken } from "./cursor";
 export { reportSkip, type Diagnostics } from "./diagnostics";
 export { createContextStore, type ContextStore } from "./context";
 export { normalizeSort, type NormalizedSortItem } from "./sort";
