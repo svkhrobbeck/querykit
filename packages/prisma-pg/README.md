@@ -373,6 +373,16 @@ await ordersRepository.aggregate({ sum: "amount", avg: "amount", groupBy: "regio
 >
 > **Bulk.** Prisma'da bulk upsert yo'q — `upsertMany` ketma-ket `upsert` qiladi (kirish tartibi saqlanadi). Katta importlar uchun `registry.transaction()` ichida chaqiring.
 
+## Qiymatlar, NULL tartibi va bir xillik
+
+Uchala adapter (drizzle-pg, prisma-pg, mongoose) bir xil natija beradi (task 021):
+
+- **Literal qiymat operatorlari.** `contains`, `startsWith`, `endsWith` qiymatni harfma-harf qidiradi: `startsWith "%"` faqat `%` bilan boshlanuvchi qatorlar, `contains "_"` — haqiqiy `_`. Wildcard faqat `like` / `ilike` / `notLike` da.
+- **Tip cast'i.** Har qiymat maydon tipiga keltiriladi (son, boolean, sana, uuid, enum). Mos kelmasa (`age = "abc"`) — `invalid-value`: shart tashlanadi va `onSkippedCondition` chaqiriladi, `strict` da `QueryKitError`; drayver chaqirilmaydi.
+- **`not`** — SQL uch qiymatli mantiq: NULL maydon bo'yicha `not(and(…))` / `not(or(…))` hamma adapterda bir xil.
+- **NULL tartibi.** `asc` — NULL birinchi, `desc` — NULL oxirida (MongoDB tartibi). prisma-pg `{ sort, nulls }` ni faqat maydon ixtiyoriy ekani ma'lum bo'lsa qo'yadi (pastdagi Cheklovlar).
+- **Buzuq sort elementi** (`null`, `{}`) — tashlanadi va `invalid-value` (`site: "sort"`) bilan xabar qilinadi, `strict` da xato.
+
 ## Migrating to 2.0
 
 2.0 da siyosatsiz repository **tor**: faqat `allowedColumns` / `forcedColumns` / `@id` maydoni bo'yicha `=` va `in`, sort — `@id` va `createdAt`. 1.x xulqini bitta repository uchun ataylab qaytarish:
@@ -407,6 +417,9 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 - Matn operatorlari faqat `String` maydonlarda; boshqa tipda shart tashlanadi va reportlanadi.
 
 Bu farqlar `test/contract.ts` bilan qadalgan — uchala adapter bir xil payloaddan bir xil natija berishi shu yerda tekshiriladi.
+
+- **`like` / `ilike` da `_`.** Prisma'da bitta belgili wildcard yo'q: qochirilmagan `_` → `invalid-value` (strict'da xato). Literal `_` uchun `\\_` yozing.
+- **NULL tartibi Prisma 7 da.** Prisma 7 runtime modeli maydon ixtiyoriymi-yo'qligini bermaydi; `nulls` faqat ma'lum bo'lsa qo'yiladi. Ixtiyoriy maydonni e'lon qiling: `registry.repository(prisma.user, { fields: [{ name: "age", isRequired: false }] })` — aks holda o'sha maydonda PostgreSQL tartibi.
 
 ## API ma'lumotnoma
 

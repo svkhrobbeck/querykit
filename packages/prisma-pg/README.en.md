@@ -373,6 +373,16 @@ await ordersRepository.aggregate({ sum: "amount", avg: "amount", groupBy: "regio
 >
 > **Bulk.** Prisma has no bulk upsert, so `upsertMany` issues sequential `upsert`s (input order preserved). Wrap large imports in `registry.transaction()`.
 
+## Values, NULL order and parity
+
+All three adapters (drizzle-pg, prisma-pg, mongoose) return the same result (task 021):
+
+- **Literal value operators.** `contains`, `startsWith` and `endsWith` match their value literally: `startsWith "%"` finds only rows starting with `%`, `contains "_"` a real `_`. Wildcards belong to `like` / `ilike` / `notLike` only.
+- **Type casting.** Every value is cast to its field type (number, boolean, date, uuid, enum). A mismatch (`age = "abc"`) is `invalid-value`: the condition is dropped and `onSkippedCondition` is called, a `QueryKitError` under `strict`; the driver is not called.
+- **`not`** follows SQL three-valued logic: `not(and(…))` / `not(or(…))` over a NULL field agree on every adapter.
+- **NULL order.** NULL first on `asc`, last on `desc` (MongoDB's order). prisma-pg emits `{ sort, nulls }` only where the field is known to be optional (see Limitations).
+- **A malformed sort item** (`null`, `{}`) is dropped and reported as `invalid-value` (`site: "sort"`), an error under `strict`.
+
 ## Migrating to 2.0
 
 In 2.0 a repository without a policy is **narrow**: `=` and `in` on `allowedColumns` / `forcedColumns` / the `@id` field only, sorting by `@id` and `createdAt`. To bring back the 1.x behaviour for one repository on purpose:
@@ -407,6 +417,9 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 - Text operators only apply to `String` fields; on any other type the condition is dropped and reported.
 
 These are pinned by `test/contract.ts`, which asserts all three adapters agree on the same payload.
+
+- **`_` in `like` / `ilike`.** Prisma has no one-character wildcard: an unescaped `_` is `invalid-value` (an error under strict). Write `\\_` for a literal underscore.
+- **NULL order on Prisma 7.** Prisma 7's runtime model does not say whether a field is optional; `nulls` is emitted only when that is known. Declare it: `registry.repository(prisma.user, { fields: [{ name: "age", isRequired: false }] })` — otherwise that field keeps PostgreSQL's order.
 
 ## API reference
 

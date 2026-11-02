@@ -324,6 +324,16 @@ Scope'ni `registry.repository(Model, { scope })` bilan ham berish mumkin.
 Noma'lum scope kaliti — repository yaratilishida **xato** (jimgina tashlansa
 RBAC filtri yo'qolib ketardi).
 
+## Qiymatlar, NULL tartibi va bir xillik
+
+Uchala adapter (drizzle-pg, prisma-pg, mongoose) bir xil natija beradi (task 021):
+
+- **Literal qiymat operatorlari.** `contains`, `startsWith`, `endsWith` qiymatni harfma-harf qidiradi: `startsWith "%"` faqat `%` bilan boshlanuvchi qatorlar, `contains "_"` — haqiqiy `_`. Wildcard faqat `like` / `ilike` / `notLike` da.
+- **Tip cast'i.** Har qiymat maydon tipiga keltiriladi (son, boolean, sana, ObjectId, enum). Mos kelmasa (`age = "abc"`) — `invalid-value`: shart tashlanadi va `onSkippedCondition` chaqiriladi, `strict` da `QueryKitError`; drayver chaqirilmaydi.
+- **`not`** — SQL uch qiymatli mantiq: NULL maydon bo'yicha `not(and(…))` / `not(or(…))` hamma adapterda bir xil.
+- **NULL tartibi.** `asc` — NULL birinchi, `desc` — NULL oxirida (MongoDB tartibi).
+- **Buzuq sort elementi** (`null`, `{}`) — tashlanadi va `invalid-value` (`site: "sort"`) bilan xabar qilinadi, `strict` da xato.
+
 ## Migrating to 3.0
 
 3.0 da siyosatsiz repository **tor**: faqat `allowedColumns` / `forcedColumns` / `_id` bo'yicha `=` va `in`, sort — `_id` va `createdAt`. 2.x xulqini bitta repository uchun ataylab qaytarish:
