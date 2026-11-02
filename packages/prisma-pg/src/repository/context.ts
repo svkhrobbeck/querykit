@@ -1,5 +1,14 @@
 import { QueryKitError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
-import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import {
+  type Diagnostics,
+  isAllRows,
+  isEmptyFilter,
+  matchesNothing,
+  type Policy,
+  refuseEmptyFilter,
+  resolvePolicy,
+  scopeConditions,
+} from "@querykitjs/core/internal";
 
 import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions } from "../types";
 import type { AnyExecutor } from "../internal/executor";
@@ -157,19 +166,20 @@ export const toArray = <T>(value: T | T[] | undefined): T[] => (value === undefi
 
 /** The scope as a precompiled `where` (equality on each field), or `undefined`. */
 function buildScopeWhere<TDelegate>(meta: ModelMeta, config: RepositoryOptions<TDelegate>): Where | undefined {
-  const scopeConditions: FieldCondition[] = config.scope
-    ? Object.entries(config.scope).map(([key, value]) => ({ key, operation: "=" as const, value: value as never }))
-    : [];
+  // Task 014: an equality value or `{ in: [...] }`.
+  const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this
   // repository. Fail when it is configured, not per request, and regardless of
   // `strict` — this is a programming error, not bad input.
-  for (const condition of scopeConditions) {
+  for (const condition of conditions) {
     if (!resolveField(meta, condition.key)) {
       throw new QueryKitError({ source: meta.name, site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  return scopeConditions.length ? buildWhere(meta, scopeConditions) : undefined;
+  // An empty `in` list matches no row — explicitly (an empty OR is false), never by dropping it.
+  if (matchesNothing(conditions as never)) return { OR: [] };
+  return conditions.length ? buildWhere(meta, conditions) : undefined;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import type { MutationOptions } from "@querykitjs/core";
-import { clampPageSize } from "@querykitjs/core/internal";
+import { clampPageSize, scopeDefaults } from "@querykitjs/core/internal";
 
 import type { AllRows } from "@querykitjs/core";
 import type { ColumnKey, Filter, Id, Insert, RepositoryOptions, Row, UpsertOptions } from "../types";
@@ -31,9 +31,9 @@ export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
 
   /** Apply scope defaults to insert values (scope wins). */
   const forInsert = (values: object): object => ({
-    ...(config.scope as object),
+    ...scopeDefaults(config.scope as Record<string, unknown> | undefined),
     ...values,
-    ...(config.scope as object),
+    ...scopeDefaults(config.scope as Record<string, unknown> | undefined),
   });
 
   /** Bump updatedAt on update if the column exists. */

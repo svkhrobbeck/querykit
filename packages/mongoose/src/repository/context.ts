@@ -1,6 +1,15 @@
 import type { ClientSession, Model } from "mongoose";
 import { QueryKitError, QueryKitTimeoutError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
-import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import {
+  type Diagnostics,
+  isAllRows,
+  isEmptyFilter,
+  matchesNothing,
+  type Policy,
+  refuseEmptyFilter,
+  resolvePolicy,
+  scopeConditions,
+} from "@querykitjs/core/internal";
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
 import { hasPath, resolveField, type AnyModel } from "../internal/fields";
@@ -198,19 +207,20 @@ export const toArr = <T>(v?: T | T[]): T[] => (v === undefined ? [] : Array.isAr
 
 /** The scope as a precompiled Mongo query (equality on each field), or `undefined`. */
 function buildScopeWhere<TDoc>(m: AnyModel, config: RepositoryOptions<TDoc>): Query | undefined {
-  const scopeConditions: FieldCondition[] = config.scope
-    ? Object.entries(config.scope).map(([key, value]) => ({ key, operation: "=", value: value as never }))
-    : [];
+  // Task 014: an equality value or `{ in: [...] }`.
+  const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this
   // repository. Fail when it is configured, not per request, and regardless of
   // `strict` — this is a programming error, not bad input.
-  for (const condition of scopeConditions) {
+  for (const condition of conditions) {
     if (!resolveField(m, condition.key)) {
       throw new QueryKitError({ source: m.modelName, site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  return scopeConditions.length ? buildWhere(m, scopeConditions) : undefined;
+  // An empty `in` list matches no row — explicitly, never by dropping the condition.
+  if (matchesNothing(conditions as never)) return { _id: { $in: [] } };
+  return conditions.length ? buildWhere(m, conditions) : undefined;
 }
 
 /** Reads that get a time limit; writes are never cut off half-way. */

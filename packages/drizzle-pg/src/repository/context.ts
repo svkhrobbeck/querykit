@@ -1,7 +1,16 @@
 import { and, getTableName, isNull, isSQLWrapper, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
-import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import {
+  type Diagnostics,
+  isAllRows,
+  isEmptyFilter,
+  matchesNothing,
+  type Policy,
+  refuseEmptyFilter,
+  resolvePolicy,
+  scopeConditions,
+} from "@querykitjs/core/internal";
 import type { QueryLimits } from "@querykitjs/core";
 
 import type { AnyDb, ColumnKey, FieldCondition, Filter, Id, RepositoryOptions } from "../types";
@@ -177,21 +186,18 @@ function requireTableKey(schema: Record<string, unknown>, table: AnyPgTable): st
 
 /** The scope as a precompiled WHERE (equality on each field), or `undefined`. */
 function buildScopeWhere<TTable extends AnyPgTable>(table: TTable, config: RepositoryOptions<TTable>): SQL | undefined {
-  const scopeConditions: FieldCondition<TTable>[] = config.scope
-    ? Object.entries(config.scope).map(([key, value]) => ({
-        key: key as ColumnKey<TTable>,
-        operation: "=",
-        value: value as never,
-      }))
-    : [];
+  // Task 014: an equality value or `{ in: [...] }`.
+  const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition<TTable>[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this
   // repository. Fail when it is configured, not per request, and regardless of
   // `strict` — this is a programming error, not bad input.
-  for (const condition of scopeConditions) {
+  for (const condition of conditions) {
     if (!resolveColumn(table, condition.key)) {
       throw new QueryKitError({ source: getTableName(table), site: "filter", key: condition.key, reason: "unknown-key" });
     }
   }
-  return scopeConditions.length ? buildWhere(table, scopeConditions) : undefined;
+  // An empty `in` list matches no row — explicitly, never by dropping the condition.
+  if (matchesNothing(conditions as never)) return sql`false`;
+  return conditions.length ? buildWhere(table, conditions) : undefined;
 }

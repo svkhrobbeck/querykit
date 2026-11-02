@@ -5,8 +5,7 @@
  */
 import { ALL, type ConformanceCase } from "./case-types";
 
-/** Red until 014 phase 2 (scope in), 3 (timestamps), 4 (relations); removed there. */
-const SCOPE = { "drizzle-pg": "014 p2", "prisma-pg": "014 p2", mongoose: "014 p2" } as const;
+/** Red until 014 phase 3 (timestamps), 4 (relations); removed there. */
 const STAMPS = { "drizzle-pg": "014 p3", "prisma-pg": "014 p3", mongoose: "014 p3" } as const;
 const WITH = { "drizzle-pg": "014 p4", "prisma-pg": "014 p4", mongoose: "014 p4" } as const;
 const WEB = "a repository option, not built by web";
@@ -19,7 +18,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: {} },
     options: { scope: AGE_25_OR_30 },
     expect: { names: ["Alice", "Bob", "Eve_Ann"] },
-    knownDifference: SCOPE,
     notBuiltByWeb: WEB,
   },
   {
@@ -28,7 +26,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "deleteWhere", params: { filter: { all: true } } },
     options: { scope: AGE_25_OR_30 },
     expect: { meta: { count: 3 }, remaining: ["Carol", "dave", "Frank", "Alina"] },
-    knownDifference: SCOPE,
     notBuiltByWeb: WEB,
   },
   {
@@ -37,7 +34,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "updateWhere", params: { filter: [{ key: "name", operation: "=", value: "dave" }], patch: { name: "Zed" } } },
     options: { scope: AGE_25_OR_30 },
     expect: { meta: { count: 0 }, remaining: ALL },
-    knownDifference: SCOPE,
     notBuiltByWeb: WEB,
   },
   {
@@ -46,7 +42,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findList", params: { page: 1, perPage: 5 } },
     options: { scope: { age: { in: [] } } },
     expect: { names: [], meta: { total_items: 0, total_pages: 0, current_page: 1, per_page: 5, has_next: false, has_prev: false } },
-    knownDifference: SCOPE,
     notBuiltByWeb: WEB,
   },
   {

@@ -69,8 +69,16 @@ export type Sort<TKey extends string = string> = SortItem<TKey>[];
 /* Generic shapes shared by every backend adapter (drizzle-pg, mongoose, …);
  * each binds its own key type (`ColumnKey`/`FieldKey`) and insert/filter types. */
 
-/** Equality scope applied to every operation of a scoped repository. */
-export type Scope<TKey extends string = string> = Partial<Record<TKey, FilterScalar>>;
+/** Scope qiymati ro'yxat bo'yicha (task 014): `{ in: [...] }`; bo'sh ro'yxat — hech qanday qator. */
+export interface ScopeIn {
+  in: readonly FilterScalar[];
+}
+
+/**
+ * Scoped repository'ning har amaliga qo'llanadigan scope: maydon → tenglik qiymati yoki `{ in: [...] }`.
+ * `create` default'lari faqat tenglik scope'laridan olinadi.
+ */
+export type Scope<TKey extends string = string> = Partial<Record<TKey, FilterScalar | ScopeIn>>;
 
 /** Options for upsert / upsertMany — conflict target(s) + optional update set. */
 export interface UpsertOptions<TKey extends string = string, TInsert = Record<string, unknown>> {

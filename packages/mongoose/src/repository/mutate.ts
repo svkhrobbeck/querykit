@@ -1,5 +1,5 @@
 import type { AllRows, MutationOptions } from "@querykitjs/core";
-import { clampPageSize } from "@querykitjs/core/internal";
+import { clampPageSize, scopeDefaults } from "@querykitjs/core/internal";
 
 import type { FieldKey, Filter, Id, Insert, RepositoryOptions, Row, UpsertOptions } from "../types";
 import { resolveField } from "../internal/fields";
@@ -24,9 +24,9 @@ export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOp
 
   /** Apply scope defaults to insert values — scope wins (can't be overridden). */
   const forInsert = (values: object): Record<string, unknown> => ({
-    ...(config.scope as object),
+    ...scopeDefaults(config.scope as Record<string, unknown> | undefined),
     ...values,
-    ...(config.scope as object),
+    ...scopeDefaults(config.scope as Record<string, unknown> | undefined),
   });
 
   /** Build the `{filter, update}` for an upsert (target → filter, rest → $set/$setOnInsert). */
