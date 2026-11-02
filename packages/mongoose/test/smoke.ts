@@ -245,8 +245,8 @@ async function main() {
     await new Promise(res => setTimeout(res, 15));
     const updated = await usersRepo.updateById(created._id, { name: "Renamed" });
     check("updateById returns updated + bumps updatedAt", updated?.name === "Renamed" && updated.updatedAt > created.updatedAt);
-    const uw = await usersRepo.updateWhere(uf.in("name", ["M1", "M2"]), { age: 99 });
-    check("updateWhere returns updated docs", uw.length === 2 && uw.every(u => u.age === 99));
+    const uw = await usersRepo.updateWhere(uf.in("name", ["M1", "M2"]), { age: 99 }, { returning: { limit: 10 } });
+    check("updateWhere → { count, rows } of the updated docs", uw.count === 2 && uw.rows.length === 2 && uw.rows.every(u => u.age === 99));
 
     // upsert: insert, then update-on-conflict
     const up1 = await usersRepo.upsert({ name: "Ups", email: "ups@x.com", age: 5 }, { target: "email" });
@@ -279,7 +279,7 @@ async function main() {
     const del = await usersRepo.deleteById(created._id);
     check("deleteById returns deleted + gone", del?.name === "Renamed" && (await usersRepo.findById(created._id)) === undefined);
     const delW = await usersRepo.deleteWhere(uf.in("name", ["M1", "M2"]));
-    check("deleteWhere returns deleted", delW.length === 2);
+    check("deleteWhere → { count }", delW.count === 2 && !("rows" in delW));
 
     // softDelete + restore (Post has a deletedAt path)
     const sp = await postsRepo.create({ title: "SoftMe", author: ali!._id });

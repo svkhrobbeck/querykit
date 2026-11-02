@@ -1,6 +1,6 @@
 import type { ClientSession, Model } from "mongoose";
 import { QueryKitError, QueryKitTimeoutError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
-import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
+import { isAllRows, isEmptyFilter, refuseEmptyFilter, resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
 import { hasPath, resolveField, type AnyModel } from "../internal/fields";
@@ -63,6 +63,12 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   /** This repository's read time limit, in ms. */
   maxTimeMS: number;
   composeWhere: (userFilter?: Filter<TDoc>, withDeleted?: boolean) => Query;
+  /**
+   * The WHERE of `updateWhere` / `deleteWhere` (task 013): `{ all: true }` → scope and
+   * soft-delete guard only; an empty filter — also one whose every condition was skipped —
+   * is `empty-filter`; the filter passes the request policy like a read's.
+   */
+  mutationWhere: (filter: unknown, method: "updateWhere" | "deleteWhere") => Query;
   /** `filter AND idKey = id`. */
   withId: (filter: Filter<TDoc> | undefined, idKey: string, id: Id) => Filter<TDoc>;
   /** `.populate()` every truthy `with` entry. */
@@ -94,16 +100,15 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
 
   const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag);
 
-  const composeWhere = (userFilter?: Filter<TDoc>, withDeleted?: boolean): Query => {
-    const parts = [
-      buildWhere(m, userFilter as Filter | undefined, diag),
-      scopeWhere,
-      hasDeletedAt && !withDeleted ? { deletedAt: { $eq: null } } : undefined,
-    ].filter((p): p is Query => p !== undefined);
+  /** An already built user filter + scope + soft-delete guard. */
+  const combineWhere = (userWhere: Query | undefined, withDeleted?: boolean): Query => {
+    const parts = [userWhere, scopeWhere, hasDeletedAt && !withDeleted ? { deletedAt: { $eq: null } } : undefined].filter((p): p is Query => p !== undefined);
     if (parts.length === 0) return {};
     if (parts.length === 1) return parts[0]!;
     return { $and: parts };
   };
+  const composeWhere = (userFilter?: Filter<TDoc>, withDeleted?: boolean): Query =>
+    combineWhere(buildWhere(m, userFilter as Filter | undefined, diag), withDeleted);
 
   const withId = (filter: Filter<TDoc> | undefined, idKey: string, id: Id): Filter<TDoc> => {
     const idCondition: FieldCondition<TDoc> = { key: idKey as FieldKey<TDoc>, operation: "=", value: id as never };
@@ -146,6 +151,14 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     limits: { ...runtime.limits, ...config.limits },
   });
 
+  const mutationWhere = (filter: unknown, method: "updateWhere" | "deleteWhere"): Query => {
+    if (isAllRows(filter)) return combineWhere(undefined);
+    if (isEmptyFilter(filter)) refuseEmptyFilter(diag.source, method);
+    policy.checkFilter(filter as Filter<TDoc>);
+    const userWhere = buildWhere(m, filter as Filter, diag);
+    return userWhere === undefined ? refuseEmptyFilter(diag.source, method) : combineWhere(userWhere);
+  };
+
   return {
     ...guards,
     policy,
@@ -157,6 +170,7 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     forUpdate,
     sortSpec,
     composeWhere,
+    mutationWhere,
     withId,
     applyPopulate,
     attachSession,

@@ -15,6 +15,7 @@ import type {
   WithRelations,
 } from "./common";
 import type { RowWith } from "./delegate-args";
+import type { AllRows, MutationCount, MutationRows } from "@querykitjs/core";
 import type { CursorParams, CursorResult, InfiniteParams, InfiniteResult, OffsetParams, OffsetResult } from "./pagination";
 
 /* --------------------------- result-type inference ------------------------ */
@@ -124,13 +125,25 @@ export interface Repository<TDelegate = AnyDelegate> {
 
   /** Update one row by id; returns the updated row (or `undefined`). */
   updateById(id: Id, patch: Partial<Insert<TDelegate>>, idKey?: FieldKey<TDelegate>): Promise<Row<TDelegate> | undefined>;
-  /** Update every row matching the filter; returns the updated rows. */
-  updateWhere(filter: Filter<TDelegate>, patch: Partial<Insert<TDelegate>>): Promise<Row<TDelegate>[]>;
+  /**
+   * Update every row matching the filter in one atomic `updateMany` → `{ count }` (task 013).
+   * No filter only with `{ all: true }` (the scope still applies); an empty or fully skipped
+   * filter is `QueryKitError` `empty-filter`. The filter passes the request policy like a read.
+   */
+  updateWhere(filter: Filter<TDelegate> | AllRows, patch: Partial<Insert<TDelegate>>, options?: { returning?: false }): Promise<MutationCount>;
+  /** With `returning: { limit }`: `{ count, rows }` from one atomic `updateManyAndReturn`, at most `limit` rows. */
+  updateWhere(
+    filter: Filter<TDelegate> | AllRows,
+    patch: Partial<Insert<TDelegate>>,
+    options: { returning: { limit: number } },
+  ): Promise<MutationRows<Row<TDelegate>>>;
 
   /** Hard-delete one row by id; returns the deleted row (or `undefined`). */
   deleteById(id: Id, idKey?: FieldKey<TDelegate>): Promise<Row<TDelegate> | undefined>;
-  /** Hard-delete every row matching the filter; returns the deleted rows. */
-  deleteWhere(filter: Filter<TDelegate>): Promise<Row<TDelegate>[]>;
+  /** Hard-delete every row matching the filter in one `deleteMany` → `{ count }` (same rules as `updateWhere`). */
+  deleteWhere(filter: Filter<TDelegate> | AllRows, options?: { returning?: false }): Promise<MutationCount>;
+  /** With `returning: { limit }`: `{ count, rows }` — the rows are read just before the delete (not atomic). */
+  deleteWhere(filter: Filter<TDelegate> | AllRows, options: { returning: { limit: number } }): Promise<MutationRows<Row<TDelegate>>>;
 
   /** Soft-delete (set `deletedAt`); requires a `deletedAt` field. */
   softDelete(id: Id, idKey?: FieldKey<TDelegate>): Promise<Row<TDelegate> | undefined>;

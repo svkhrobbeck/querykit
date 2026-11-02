@@ -1,5 +1,6 @@
 import type * as Core from "@querykitjs/core";
 import type { Model } from "mongoose";
+import type { AllRows, MutationCount, MutationRows } from "@querykitjs/core";
 
 import type {
   AggregateRow,
@@ -155,13 +156,21 @@ export interface Repository<TDoc = Record<string, unknown>, TRel extends Record<
 
   /** Update one document by id; returns the updated doc (or undefined). */
   updateById(id: Id, patch: Partial<Insert<TDoc>>, idKey?: FieldKey<TDoc>): Promise<Row<TDoc> | undefined>;
-  /** Update all documents matching the filter; returns the updated docs. */
-  updateWhere(filter: Filter<TDoc>, patch: Partial<Insert<TDoc>>): Promise<Row<TDoc>[]>;
+  /**
+   * Update every document matching the filter in one `updateMany` → `{ count }` (matched, task 013).
+   * No filter only with `{ all: true }` (the scope still applies); an empty or fully skipped
+   * filter is `QueryKitError` `empty-filter`. The filter passes the request policy like a read.
+   */
+  updateWhere(filter: Filter<TDoc> | AllRows, patch: Partial<Insert<TDoc>>, options?: { returning?: false }): Promise<MutationCount>;
+  /** With `returning: { limit }`: `{ count, rows }` — the rows are read right after the update with the same filter (not atomic). */
+  updateWhere(filter: Filter<TDoc> | AllRows, patch: Partial<Insert<TDoc>>, options: { returning: { limit: number } }): Promise<MutationRows<Row<TDoc>>>;
 
   /** Hard-delete one document by id; returns the deleted doc (or undefined). */
   deleteById(id: Id, idKey?: FieldKey<TDoc>): Promise<Row<TDoc> | undefined>;
-  /** Hard-delete all documents matching the filter; returns the deleted docs. */
-  deleteWhere(filter: Filter<TDoc>): Promise<Row<TDoc>[]>;
+  /** Hard-delete every document matching the filter in one `deleteMany` → `{ count }` (same rules as `updateWhere`). */
+  deleteWhere(filter: Filter<TDoc> | AllRows, options?: { returning?: false }): Promise<MutationCount>;
+  /** With `returning: { limit }`: `{ count, rows }` — the rows are read just before the delete (not atomic). */
+  deleteWhere(filter: Filter<TDoc> | AllRows, options: { returning: { limit: number } }): Promise<MutationRows<Row<TDoc>>>;
 
   /** Soft-delete (set `deletedAt`); requires a `deletedAt` schema path. */
   softDelete(id: Id, idKey?: FieldKey<TDoc>): Promise<Row<TDoc> | undefined>;

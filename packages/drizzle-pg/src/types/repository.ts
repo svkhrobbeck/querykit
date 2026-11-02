@@ -1,4 +1,5 @@
 import type { AnyPgTable } from "drizzle-orm/pg-core";
+import type { AllRows, MutationCount, MutationRows } from "@querykitjs/core";
 
 import type {
   AggregateRow,
@@ -206,12 +207,20 @@ export interface Repository<TTable extends AnyPgTable, TSchema extends Record<st
 
   /** `id` bo'yicha bitta qatorni yangilaydi (topilmasa `undefined`). */
   updateById(id: Id, patch: Partial<Insert<TTable>>, idKey?: ColumnKey<TTable>): Promise<Row<TTable> | undefined>;
-  /** Filterga mos barcha qatorlarni yangilaydi va ularni qaytaradi. */
-  updateWhere(filter: Filter<TTable>, patch: Partial<Insert<TTable>>): Promise<Row<TTable>[]>;
+  /**
+   * Filterga mos qatorlarni bitta atomar `UPDATE` bilan yangilaydi → `{ count }` (task 013).
+   * Filtrsiz faqat `{ all: true }` bilan (scope baribir qo'llanadi); bo'sh yoki to'liq tashlab
+   * yuborilgan filtr — `QueryKitError` `empty-filter`. Filtr o'qishdagidek siyosatdan o'tadi.
+   */
+  updateWhere(filter: Filter<TTable> | AllRows, patch: Partial<Insert<TTable>>, options?: { returning?: false }): Promise<MutationCount>;
+  /** `returning: { limit }` bilan: `{ count, rows }` — `RETURNING` natijasidan ko'pi bilan `limit` ta qator. */
+  updateWhere(filter: Filter<TTable> | AllRows, patch: Partial<Insert<TTable>>, options: { returning: { limit: number } }): Promise<MutationRows<Row<TTable>>>;
   /** `id` bo'yicha qatorni **butunlay** o'chiradi (hard delete). */
   deleteById(id: Id, idKey?: ColumnKey<TTable>): Promise<Row<TTable> | undefined>;
-  /** Filterga mos qatorlarni **butunlay** o'chiradi va ularni qaytaradi. */
-  deleteWhere(filter: Filter<TTable>): Promise<Row<TTable>[]>;
+  /** Filterga mos qatorlarni bitta atomar `DELETE` bilan **butunlay** o'chiradi → `{ count }` (`updateWhere` qoidalari). */
+  deleteWhere(filter: Filter<TTable> | AllRows, options?: { returning?: false }): Promise<MutationCount>;
+  /** `returning: { limit }` bilan: `{ count, rows }`. */
+  deleteWhere(filter: Filter<TTable> | AllRows, options: { returning: { limit: number } }): Promise<MutationRows<Row<TTable>>>;
 
   /**
    * **Yumshoq o'chirish** — `deletedAt` ustunini `now()` ga qo'yadi (fizik

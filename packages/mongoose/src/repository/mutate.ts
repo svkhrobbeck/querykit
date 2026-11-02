@@ -1,3 +1,6 @@
+import type { AllRows, MutationOptions } from "@querykitjs/core";
+import { clampPageSize } from "@querykitjs/core/internal";
+
 import type { FieldKey, Filter, Id, Insert, RepositoryOptions, Row, UpsertOptions } from "../types";
 import { resolveField } from "../internal/fields";
 import type { Query } from "../internal/where";
@@ -14,7 +17,10 @@ const KEY_SEPARATOR = String.fromCharCode(0);
 
 /** `create*`, `upsert*`, `update*`, `delete*`, `softDelete`, `restore`. */
 export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOptions<TDoc>) {
-  const { runtime, m, hasDeletedAt, forUpdate, composeWhere, withId, attachSession } = ctx;
+  const { runtime, m, hasDeletedAt, forUpdate, composeWhere, mutationWhere, withId, attachSession } = ctx;
+
+  /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
+  const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
 
   /** Apply scope defaults to insert values — scope wins (can't be overridden). */
   const forInsert = (values: object): Record<string, unknown> => ({
@@ -92,17 +98,16 @@ export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOp
       return updateOne(composeWhere(withId(undefined, idKey as string, id)), forUpdate(patch));
     },
 
-    async updateWhere(filter: Filter<TDoc>, patch: Partial<Insert<TDoc>>) {
-      const where = composeWhere(filter);
-      const found = (await attachSession(m.find(where).select({ _id: 1 }))
-        .lean()
-        .exec()) as { _id: unknown }[];
-      if (found.length === 0) return [];
-      const ids = found.map(d => d._id);
-      await attachSession(m.updateMany({ _id: { $in: ids } }, forUpdate(patch))).exec();
-      return (await attachSession(m.find({ _id: { $in: ids } }))
+    async updateWhere(filter: Filter<TDoc> | AllRows, patch: Partial<Insert<TDoc>>, options: MutationOptions = {}) {
+      // Task 013: one updateMany with the filter — no read before the write.
+      const where = mutationWhere(filter, "updateWhere");
+      const { matchedCount: count } = (await attachSession(m.updateMany(where, forUpdate(patch))).exec()) as { matchedCount: number };
+      if (!options.returning) return { count };
+      // Mongo has no multi-document "update and return": read right after, same filter (not atomic, README).
+      const rows = (await attachSession(m.find(where).limit(returningLimit(options.returning)))
         .lean()
         .exec()) as Row<TDoc>[];
+      return { count, rows };
     },
 
     async deleteById(id: Id, idKey: FieldKey<TDoc> = "id" as FieldKey<TDoc>) {
@@ -111,12 +116,16 @@ export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOp
       return (row ?? undefined) as Row<TDoc> | undefined;
     },
 
-    async deleteWhere(filter: Filter<TDoc>) {
-      const where = composeWhere(filter);
-      const rows = (await attachSession(m.find(where)).lean().exec()) as { _id: unknown }[];
-      if (rows.length === 0) return [];
-      await attachSession(m.deleteMany({ _id: { $in: rows.map(d => d._id) } })).exec();
-      return rows as Row<TDoc>[];
+    async deleteWhere(filter: Filter<TDoc> | AllRows, options: MutationOptions = {}) {
+      const where = mutationWhere(filter, "deleteWhere");
+      // The rows are read just before the delete (not atomic, README).
+      const rows = options.returning
+        ? ((await attachSession(m.find(where).limit(returningLimit(options.returning)))
+            .lean()
+            .exec()) as Row<TDoc>[])
+        : undefined;
+      const { deletedCount: count } = (await attachSession(m.deleteMany(where)).exec()) as { deletedCount: number };
+      return rows ? { count, rows } : { count };
     },
 
     async softDelete(id: Id, idKey: FieldKey<TDoc> = "id" as FieldKey<TDoc>) {
