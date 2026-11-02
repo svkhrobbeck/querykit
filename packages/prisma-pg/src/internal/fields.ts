@@ -25,6 +25,8 @@ export interface FieldMeta {
   isList: boolean;
   /** The `@map`ped database column, when it differs from the field name. */
   dbName?: string;
+  /** An enum field's values (from the runtime data model), for the task 021 B8 cast. */
+  enumValues?: readonly string[];
 }
 
 /** Everything the repository needs to know about one model. */
@@ -98,7 +100,11 @@ function fromRuntimeDataModel(
   delegateKey: string,
 ): { name: string; fields: FieldMeta[]; primaryKey?: { name?: unknown; fields?: unknown } | null } | undefined {
   const rdm = client._runtimeDataModel as
-    { models?: Record<string, { fields?: RuntimeField[]; primaryKey?: { name?: unknown; fields?: unknown } | null }> } | undefined;
+    | {
+        models?: Record<string, { fields?: RuntimeField[]; primaryKey?: { name?: unknown; fields?: unknown } | null }>;
+        enums?: Record<string, { values?: Array<{ name?: unknown }> }>;
+      }
+    | undefined;
   const models = rdm?.models;
   if (!models || typeof models !== "object") return undefined;
 
@@ -119,6 +125,7 @@ function fromRuntimeDataModel(
       isUpdatedAt: field.isUpdatedAt === true,
       isList: field.isList === true,
       ...(typeof field.dbName === "string" && field.dbName ? { dbName: field.dbName } : {}),
+      ...enumValuesOf(rdm?.enums, field),
     });
   }
   return fields.length ? { name: modelName, fields, primaryKey: models[modelName]?.primaryKey ?? null } : undefined;
@@ -265,4 +272,11 @@ export function castValue(meta: ModelMeta, field: string, value: unknown): unkno
   if (typeof value !== "string" && typeof value !== "number") return value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date;
+}
+
+/** `{ enumValues }` for an enum field whose values the runtime data model lists, else nothing. */
+function enumValuesOf(enums: Record<string, { values?: Array<{ name?: unknown }> }> | undefined, field: RuntimeField): { enumValues?: readonly string[] } {
+  if (field.kind !== "enum" || typeof field.type !== "string") return {};
+  const values = enums?.[field.type]?.values?.map(value => value.name).filter((name): name is string => typeof name === "string");
+  return values && values.length > 0 ? { enumValues: values } : {};
 }

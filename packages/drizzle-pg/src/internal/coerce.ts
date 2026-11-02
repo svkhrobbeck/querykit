@@ -27,10 +27,51 @@ export const INVALID_VALUE = Symbol("querykit.invalid-value");
  * everything else is left to Postgres, which casts (or complains) itself.
  */
 export function castForColumn(column: AnyPgColumn, value: unknown): unknown | typeof INVALID_VALUE {
-  const cast = castValue(column, value);
-  if (column.dataType !== "date" || cast === null || cast === undefined) return cast;
-  if (cast instanceof Date) return Number.isNaN(cast.getTime()) ? INVALID_VALUE : cast;
-  return INVALID_VALUE; // a string/number that could not be parsed, or a wrong-typed value
+  if (value === null || value === undefined) return value;
+  switch (column.dataType) {
+    case "date": {
+      const cast = castValue(column, value);
+      if (cast instanceof Date) return Number.isNaN(cast.getTime()) ? INVALID_VALUE : cast;
+      return INVALID_VALUE; // a string/number that could not be parsed, or a wrong-typed value
+    }
+    case "number":
+      return castNumber(value);
+    case "boolean":
+      return castBoolean(value);
+    case "string":
+      return castString(column, value);
+    default:
+      return value;
+  }
+}
+
+/* Task 021 B8: a value Postgres would reject (22P02 / 22007 …) is invalid-value here,
+ * before the driver runs — skipped and reported, or a QueryKitError under strict. */
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A finite number, or a numeric string (query strings carry numbers as text). */
+function castNumber(value: unknown): number | typeof INVALID_VALUE {
+  if (typeof value === "number") return Number.isFinite(value) ? value : INVALID_VALUE;
+  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+  return INVALID_VALUE;
+}
+
+function castBoolean(value: unknown): boolean | typeof INVALID_VALUE {
+  if (typeof value === "boolean") return value;
+  // The same set prisma-pg accepts (R11).
+  if (value === "true" || value === "1" || value === 1) return true;
+  if (value === "false" || value === "0" || value === 0) return false;
+  return INVALID_VALUE;
+}
+
+/** Text is free-form; a uuid column needs a uuid, an enum column one of its values. */
+function castString(column: AnyPgColumn, value: unknown): unknown {
+  if (typeof value !== "string") return typeof value === "number" || typeof value === "boolean" ? String(value) : INVALID_VALUE;
+  if (column.columnType === "PgUUID" && !UUID.test(value)) return INVALID_VALUE;
+  const enumValues = (column as { enumValues?: readonly string[] }).enumValues;
+  if (enumValues && enumValues.length > 0 && !enumValues.includes(value)) return INVALID_VALUE;
+  return value;
 }
 
 /**

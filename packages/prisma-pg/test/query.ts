@@ -465,6 +465,24 @@ console.log("\n=== 6. value coercion ===");
     (coerceCondition(userMeta, "createdAt", "in", [iso, iso]) as Date[]).every(d => d instanceof Date),
   );
   check("text operators keep their raw string", coerceCondition(userMeta, "createdAt", "contains", "2026") === "2026");
+  // Task 021 B8: Boolean and enum fields are cast too (synthetic meta: the fixture schema has neither).
+  const castMeta = {
+    ...userMeta,
+    fields: new Map([
+      ...userMeta.fields,
+      ["active", { name: "active", type: "Boolean", kind: "scalar", isId: false, isUpdatedAt: false, isList: false }],
+      ["role", { name: "role", type: "Role", kind: "enum", isId: false, isUpdatedAt: false, isList: false, enumValues: ["ADMIN", "USER"] }],
+    ]),
+  } as ModelMeta;
+  check(
+    "Boolean: 'maybe' is invalid-value, 'true' → true",
+    coerceCondition(castMeta, "active", "=", "maybe") === INVALID_VALUE && coerceCondition(castMeta, "active", "=", "true") === true,
+  );
+  check(
+    "enum: a value outside the enum is invalid-value",
+    coerceCondition(castMeta, "role", "=", "OWNER") === INVALID_VALUE && coerceCondition(castMeta, "role", "=", "ADMIN") === "ADMIN",
+  );
+  check("Int: 'abc' is invalid-value", coerceCondition(userMeta, "age", "=", "abc") === INVALID_VALUE);
   check("castValue leaves unparseable values alone", castValue(userMeta, "createdAt", "nope") === "nope");
 
   // Prisma type-checks arguments client-side, so a wire string on an Int field

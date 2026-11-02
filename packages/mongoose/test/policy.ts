@@ -218,6 +218,35 @@ check(
   JSON.stringify(sent[0]?.filter),
 );
 
+/* Task 021 B8 — every path type is cast before exec: a bad value is invalid-value, never a CastError. */
+{
+  const castSchema = new Schema({ count: Number, active: Boolean, ref: Schema.Types.ObjectId, kind: { type: String, enum: ["a", "b"] } });
+  const CastThing = mongoose.models.CastThing ?? mongoose.model("CastThing", castSchema);
+  const { castForPath, INVALID_VALUE } = await import("../src/internal/coerce");
+  const bad = (path: string, value: unknown) => castForPath(CastThing as never, path, value) === INVALID_VALUE;
+  check(
+    "B8 Number 'abc' / Boolean 'maybe' / ObjectId 'x' / enum 'c' → invalid-value",
+    bad("count", "abc") && bad("active", "maybe") && bad("ref", "x") && bad("kind", "c"),
+  );
+  check(
+    "B8 good values cast: '7' → 7, 'true' → true, enum 'a' passes",
+    castForPath(CastThing as never, "count", "7") === 7 &&
+      castForPath(CastThing as never, "active", "true") === true &&
+      castForPath(CastThing as never, "kind", "a") === "a",
+  );
+  const skips: SkippedCondition[] = [];
+  const badAge = await attempt(() =>
+    repositoryOf({ filterable: { age: "*" } }, { onSkippedCondition: (i: SkippedCondition) => skips.push(i) }).findAll!({
+      filter: [{ key: "age", value: "abc" }],
+    }),
+  );
+  check(
+    "B8 age 'abc' → skipped with invalid-value, the query still runs (no CastError)",
+    !badAge.error && skips[0]?.reason === "invalid-value",
+    describe(badAge),
+  );
+}
+
 /* Unknown keys keep unknown-key. */
 const unknown = await attempt(() => repositoryOf(statusOnly, { strict: true }).findAll!({ filter: [{ key: "nope", value: 1 }] }));
 check("nope with strict → unknown-key", unknown.error instanceof QueryKitError && unknown.error.info.reason === "unknown-key", describe(unknown));

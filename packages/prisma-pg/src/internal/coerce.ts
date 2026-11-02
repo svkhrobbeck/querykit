@@ -71,7 +71,11 @@ export function castForField(meta: ModelMeta, field: string, value: unknown): un
     return INVALID_VALUE;
   }
 
-  // String / enum / Json / everything else: left alone. Postgres would not have
+  // Task 021 B8: an enum value outside the enum can never match — invalid-value.
+  const enumValues = meta.fields.get(field)?.enumValues;
+  if (enumValues) return typeof value === "string" && enumValues.includes(value) ? value : INVALID_VALUE;
+
+  // String / Json / everything else: left alone. Postgres would not have
   // cast an int to text either, so this matches drizzle-pg's behaviour.
   return value;
 }
