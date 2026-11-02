@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/mongodb",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Advanced filtering + flexible pagination repository layer for the official MongoDB driver.",
   "type": "module",
   "author": {

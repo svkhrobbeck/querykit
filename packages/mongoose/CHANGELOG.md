@@ -1,5 +1,55 @@
 # @querykitjs/mongoose
 
+## 3.0.0
+
+### Major Changes
+
+- 5e0551f: Request policy in mongoose, LIKE wildcard limit, read time limit.
+  
+  - **mongoose** (breaking): repository `filterable` / `sortable` / `limits` (also on the registry) — the same names, defaults, reasons and sites as drizzle-pg and prisma-pg (`id` ≡ `_id`). An unbranded raw Mongo filter (`{ $where }`, `{ $expr }`, `{ path: { $regex } }`) is refused as `forbidden-key`; wrap server-side filters in `raw()`. Every read (`find`, `findOne`, `countDocuments`, `aggregate`) runs with `maxTimeMS` (registry / repository option, default 2000); a timeout throws `QueryKitTimeoutError`. A run of `%%` in a LIKE pattern compiles to one `.*`. README "Migrating to 3.0".
+  - **core**: `QueryLimits.maxLikeWildcards` (`DEFAULT_MAX_LIKE_WILDCARDS` = 2) checked by the adapter policy for `like` / `ilike` / `notLike`; `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`).
+  - **drizzle-pg**, **prisma-pg**: a LIKE pattern with more than `maxLikeWildcards` wildcards is refused as `limit-exceeded` (inside their pending majors).
+- 7b341d3: Require Node.js `>=22.12` (`engines`; Node 20 reached end of life) and declare peer ranges as the last two majors, both ends tested by `bun run test:matrix`: `zod ^4` · `mongoose ^8.24 || ^9.11` · `drizzle-orm >=0.44 <0.46` · `class-validator >=0.14 <0.16`, `class-transformer ^0.5`, `reflect-metadata ^0.1.13 || ^0.2` · `react ^18.3 || ^19.2.7`. See each README's Requirements section.
+
+### Patch Changes
+
+- 3d784f3: Adapter parity (task 021): `contains` / `startsWith` / `endsWith` match their value literally (drizzle-pg escapes `%`, `_`, `\`); every filter value is cast to its field type and a mismatch is `invalid-value` instead of a driver error (all three); prisma-pg refuses an unescaped `_` in `like` / `ilike` as `invalid-value`; mongoose `not` follows SQL three-valued logic; NULL sorts first on `asc` and last on `desc` on every adapter (drizzle-pg `NULLS FIRST` / `NULLS LAST`, prisma-pg `{ sort, nulls }` where the field is known optional — runtime model or the `fields` override, which now patches fields by name); a malformed sort item is reported as `invalid-value` (`site: "sort"`).
+- b7da794: Each adapter now ships its agent skill in the npm tarball: `skills/querykit-<pkg>/SKILL.md`. It holds the safety rules (`filterable`, `sortable`, `raw()`, `relations`, limits, `strict`, `{ all: true }`, `cursorSecret`), setup, typechecked examples for the common tasks and the shared request contract.
+- a60c564: Cursor pagination with a non-unique `cursorKey` (task 012): `findCursor` seeks on `(cursorKey, primary key)` — `(k > v) OR (k = v AND id > i)`, ordered by both — so rows that share a value (for example one `createdAt`) are never skipped or repeated; a primary-key cursor keeps the one-field seek.
+  
+  - Cursor tokens are v2 (`{ v: 2, k, id }`): only scalar values, cast to the field type; an object, an array, a value that does not fit or an old v1 token is refused with `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` before the driver runs. Start paging from the first page after the upgrade (README "Migrating").
+  - New registry option `cursorSecret`: tokens are signed with HMAC-SHA256 (Web Crypto) and an unsigned or altered token is `invalid-value`.
+  - **core** (`@querykitjs/core/internal`): `encodeCursorToken` / `decodeCursorToken` and type `CursorToken`; `cursorPage` is async and takes `idField` and `secret`.
+- 6d2291a: Fix the published types of `createFilters`: `dist/index.d.ts` referred to `RawFilter<_TDoc>`, a name not in scope, so a consumer compiling with `skipLibCheck: false` got `TS2552 Cannot find name '_TDoc'`. The public type is unchanged.
+- e88d791: Use the shared `@querykitjs/core/internal` helpers (cursor tokens, skip diagnostics, transaction context, sort normalization, pagination metas) and split the repository into modules. The public API, the cursor token format and every result are unchanged.
+- 735749f: Bulk mutations and counts (task 013).
+  
+  - `updateWhere(filter, patch, options?)` / `deleteWhere(filter, options?)` are one write on every adapter (prisma-pg and mongoose no longer read before the write) and return `{ count }`; with `{ returning: { limit } }` they return `{ count, rows }` (README "Bulk update and delete" says which rows are atomic per adapter). Before: `Row[]`.
+  - An empty filter (`undefined`, `{}`, `[]`, or every condition skipped) is refused with `QueryKitError` `reason: "empty-filter"`, `site: "mutation"` before the driver runs; `{ all: true }` asks for every row (the scope still applies). A mutation filter passes `filterable` and `limits` like a read's.
+  - `findList({ withTotal: false })` runs no count: `perPage + 1` rows, `has_next` from the extra row, `total_items` / `total_pages` `null`.
+  - README "Transactions": only database work inside the callback — external effects through an outbox, the driver may retry.
+  - **core**: `SkipReason` `empty-filter`, `SkipSite` `mutation`, `OffsetMeta` totals `number | null`, `WireOffsetParams.withTotal`, types `AllRows`, `MutationOptions`, `MutationCount`, `MutationRows`; `@querykitjs/core/internal` gets `isAllRows`, `isEmptyFilter`, `refuseEmptyFilter`, `offsetPageWithoutTotal`.
+- 02210b4: Scope lists, timestamp names, a `with` allow-list, legacy schemas deprecated (task 014).
+  
+  - **scope `in`** (all three adapters): a scope value may be `{ in: [...] }`; an empty list matches no row (not an error). `create` / `upsert` fill in the equality scopes only.
+  - **`timestamps`** registry option `{ createdAt?, deletedAt? }` (default `createdAt`, `deletedAt`): the default sort and the default `sortable` use that createdAt, soft delete (`softDelete`, `restore`, `withDeleted`) uses that deletedAt.
+  - **`relations`** repository option (R21): a client `with` opens only listed relations — `{ columns: [...] | "*", filterable?, nested? }` (mongoose also `model?`). An unlisted relation, column, relation filter field (prisma `where`, mongoose `match`) or nested relation is `QueryKitError` `forbidden-key`, `site: "with"`, before the driver runs; `with: { rel: true }` selects only the listed columns. Breaking: `with` on a repository without `relations` is refused; the mongoose shorthand `{ author: User }` still types `with` but no longer opens it (README "Migrating").
+  - **zod / class-validator**: the constant schemas (`baseParamsSchema`, `offsetParamsSchema`, `infiniteParamsSchema`, `cursorParamsSchema`) and DTOs (`BaseParamsDto`, `OffsetParamsDto`, `InfiniteParamsDto`, `CursorParamsDto`) are `@deprecated` — use the `make*` factories; removed in the next major.
+  - **core**: `Scope` accepts `ScopeIn`, `SkipSite` `with`, types `RelationRule` / `Relations`; `@querykitjs/core/internal` gets `scopeConditions`, `scopeDefaults`, `checkWith`, `WithDialect`.
+- Updated dependencies [3d784f3]
+- Updated dependencies [f5639d8]
+- Updated dependencies [4d440e3]
+- Updated dependencies [e88d791]
+- Updated dependencies [a60c564]
+- Updated dependencies [cf30c25]
+- Updated dependencies [5e0551f]
+- Updated dependencies [307c14c]
+- Updated dependencies [735749f]
+- Updated dependencies [7b341d3]
+- Updated dependencies [0eedc06]
+- Updated dependencies [02210b4]
+  - @querykitjs/core@2.0.0
+
 ## 2.0.0
 
 ### Major Changes

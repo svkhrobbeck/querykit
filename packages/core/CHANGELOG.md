@@ -1,5 +1,65 @@
 # @querykitjs/core
 
+## 2.0.0
+
+### Major Changes
+
+- 7b341d3: Require Node.js `>=22.12` (`engines`; Node 20 reached end of life) and declare peer ranges as the last two majors, both ends tested by `bun run test:matrix`: `zod ^4` · `mongoose ^8.24 || ^9.11` · `drizzle-orm >=0.44 <0.46` · `class-validator >=0.14 <0.16`, `class-transformer ^0.5`, `reflect-metadata ^0.1.13 || ^0.2` · `react ^18.3 || ^19.2.7`. See each README's Requirements section.
+
+### Minor Changes
+
+- e88d791: New subpath export `@querykitjs/core/internal`, for adapter authors only: cursor tokens (`encodeCursor`, `decodeCursor`), skip diagnostics (`reportSkip`), the per-call repository context (`createContextStore`), sort normalization (`normalizeSort`) and the pagination metas (`clampPageSize`, `clampPage`, `clampOffset`, `offsetMeta`, `infinitePage`, `cursorPage`). The main `@querykitjs/core` entry is unchanged. The internal entry is not application API and may change in a minor release.
+- a60c564: Cursor pagination with a non-unique `cursorKey` (task 012): `findCursor` seeks on `(cursorKey, primary key)` — `(k > v) OR (k = v AND id > i)`, ordered by both — so rows that share a value (for example one `createdAt`) are never skipped or repeated; a primary-key cursor keeps the one-field seek.
+  
+  - Cursor tokens are v2 (`{ v: 2, k, id }`): only scalar values, cast to the field type; an object, an array, a value that does not fit or an old v1 token is refused with `QueryKitError` `reason: "invalid-value"`, `site: "cursorKey"` before the driver runs. Start paging from the first page after the upgrade (README "Migrating").
+  - New registry option `cursorSecret`: tokens are signed with HMAC-SHA256 (Web Crypto) and an unsigned or altered token is `invalid-value`.
+  - **core** (`@querykitjs/core/internal`): `encodeCursorToken` / `decodeCursorToken` and type `CursorToken`; `cursorPage` is async and takes `idField` and `secret`.
+- cf30c25: Request policy — safe by default.
+  
+  - **drizzle-pg** (breaking): repository options `filterable` (field → operators or `"*"`), `sortable` and `limits` (also on the registry). Without `filterable` a client may filter only by `allowedColumns` (else the `forcedColumns` keys, else the primary key) with `=` and `in`, and sort only by the primary key and `createdAt`. A refused filter, sort, `cursorKey`, offset or aggregate key throws `QueryKitError` (`forbidden-key`, `forbidden-operator`, `limit-exceeded`) before any SQL runs, whatever `strict` says. A key the table does not have keeps the `unknown-key` behaviour. Restore 3.x per repository with `filterable: { column: "*" }` and a full `sortable` (README "Migrating to 4.0").
+  - **core**: `SkipReason` adds `forbidden-key`, `forbidden-operator`, `limit-exceeded`; `SkipSite` adds `page`; new `Filterable` type. `@querykitjs/core/internal` gets `resolvePolicy`, shared by every adapter.
+- 5e0551f: Request policy in mongoose, LIKE wildcard limit, read time limit.
+  
+  - **mongoose** (breaking): repository `filterable` / `sortable` / `limits` (also on the registry) — the same names, defaults, reasons and sites as drizzle-pg and prisma-pg (`id` ≡ `_id`). An unbranded raw Mongo filter (`{ $where }`, `{ $expr }`, `{ path: { $regex } }`) is refused as `forbidden-key`; wrap server-side filters in `raw()`. Every read (`find`, `findOne`, `countDocuments`, `aggregate`) runs with `maxTimeMS` (registry / repository option, default 2000); a timeout throws `QueryKitTimeoutError`. A run of `%%` in a LIKE pattern compiles to one `.*`. README "Migrating to 3.0".
+  - **core**: `QueryLimits.maxLikeWildcards` (`DEFAULT_MAX_LIKE_WILDCARDS` = 2) checked by the adapter policy for `like` / `ilike` / `notLike`; `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`).
+  - **drizzle-pg**, **prisma-pg**: a LIKE pattern with more than `maxLikeWildcards` wildcards is refused as `limit-exceeded` (inside their pending majors).
+- 307c14c: Request policy in prisma-pg, and branded raw filters (R19).
+  
+  - **prisma-pg** (breaking): repository options `filterable` (field → operators or `"*"`; relation fields as `"relation.field"`), `sortable` and `limits` (also on the registry) — the same names, defaults, reasons and sites as drizzle-pg. Without `filterable` a client may filter only by `allowedColumns` (else the `forcedColumns` keys, else the `@id` field) with `=` and `in`, and sort only by `@id` and `createdAt`. A refused filter, sort, `cursorKey`, offset or aggregate field throws `QueryKitError` before Prisma is called. A raw Prisma `where` must now be branded with `raw()`; an unbranded one throws `forbidden-key` (README "Migrating to 2.0").
+  - **core**: `raw(value)` brands a driver-native filter object with a `Symbol` (a JSON body cannot carry one); `@querykitjs/core/internal` gets `isRaw`, and the policy refuses an unbranded driver object as `forbidden-key`.
+  - **drizzle-pg**: a JSON-shaped object that is not a condition or a group is now refused as `forbidden-key` instead of being skipped; drizzle `SQL` fragments are accepted as before.
+- 735749f: Bulk mutations and counts (task 013).
+  
+  - `updateWhere(filter, patch, options?)` / `deleteWhere(filter, options?)` are one write on every adapter (prisma-pg and mongoose no longer read before the write) and return `{ count }`; with `{ returning: { limit } }` they return `{ count, rows }` (README "Bulk update and delete" says which rows are atomic per adapter). Before: `Row[]`.
+  - An empty filter (`undefined`, `{}`, `[]`, or every condition skipped) is refused with `QueryKitError` `reason: "empty-filter"`, `site: "mutation"` before the driver runs; `{ all: true }` asks for every row (the scope still applies). A mutation filter passes `filterable` and `limits` like a read's.
+  - `findList({ withTotal: false })` runs no count: `perPage + 1` rows, `has_next` from the extra row, `total_items` / `total_pages` `null`.
+  - README "Transactions": only database work inside the callback — external effects through an outbox, the driver may retry.
+  - **core**: `SkipReason` `empty-filter`, `SkipSite` `mutation`, `OffsetMeta` totals `number | null`, `WireOffsetParams.withTotal`, types `AllRows`, `MutationOptions`, `MutationCount`, `MutationRows`; `@querykitjs/core/internal` gets `isAllRows`, `isEmptyFilter`, `refuseEmptyFilter`, `offsetPageWithoutTotal`.
+- 0eedc06: Request limits: every filter and pagination request is bounded in size at parse time.
+  
+  - **core**: `DEFAULT_MAX_FILTER_DEPTH` (5), `DEFAULT_MAX_CONDITIONS` (30), `DEFAULT_MAX_IN_ITEMS` (200), `DEFAULT_MAX_STRING_LENGTH` (256), `DEFAULT_MAX_OFFSET` (10 000), `DEFAULT_MAX_SORT_FIELDS` (3), the `QueryLimits` type, `DEFAULT_QUERY_LIMITS` and `resolveLimits(partial)`. `@querykitjs/core/internal` gets the iterative `findFilterLimitViolation` walk the validators share.
+  - **zod** (breaking): the factories take `limits` and the constant schemas apply the core defaults. A payload past a limit is rejected (`filter exceeds maxInItems (200)`); a 10 000-level `not` chain is rejected before the recursive schema runs, without a stack overflow. `offsetParamsSchema` and `makeOffsetParamsSchema()` carry an object-level check, so zod 4 refuses `.pick()` / `.omit()` on them.
+  - **class-validator**: `validateFilter`, `validateSort`, the DTOs and the DTO factories (`limits`) apply the same limits; new `IsWithinMaxOffset` decorator; new message key `querykit.limit.exceeded` in en/uz/ru; `querykit.filter.max_depth` now names `maxDepth (5)`.
+  - **web**: the list and infinite builders throw an `Error` for an offset past `maxOffset` or more than `maxSortFields` sort fields instead of building the payload (`QueryConfig` / registry `defaults`: `maxOffset`, `maxSortFields`). Filter limits stay with the server.
+- 02210b4: Scope lists, timestamp names, a `with` allow-list, legacy schemas deprecated (task 014).
+  
+  - **scope `in`** (all three adapters): a scope value may be `{ in: [...] }`; an empty list matches no row (not an error). `create` / `upsert` fill in the equality scopes only.
+  - **`timestamps`** registry option `{ createdAt?, deletedAt? }` (default `createdAt`, `deletedAt`): the default sort and the default `sortable` use that createdAt, soft delete (`softDelete`, `restore`, `withDeleted`) uses that deletedAt.
+  - **`relations`** repository option (R21): a client `with` opens only listed relations — `{ columns: [...] | "*", filterable?, nested? }` (mongoose also `model?`). An unlisted relation, column, relation filter field (prisma `where`, mongoose `match`) or nested relation is `QueryKitError` `forbidden-key`, `site: "with"`, before the driver runs; `with: { rel: true }` selects only the listed columns. Breaking: `with` on a repository without `relations` is refused; the mongoose shorthand `{ author: User }` still types `with` but no longer opens it (README "Migrating").
+  - **zod / class-validator**: the constant schemas (`baseParamsSchema`, `offsetParamsSchema`, `infiniteParamsSchema`, `cursorParamsSchema`) and DTOs (`BaseParamsDto`, `OffsetParamsDto`, `InfiniteParamsDto`, `CursorParamsDto`) are `@deprecated` — use the `make*` factories; removed in the next major.
+  - **core**: `Scope` accepts `ScopeIn`, `SkipSite` `with`, types `RelationRule` / `Relations`; `@querykitjs/core/internal` gets `scopeConditions`, `scopeDefaults`, `checkWith`, `WithDialect`.
+
+### Patch Changes
+
+- 3d784f3: Adapter parity (task 021): `contains` / `startsWith` / `endsWith` match their value literally (drizzle-pg escapes `%`, `_`, `\`); every filter value is cast to its field type and a mismatch is `invalid-value` instead of a driver error (all three); prisma-pg refuses an unescaped `_` in `like` / `ilike` as `invalid-value`; mongoose `not` follows SQL three-valued logic; NULL sorts first on `asc` and last on `desc` on every adapter (drizzle-pg `NULLS FIRST` / `NULLS LAST`, prisma-pg `{ sort, nulls }` where the field is known optional — runtime model or the `fields` override, which now patches fields by name); a malformed sort item is reported as `invalid-value` (`site: "sort"`).
+- f5639d8: Smaller bundles: every export tree-shakes on its own (task 016).
+  
+  - **core**: `@querykitjs/core/internal` no longer imports `node:async_hooks` statically (it is loaded when an adapter creates its context store), so `@querykitjs/zod` and `@querykitjs/class-validator` bundle for the browser; the build no longer uses `keepNames`, and `f` is marked pure — importing one constant now costs ~180 B instead of ~850 B.
+  - **zod**: importing one schema no longer keeps every schema (`sortSchema` alone: ~9 % of the entry instead of 76 %).
+  - **class-validator**: the deprecated static DTOs and the load-time decorators are split into their own chunks, so importing a constant or a message catalog no longer carries every decorator (one constant: ~9 KB → ~0.5 KB minified).
+  - All packages: minified builds (class names kept where they are public), `exports` with separate `import` / `require` types (`.d.ts` / `.d.cts`) and node10 `typesVersions` for subpaths — `publint` and `attw` report no problems. Public API and types are unchanged.
+- 4d440e3: Ship the `querykit-core` agent skill (`skills/querykit-core/SKILL.md`) in the npm package: safety rules, the request contract and checked examples for filters, operators, pagination caps and `QueryKitError`.
+
 ## 1.2.0
 
 ### Minor Changes

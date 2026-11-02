@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/class-validator",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "class-validator decorators and DTOs that validate the querykit request contract (filters, sort, pagination) — types stay in sync with @querykitjs/core.",
   "type": "module",
   "author": {
