@@ -13,7 +13,8 @@ import {
 } from "@querykitjs/core/internal";
 import type { QueryLimits } from "@querykitjs/core";
 
-import type { AnyDb, ColumnKey, FieldCondition, Filter, Id, RepositoryOptions } from "../types";
+import type { AnyDb, FieldCondition, Filter, Id, RepositoryOptions, Sort } from "../types";
+import { buildOrderBy } from "../internal/order-by";
 import { getTableKey, isTable, resolveColumn, tableColumns } from "../internal/columns";
 import { buildWhere } from "../internal/where";
 import { buildProjection, type Projection } from "./projection";
@@ -40,6 +41,8 @@ export interface RepoRuntime {
   limits?: Partial<QueryLimits>;
   /** Signs cursor tokens (task 012). */
   cursorSecret?: string;
+  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 export interface RelationalHandle {
@@ -60,7 +63,13 @@ export interface RepoContext<TTable extends AnyPgTable> {
   executor: () => AnyDb;
   handle: () => RelationalHandle;
   updatedAtCol: AnyPgColumn | undefined;
+  /** The soft-delete column (`timestamps.deletedAt`, default `deletedAt`) and its JS key. */
   deletedAtCol: AnyPgColumn | undefined;
+  deletedAtKey: string | undefined;
+  /** The createdAt column's JS key (`timestamps.createdAt`, default `createdAt`). */
+  createdAtKey: string | undefined;
+  /** ORDER BY for a sort; none given ⇒ createdAt desc, else the primary key. */
+  sortBy: (sort?: Sort<TTable>) => SQL[];
   projection: Projection<TTable>;
   /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
   policy: Policy;
@@ -98,11 +107,17 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
   // Auto-detected columns (by JS property name): updatedAt is bumped on update,
   // deletedAt enables soft-delete.
   const updatedAtCol = resolveColumn(table, "updatedAt");
-  const deletedAtCol = resolveColumn(table, "deletedAt");
+  // Task 014: the registry's `timestamps` names these columns (JS key or DB column name).
+  const keyOf = (column: AnyPgColumn | undefined) => (column ? tableColumns(table).find(([, candidate]) => candidate === column)?.[0] : undefined);
+  const deletedAtCol = resolveColumn(table, runtime.timestamps?.deletedAt ?? "deletedAt");
+  const createdAtCol = resolveColumn(table, runtime.timestamps?.createdAt ?? "createdAt");
+  const deletedAtKey = keyOf(deletedAtCol);
+  const createdAtKey = keyOf(createdAtCol);
+  const sortBy = (sort?: Sort<TTable>): SQL[] => buildOrderBy(table, sort, diag, createdAtCol);
 
   const scopeWhere = buildScopeWhere(table, config);
   const projection = buildProjection(config);
-  const policy = buildPolicy(table, config, runtime.limits);
+  const policy = buildPolicy(table, config, runtime.limits, createdAtKey, runtime.timestamps?.createdAt !== undefined);
 
   /** An already built user WHERE + scope + soft-delete guard. */
   const combineWhere = (userWhere: SQL | undefined, withDeleted?: boolean): SQL | undefined => {
@@ -136,11 +151,34 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
     return rows[0]?.value ?? 0;
   };
 
-  return { runtime, table, diag, executor, handle, updatedAtCol, deletedAtCol, projection, policy, composeWhere, mutationWhere, withId, countWhere };
+  return {
+    runtime,
+    table,
+    diag,
+    executor,
+    handle,
+    updatedAtCol,
+    deletedAtCol,
+    deletedAtKey,
+    createdAtKey,
+    sortBy,
+    projection,
+    policy,
+    composeWhere,
+    mutationWhere,
+    withId,
+    countWhere,
+  };
 }
 
 /** The table's request policy. Fields are named by JS property; a DB column name maps to the same field. */
-function buildPolicy<TTable extends AnyPgTable>(table: TTable, config: RepositoryOptions<TTable>, registryLimits?: Partial<QueryLimits>): Policy {
+function buildPolicy<TTable extends AnyPgTable>(
+  table: TTable,
+  config: RepositoryOptions<TTable>,
+  registryLimits: Partial<QueryLimits> | undefined,
+  createdAtKey: string | undefined,
+  createdAtConfigured: boolean,
+): Policy {
   const columns = tableColumns(table);
   const fieldByName = new Map<string, string>();
   for (const [key, column] of columns) {
@@ -152,7 +190,8 @@ function buildPolicy<TTable extends AnyPgTable>(table: TTable, config: Repositor
     source: getTableName(table),
     fieldOf,
     primaryKey: columns.find(([, column]) => column.primary)?.[0] ?? "id",
-    createdAt: fieldOf("createdAt") ?? fieldOf("created_at"),
+    // A configured `timestamps.createdAt` is the only one; else `createdAt` or `created_at`.
+    createdAt: createdAtConfigured ? createdAtKey : (fieldOf("createdAt") ?? fieldOf("created_at")),
     filterable: config.filterable,
     sortable: config.sortable,
     allowedColumns: config.allowedColumns,

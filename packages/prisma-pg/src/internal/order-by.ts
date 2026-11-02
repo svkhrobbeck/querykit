@@ -12,7 +12,12 @@ export type OrderBy = Array<Record<string, SortDirection | { sort: SortDirection
  * pagination is stable (identical to the drizzle-pg and mongoose adapters;
  * without it Postgres returns rows in arbitrary order).
  */
-export function buildOrderBy(meta: ModelMeta, sort?: Sort, diag?: Diagnostics): OrderBy {
+export function buildOrderBy(
+  meta: ModelMeta,
+  sort?: Sort,
+  diag?: Diagnostics,
+  createdAt: string | undefined = meta.hasCreatedAt ? "createdAt" : undefined,
+): OrderBy {
   const orderBy: OrderBy = [];
 
   for (const { key, direction } of normalizeSort(sort, diag)) {
@@ -31,6 +36,6 @@ export function buildOrderBy(meta: ModelMeta, sort?: Sort, diag?: Diagnostics): 
 
   if (orderBy.length > 0) return orderBy;
 
-  if (meta.hasCreatedAt) return [{ createdAt: "desc" }];
+  if (createdAt) return [{ [createdAt]: "desc" }];
   return meta.idField ? [{ [meta.idField]: "desc" }] : [];
 }

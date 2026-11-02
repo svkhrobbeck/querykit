@@ -12,7 +12,12 @@ import { resolveColumn } from "./columns";
  * pagination is stable (matches the mongoose adapter). `resolveColumn` matches
  * by JS property or DB column name, so `createdAt` also finds a `created_at` column.
  */
-export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: Sort<TTable>, diag?: Diagnostics): SQL[] {
+export function buildOrderBy<TTable extends AnyPgTable>(
+  table: TTable,
+  sort?: Sort<TTable>,
+  diag?: Diagnostics,
+  createdAt: AnyPgColumn | undefined = resolveColumn(table, "createdAt"),
+): SQL[] {
   const orderBy: SQL[] = [];
 
   for (const { key, direction } of normalizeSort(sort as Sort | undefined, diag)) {
@@ -25,7 +30,6 @@ export function buildOrderBy<TTable extends AnyPgTable>(table: TTable, sort?: So
 
   if (orderBy.length > 0) return orderBy;
 
-  const createdAt = resolveColumn(table, "createdAt");
   if (createdAt) return [ordered(createdAt, "desc")];
 
   // Deterministic tiebreaker so offset/keyset pagination is stable when neither a

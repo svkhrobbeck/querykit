@@ -12,7 +12,7 @@ const CHUNK_SIZE = 1000;
 
 /** `create*`, `upsert*`, `update*`, `delete*`, `softDelete`, `restore`. */
 export function mutateMethods<TDelegate>(ctx: RepoContext<TDelegate>, config: RepositoryOptions<TDelegate>) {
-  const { runtime, meta, delegate, composeWhere, mutationWhere, withId } = ctx;
+  const { runtime, meta, delegate, deletedAtField, createdAtField, composeWhere, mutationWhere, withId } = ctx;
 
   /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
   const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
@@ -54,7 +54,7 @@ export function mutateMethods<TDelegate>(ctx: RepoContext<TDelegate>, config: Re
 
   /** Default update-on-conflict set: the inserted values minus target/creation fields. */
   const defaultConflictSet = (values: Record<string, unknown>, targetKeys: string[]): Record<string, unknown> => {
-    const skip = new Set([...targetKeys, "createdAt"]);
+    const skip = new Set([...targetKeys, createdAtField ?? "createdAt"]);
     const set: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(values)) {
       if (!skip.has(key)) set[key] = value;
@@ -150,13 +150,13 @@ export function mutateMethods<TDelegate>(ctx: RepoContext<TDelegate>, config: Re
     },
 
     async softDelete(id: Id, idKey: string = "id") {
-      if (!meta.hasDeletedAt) throw new Error("softDelete: model has no deletedAt field.");
-      return updateOne(composeWhere(withId(undefined, idKey, id), false), forUpdate({ deletedAt: new Date() }), "softDelete");
+      if (!deletedAtField) throw new Error("softDelete: model has no deletedAt field.");
+      return updateOne(composeWhere(withId(undefined, idKey, id), false), forUpdate({ [deletedAtField]: new Date() }), "softDelete");
     },
 
     async restore(id: Id, idKey: string = "id") {
-      if (!meta.hasDeletedAt) throw new Error("restore: model has no deletedAt field.");
-      return updateOne(composeWhere(withId(undefined, idKey, id), true), forUpdate({ deletedAt: null }), "restore");
+      if (!deletedAtField) throw new Error("restore: model has no deletedAt field.");
+      return updateOne(composeWhere(withId(undefined, idKey, id), true), forUpdate({ [deletedAtField]: null }), "restore");
     },
   };
 }

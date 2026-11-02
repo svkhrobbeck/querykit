@@ -14,7 +14,7 @@ const CHUNK_SIZE = 1000;
 
 /** `create*`, `upsert*`, `update*`, `delete*`, `softDelete`, `restore`. */
 export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>, config: RepositoryOptions<TTable>) {
-  const { runtime, table, executor, handle, updatedAtCol, deletedAtCol, composeWhere, mutationWhere, withId } = ctx;
+  const { runtime, table, executor, handle, updatedAtCol, deletedAtCol, deletedAtKey, createdAtKey, composeWhere, mutationWhere, withId } = ctx;
 
   /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
   const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
@@ -53,7 +53,7 @@ export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
   /** Default ON CONFLICT SET: provided columns (minus target/creation) → excluded. */
   const defaultConflictSet = (sample: object, targetKeys: string[]): Record<string, unknown> => {
     const set: Record<string, unknown> = {};
-    const skip = new Set([...targetKeys, "createdAt"]);
+    const skip = new Set([...targetKeys, createdAtKey ?? "createdAt"]);
     for (const key of Object.keys(sample)) {
       if (skip.has(key)) continue;
       const column = resolveColumn(table, key);
@@ -164,12 +164,12 @@ export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
 
     async softDelete(id: Id, idKey: ColumnKey<TTable> = "id" as ColumnKey<TTable>) {
       if (!deletedAtCol) throw new Error("softDelete: table has no deletedAt column.");
-      return updateOne(id, idKey, { deletedAt: new Date() }, false);
+      return updateOne(id, idKey, { [deletedAtKey!]: new Date() }, false);
     },
 
     async restore(id: Id, idKey: ColumnKey<TTable> = "id" as ColumnKey<TTable>) {
       if (!deletedAtCol) throw new Error("restore: table has no deletedAt column.");
-      return updateOne(id, idKey, { deletedAt: null }, true);
+      return updateOne(id, idKey, { [deletedAtKey!]: null }, true);
     },
   };
 }

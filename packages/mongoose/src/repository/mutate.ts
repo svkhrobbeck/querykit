@@ -17,7 +17,7 @@ const KEY_SEPARATOR = String.fromCharCode(0);
 
 /** `create*`, `upsert*`, `update*`, `delete*`, `softDelete`, `restore`. */
 export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOptions<TDoc>) {
-  const { runtime, m, hasDeletedAt, forUpdate, composeWhere, mutationWhere, withId, attachSession } = ctx;
+  const { runtime, m, hasDeletedAt, deletedAtPath, forUpdate, composeWhere, mutationWhere, withId, attachSession } = ctx;
 
   /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
   const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
@@ -130,12 +130,12 @@ export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOp
 
     async softDelete(id: Id, idKey: FieldKey<TDoc> = "id" as FieldKey<TDoc>) {
       if (!hasDeletedAt) throw new Error("softDelete: schema has no deletedAt path.");
-      return updateOne(composeWhere(withId(undefined, idKey as string, id), false), forUpdate({ deletedAt: new Date() }));
+      return updateOne(composeWhere(withId(undefined, idKey as string, id), false), forUpdate({ [deletedAtPath]: new Date() }));
     },
 
     async restore(id: Id, idKey: FieldKey<TDoc> = "id" as FieldKey<TDoc>) {
       if (!hasDeletedAt) throw new Error("restore: schema has no deletedAt path.");
-      return updateOne(composeWhere(withId(undefined, idKey as string, id), true), forUpdate({ deletedAt: null }));
+      return updateOne(composeWhere(withId(undefined, idKey as string, id), true), forUpdate({ [deletedAtPath]: null }));
     },
   };
 }

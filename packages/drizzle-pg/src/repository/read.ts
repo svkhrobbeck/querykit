@@ -2,12 +2,11 @@ import type { AnyPgTable } from "drizzle-orm/pg-core";
 import { clampOffset, clampPage, clampPageSize, infinitePage, offsetMeta, offsetPageWithoutTotal } from "@querykitjs/core/internal";
 
 import type { ByIdParams, Filter, Id, InfiniteParams, InfiniteResult, OffsetParams, OffsetResult, QueryParams } from "../types";
-import { buildOrderBy } from "../internal/order-by";
 import type { RepoContext } from "./context";
 
 /** `findAll`, `findOne`, `findById`, `findList`, `findInfinite`, `count`, `exists`. */
 export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>) {
-  const { runtime, table, diag, handle, policy, composeWhere, withId, countWhere } = ctx;
+  const { runtime, handle, policy, sortBy, composeWhere, withId, countWhere } = ctx;
   const { pickColumns } = ctx.projection;
 
   /** The client's filter and sort, checked before any SQL is built. */
@@ -21,7 +20,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
       checked(params);
       const rows = await handle().findMany({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(table, params.sort, diag),
+        orderBy: sortBy(params.sort),
         columns: pickColumns(params.columns),
         with: params.with,
       });
@@ -32,7 +31,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
       checked(params);
       const row = await handle().findFirst({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(table, params.sort, diag),
+        orderBy: sortBy(params.sort),
         columns: pickColumns(params.columns),
         with: params.with,
       });
@@ -60,7 +59,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
       const rows = (limit: number) =>
         handle().findMany({
           where,
-          orderBy: buildOrderBy(table, params.sort, diag),
+          orderBy: sortBy(params.sort),
           limit,
           offset: (page - 1) * perPage,
           columns: pickColumns(params.columns),
@@ -81,7 +80,7 @@ export function readMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable>)
 
       const rows = await handle().findMany({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: buildOrderBy(table, params.sort, diag),
+        orderBy: sortBy(params.sort),
         limit: limit + 1,
         offset,
         columns: pickColumns(params.columns),

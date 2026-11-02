@@ -375,6 +375,27 @@ async function main() {
     }
     check("A1 tied createdAt with columns { n }: 25 distinct n, no _id in rows", ns.size === 25 && !("_id" in (colPage.data[0] ?? {})), `${ns.size}`);
     check("A1 tied createdAt: walking back reaches the other 20 _id", backIds.size === 20 && [...backIds].every(id => tieSeen.has(id)), `${backIds.size}`);
+    // Task 014 P2: registry timestamps name snake_case paths — default sort, soft delete, restore.
+    const Snake =
+      mongoose.models.Snake ?? mongoose.model("Snake", new mongoose.Schema({ title: String, created_at: Date, deleted_at: { type: Date, default: null } }));
+    await Snake.deleteMany({});
+    const [older] = await Snake.create([
+      { title: "older", created_at: new Date("2026-01-01T00:00:00.000Z") },
+      { title: "newer", created_at: new Date("2026-02-01T00:00:00.000Z") },
+    ]);
+    const snakeRepo = createRegistry(mongoose.connection, { timestamps: { createdAt: "created_at", deletedAt: "deleted_at" } }).repository(
+      Snake as never,
+    ) as unknown as {
+      findAll(params?: unknown): Promise<{ title: string }[]>;
+      softDelete(id: unknown): Promise<unknown>;
+      restore(id: unknown): Promise<unknown>;
+    };
+    check("A3 timestamps.createdAt: default sort is created_at desc", (await snakeRepo.findAll()).map(d => d.title).join() === "newer,older");
+    await snakeRepo.softDelete(older!._id);
+    check("A3 timestamps.deletedAt: softDelete sets deleted_at and hides the doc", (await snakeRepo.findAll()).map(d => d.title).join() === "newer");
+    check("A3 …withDeleted shows it", (await snakeRepo.findAll({ withDeleted: true })).length === 2);
+    await snakeRepo.restore(older!._id);
+    check("A3 …restore clears deleted_at", (await snakeRepo.findAll()).length === 2);
 
     /* --------------------------- projection guards -------------------------- */
     /* Parity with drizzle-pg test/sql.ts §13-§17. `email` stands in for `password`. */

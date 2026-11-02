@@ -5,8 +5,7 @@
  */
 import { ALL, type ConformanceCase } from "./case-types";
 
-/** Red until 014 phase 3 (timestamps), 4 (relations); removed there. */
-const STAMPS = { "drizzle-pg": "014 p3", "prisma-pg": "014 p3", mongoose: "014 p3" } as const;
+/** Red until 014 phase 4 (relations); removed there. */
 const WITH = { "drizzle-pg": "014 p4", "prisma-pg": "014 p4", mongoose: "014 p4" } as const;
 const WEB = "a repository option, not built by web";
 const AGE_25_OR_30 = { age: { in: [25, 30] } };
@@ -58,7 +57,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findList", params: { page: 1, perPage: 7 } },
     options: { timestamps: { createdAt: "email" } },
     expect: { names: ["Frank", "Eve_Ann", "dave", "Carol", "Bob", "Alina", "Alice"], ordered: true },
-    knownDifference: STAMPS,
     notBuiltByWeb: WEB,
   },
   {
@@ -67,7 +65,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { sort: [{ key: "createdAt", direction: "asc" }] } },
     options: { policy: "default", timestamps: { createdAt: "email" } },
     expect: { error: { site: "sort", key: "createdAt", reason: "forbidden-key" } },
-    knownDifference: STAMPS,
     notBuiltByWeb: WEB,
   },
   {
@@ -76,7 +73,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { sort: [{ key: "email", direction: "asc" }] } },
     options: { policy: "default", timestamps: { createdAt: "email" } },
     expect: { names: ["Alice", "Alina", "Bob", "Carol", "dave", "Eve_Ann", "Frank"], ordered: true },
-    knownDifference: STAMPS,
     notBuiltByWeb: WEB,
   },
   {
@@ -85,7 +81,6 @@ export const SCOPE_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: {} },
     options: { timestamps: { deletedAt: "age" } },
     expect: { names: ["Carol", "Alina"] },
-    knownDifference: STAMPS,
     notBuiltByWeb: WEB,
   },
   {

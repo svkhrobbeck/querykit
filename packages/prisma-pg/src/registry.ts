@@ -72,6 +72,7 @@ export function createRegistry<TClient extends AnyClient>(prisma: TClient, optio
     onSkippedCondition: options.onSkippedCondition,
     limits: options.limits,
     cursorSecret: options.cursorSecret,
+    timestamps: options.timestamps,
   };
 
   /* A model is addressed either by its delegate key (`"user"`) or by the delegate

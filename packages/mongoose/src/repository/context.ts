@@ -37,6 +37,8 @@ export interface RepoRuntime {
   maxTimeMS: number;
   /** Signs cursor tokens (task 012). */
   cursorSecret?: string;
+  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
 // Mongoose's Query generics are extremely deep; we drive queries untyped
@@ -63,6 +65,8 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   m: AnyModel;
   diag: Diagnostics;
   hasDeletedAt: boolean;
+  /** The soft-delete path (`timestamps.deletedAt`, default `deletedAt`). */
+  deletedAtPath: string;
   /** Stamp `updatedAt` when the schema has a manual one (no `timestamps`). */
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
@@ -90,7 +94,11 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
 
 export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, config: RepositoryOptions<TDoc>): RepoContext<TDoc> {
   const m = model as AnyModel;
-  const hasDeletedAt = hasPath(m, "deletedAt");
+  // Task 014: the registry's `timestamps` names these paths.
+  const deletedAtPath = resolveField(m, runtime.timestamps?.deletedAt ?? "deletedAt") ?? "deletedAt";
+  const hasDeletedAt = hasPath(m, deletedAtPath);
+  const createdAtConfigured = runtime.timestamps?.createdAt !== undefined;
+  const createdAtPath = resolveField(m, runtime.timestamps?.createdAt ?? "createdAt");
   // Mongoose auto-bumps `updatedAt` only when the schema opts into timestamps;
   // for a manual `updatedAt` path we stamp it ourselves so every update path
   // bumps it — matching drizzle-pg's forUpdate.
@@ -107,11 +115,13 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     onSkipped: runtime.onSkippedCondition,
   };
 
-  const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag);
+  const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag, createdAtPath);
 
   /** An already built user filter + scope + soft-delete guard. */
   const combineWhere = (userWhere: Query | undefined, withDeleted?: boolean): Query => {
-    const parts = [userWhere, scopeWhere, hasDeletedAt && !withDeleted ? { deletedAt: { $eq: null } } : undefined].filter((p): p is Query => p !== undefined);
+    const parts = [userWhere, scopeWhere, hasDeletedAt && !withDeleted ? { [deletedAtPath]: { $eq: null } } : undefined].filter(
+      (p): p is Query => p !== undefined,
+    );
     if (parts.length === 0) return {};
     if (parts.length === 1) return parts[0]!;
     return { $and: parts };
@@ -152,7 +162,7 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     // `id` is `_id` on the wire, like everywhere else in this adapter.
     fieldOf: key => resolveField(m, key),
     primaryKey: "_id",
-    createdAt: resolveField(m, "createdAt") ?? resolveField(m, "created_at"),
+    createdAt: createdAtConfigured ? createdAtPath : (createdAtPath ?? resolveField(m, "created_at")),
     filterable: config.filterable as never,
     sortable: config.sortable as readonly string[] | undefined,
     allowedColumns: config.allowedColumns as readonly string[] | undefined,
@@ -176,6 +186,7 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     m,
     diag,
     hasDeletedAt,
+    deletedAtPath,
     forUpdate,
     sortSpec,
     composeWhere,
