@@ -31,3 +31,24 @@ export class QueryKitError extends Error {
     this.info = info;
   }
 }
+
+/**
+ * A read ran past its time limit (`maxTimeMS` on MongoDB). Kept apart from
+ * {@link QueryKitError}: the request was valid, the database was slow — map it to
+ * 503 / 504, not 400.
+ */
+export class QueryKitTimeoutError extends Error {
+  /** Stable code for boundaries where `instanceof` does not work. */
+  readonly code = "QUERYKIT_TIMEOUT";
+
+  constructor(
+    /** Collection / model name. */
+    readonly source: string,
+    /** The limit that was hit, in milliseconds. */
+    readonly maxTimeMS: number,
+    options?: { cause?: unknown },
+  ) {
+    super(`querykit: a read on "${source}" ran past maxTimeMS (${maxTimeMS} ms).`, options);
+    this.name = "QueryKitTimeoutError";
+  }
+}

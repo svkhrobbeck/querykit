@@ -14,6 +14,7 @@ description: Use when code creates or reads querykit filters, sort, pagination p
 - DO make dropped conditions visible: a backend adapter skips an unknown key or an invalid value silently unless you pass `onSkippedCondition` (receives a `SkippedCondition`) or `strict: true` (throws `QueryKitError`).
 - DON'T treat `forbidden-key` / `forbidden-operator` / `limit-exceeded` as skippable: they mean the server policy refused the request, and adapters throw them even without `strict`.
 - DO wrap a driver-native filter object in `raw()` (from `@querykitjs/core`) when server code needs one; an unbranded object is refused as `forbidden-key`. DON'T build a `raw()` node from request data — the `filterable` policy does not look inside it.
+- DO map `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`, a read past `maxTimeMS`) to 503/504, not 400 — the request was valid.
 - DO map `QueryKitError` to HTTP 400; check `err instanceof QueryKitError`, or `err.code === "QUERYKIT_INVALID_CONDITION"` across RPC/worker boundaries. DON'T match on the message text.
 
 ## When to use
@@ -145,7 +146,7 @@ The same JSON shape travels from `@querykitjs/web` through a validator to a back
 
 Operators: comparison `=` `!=` `>` `>=` `<` `<=` (aliases `eq` `ne` `gt` `gte` `lt` `lte`); text `like` `ilike` `notLike` `contains` `startsWith` `endsWith` (tokens `%_%` = contains, `%_` = startsWith, `_%` = endsWith); sets `in` `notIn`; ranges `between` `notBetween` (value `[min, max]`); `isNull` `isNotNull` (no value).
 
-Request limits (`QueryLimits`, defaults in `DEFAULT_QUERY_LIMITS`): `maxDepth` `5` (root-to-leaf nodes; the root and the condition each count one level), `maxConditions` `30` (field conditions across all groups), `maxInItems` `200` (items in one array value), `maxStringLength` `256` (characters in one string value, also inside an array), `maxOffset` `10000` (`(page - 1) × perPage`, or infinite `offset`), `maxSortFields` `3`. A validator error names the limit and its value, e.g. `maxInItems (200)`.
+Request limits (`QueryLimits`, defaults in `DEFAULT_QUERY_LIMITS`): `maxDepth` `5` (root-to-leaf nodes; the root and the condition each count one level), `maxConditions` `30` (field conditions across all groups), `maxInItems` `200` (items in one array value), `maxStringLength` `256` (characters in one string value, also inside an array), `maxOffset` `10000` (`(page - 1) × perPage`, or infinite `offset`), `maxSortFields` `3`, `maxLikeWildcards` `2` (`%`/`_` in one `like`/`ilike`/`notLike` pattern; a run of `%%` counts once; checked by the adapters' policy). A validator error names the limit and its value, e.g. `maxInItems (200)`.
 
 Skip diagnostics: `SkippedCondition` = `{ source, site, key, operation?, reason }`, `site` one of `filter` `sort` `cursorKey` `aggregate` `page`, `reason` one of `unknown-key` `invalid-value` (dropped, or thrown under `strict`) and `forbidden-key` `forbidden-operator` `limit-exceeded` (server policy: always thrown as `QueryKitError`, never dropped). `Filterable` = field → allowed operators or `"*"`.
 

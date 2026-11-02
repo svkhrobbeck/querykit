@@ -1,6 +1,7 @@
 import type { Filter, FieldCondition, FilterNode } from "../types";
 import { coerceCondition, INVALID_VALUE, isDatePath, isTextOperator } from "./coerce";
-import { reportSkip, type Diagnostics } from "@querykitjs/core/internal";
+import { QueryKitError } from "@querykitjs/core";
+import { isRaw, reportSkip, type Diagnostics } from "@querykitjs/core/internal";
 import { operators } from "./operators";
 import { resolveField, type AnyModel } from "./fields";
 
@@ -92,8 +93,11 @@ function buildNode(model: AnyModel, node: FilterNode, diag?: Diagnostics): Query
       }
       return { $nor: [inner] };
     }
-    // Raw escape hatch — a plain Mongo filter object, used as-is.
-    return node as Query;
+    // Raw escape hatch — a Mongo filter object, used as-is only when server code
+    // branded it with core `raw()` (R19). A plain object can come from a JSON body
+    // (`{ $where: … }`), so it is refused whatever `strict` says — mutations included.
+    if (isRaw(node)) return node as Query;
+    throw new QueryKitError({ source: model.modelName, site: "filter", key: Object.keys(node as object)[0] ?? "", reason: "forbidden-key" });
   }
   return undefined;
 }

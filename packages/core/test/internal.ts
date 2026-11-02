@@ -16,6 +16,7 @@ import {
   formatLimit,
   infinitePage,
   isRaw,
+  likeWildcards,
   normalizeSort,
   offsetMeta,
   offsetOf,
@@ -231,6 +232,21 @@ check(
   "policy aggregate key",
   refusal(() => statusPolicy.checkAggregateKey("secret")) === "forbidden-key/aggregate/secret" &&
     refusal(() => statusPolicy.checkAggregateKey("status")) === "ok",
+);
+
+/* LIKE wildcard limit (task 011) */
+check(
+  "likeWildcards: %% counts once, escapes skipped",
+  likeWildcards("%%a%") === 2 && likeWildcards("%a%a%b") === 3 && likeWildcards("a\\%b_") === 1 && likeWildcards("abc") === 0,
+);
+check(
+  "policy: like past maxLikeWildcards → limit-exceeded",
+  refusal(() => policyOf({ filterable: { status: "*" } }).checkFilter([{ key: "status", operation: "like", value: "%a%a%b" }])) ===
+    "limit-exceeded/filter/maxLikeWildcards",
+);
+check(
+  "policy: contains is not a LIKE pattern (no wildcard count)",
+  refusal(() => policyOf({ filterable: { status: "*" } }).checkFilter([{ key: "status", operation: "contains", value: "%a%a%b" }])) === "ok",
 );
 
 console.log(`\ncore/internal: ${passed} passed, ${failed} failed`);

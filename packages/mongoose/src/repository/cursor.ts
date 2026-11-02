@@ -8,12 +8,15 @@ import type { AnyQuery, RepoContext } from "./context";
 
 /** `findCursor` — keyset pagination on one field. */
 export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
-  const { runtime, m, diag, guarded, permits, projection, composeWhere, applyPopulate, attachSession } = ctx;
+  const { runtime, m, diag, guarded, permits, projection, policy, composeWhere, applyPopulate, attachSession } = ctx;
 
   return {
     async findCursor(params: CursorParams<TDoc> = {}) {
       const limit = clampPageSize(params.limit, runtime.defaultLimit, runtime.maxLimit);
       const cursorKey = (params.cursorKey ?? "id") as string;
+      policy.checkFilter(params.filter);
+      // The default `id` is the server's choice; a client-sent key must be sortable.
+      if (params.cursorKey !== undefined) policy.checkCursorKey(cursorKey);
       const order: SortDirection = params.order ?? "asc";
       const direction = params.direction ?? "forward";
 

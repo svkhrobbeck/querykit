@@ -3,13 +3,9 @@
  * `limits` on the repository. A case without `options.policy` runs under the
  * open 3.x policy (every field, every operator, every sort field); these set it.
  *
- * drizzle-pg (009) and prisma-pg (010) have the policy; mongoose carries a
- * `knownDifference` until task 011 lands.
+ * drizzle-pg (009), prisma-pg (010) and mongoose (011) all apply the policy.
  */
 import type { ConformanceCase } from "./case-types";
-
-const MONGOOSE = "request policy arrives in task 011";
-const pending = { mongoose: MONGOOSE } as const;
 
 const nameOnly = { filterable: { name: ["="] as const } };
 
@@ -20,7 +16,6 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "email", operation: "startsWith", value: "a" }] } },
     options: { policy: nameOnly },
     expect: { error: { site: "filter", key: "email", reason: "forbidden-key" } },
-    knownDifference: pending,
   },
   {
     name: "an operator outside the field's list is refused (name like)",
@@ -28,7 +23,6 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "name", operation: "like", value: "A%" }] } },
     options: { policy: nameOnly },
     expect: { error: { site: "filter", key: "name", reason: "forbidden-operator" } },
-    knownDifference: pending,
   },
   {
     name: "an allowed field and operator pass (name = Alice)",
@@ -43,7 +37,6 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { sort: [{ key: "email", direction: "asc" }] } },
     options: { policy: { filterable: { name: "*" }, sortable: ["id", "createdAt"] } },
     expect: { error: { site: "sort", key: "email", reason: "forbidden-key" } },
-    knownDifference: pending,
   },
   {
     name: "Y4: an offset past maxOffset is refused (limits.maxOffset 40, page 4 × 20)",
@@ -51,7 +44,6 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findList", params: { page: 4, perPage: 20 } },
     options: { policy: { filterable: { name: "*" }, limits: { maxOffset: 40 } } },
     expect: { error: { site: "page", key: "maxOffset", reason: "limit-exceeded" } },
-    knownDifference: pending,
   },
   {
     name: "safe default: no filterable, no column options — a non-key field is refused",
@@ -59,7 +51,6 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "name", operation: "=", value: "Alice" }] } },
     options: { policy: "default" },
     expect: { error: { site: "filter", key: "name", reason: "forbidden-key" } },
-    knownDifference: pending,
   },
   {
     name: "safe default: the primary key with = passes",
@@ -67,7 +58,7 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ key: "id", operation: "=", value: 2 }] } },
     options: { policy: "default" },
     expect: { names: ["Bob"] },
-    knownDifference: { mongoose: "the fixture id maps to `_id` (an ObjectId), so `id = 2` fails to cast; the policy and its primary key arrive in task 011" },
+    knownDifference: { mongoose: "the fixture id maps to `_id` (an ObjectId), so the numeric `id = 2` fails to cast — a fixture difference, not a policy one" },
   },
   {
     name: "R19: a JSON-shaped driver object is refused (no raw() brand)",
@@ -75,7 +66,20 @@ export const POLICY_CASES: readonly ConformanceCase[] = [
     call: { method: "findAll", params: { filter: [{ name: { startsWith: "A" } }] as never } },
     options: { policy: { filterable: { name: "*" } } },
     expect: { error: { site: "filter", key: "name", reason: "forbidden-key" } },
-    knownDifference: pending,
     notBuiltByWeb: "the web builders drop a node without a key, so this payload only reaches a repository directly",
+  },
+  {
+    name: "Y2: a LIKE pattern past maxLikeWildcards is refused (3 wildcards)",
+    group: "policy",
+    call: { method: "findAll", params: { filter: [{ key: "name", operation: "like", value: "%a%l%e" }] } },
+    options: { policy: { filterable: { name: "*" } } },
+    expect: { error: { site: "filter", key: "maxLikeWildcards", reason: "limit-exceeded" } },
+  },
+  {
+    name: 'Y2: a run of % counts once ("%%li%" is 2 wildcards)',
+    group: "policy",
+    call: { method: "findAll", params: { filter: [{ key: "name", operation: "like", value: "%%li%" }] } },
+    options: { policy: { filterable: { name: "*" } } },
+    expect: { names: ["Alice", "Alina"] },
   },
 ];

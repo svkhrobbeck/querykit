@@ -208,6 +208,41 @@ try {
 - **Cursor** default `_id` bo'yicha (`cursorKey` bilan o'zgartiring) — insert'larда barqaror.
 - **Tranzaksiya replica set talab qiladi** — lokal dev uchun bir-nodали yetarli (`mongod --replSet rs0` so'ng `rs.initiate()`, yoki testда [`mongodb-memory-server`](https://github.com/typegoose/mongodb-memory-server)).
 
+- **Indekslar va operatorlar.** `startsWith` — `^` bilan bog'langan, lekin registrga sezgirsiz (`i`) regex: MongoDB uni indeks bilan yomon ishlatadi. Katta kolleksiyada kichik harfli soya maydon (`nameLower`) saqlang va unga `=` / `startsWith` bering. `contains`, `endsWith`, `!=`, `notIn` indeksdan foydalana olmaydi (COLLSCAN) — default `filterable`da yopiq, faqat kichik kolleksiyalar uchun oching. Enum maydonlarida `in` ishlating.
+
+## Safe by default — `filterable`, `sortable`, `limits`
+
+Mijoz faqat server ruxsat bergan path bo'yicha, faqat ruxsat bergan operator bilan filtrlaydi va saralaydi. Ruxsatsiz so'rov MongoDB'ga yetmasdan `QueryKitError` bilan to'xtaydi — `strict` va `onSkippedCondition`dan qat'i nazar. Opsiya nomlari, default'lar, `reason`/`site` — drizzle-pg va prisma-pg bilan bir xil (`id` ≡ `_id`).
+
+```ts
+const usersRepository = registry.repository(User, {
+  forcedColumns: { _id: true, name: true, status: true, createdAt: true },
+  filterable: {
+    status: ["=", "in"],
+    createdAt: ["between", ">=", "<="],
+    name: ["startsWith"], // faqat shu yerda ochilgan
+  },
+  sortable: ["_id", "createdAt", "name"],
+  limits: { maxInItems: 500 },
+  maxTimeMS: 1000,
+});
+```
+
+| Opsiya       | Berilmasa (default)                                                                                                  | Rad etilsa                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `filterable` | `allowedColumns` (yo'q bo'lsa `forcedColumns` kalitlari, u ham yo'q bo'lsa faqat primary key), faqat `"="` va `"in"` | `reason: "forbidden-key"` / `"forbidden-operator"`, `site: "filter"` |
+| `sortable`   | primary key va `createdAt` (jadvalda bo'lsa); mijoz yuborgan `cursorKey` ham shu ro'yxatdan                          | `reason: "forbidden-key"`, `site: "sort"` / `"cursorKey"`            |
+| `limits`     | core `DEFAULT_QUERY_LIMITS` (chuqurlik 5, shartlar 30, massiv 200, satr 256, offset 10 000, sort 3)                  | `reason: "limit-exceeded"`, `site: "filter"` / `"sort"` / `"page"`   |
+
+- `aggregate`: `filter` va har `groupBy`/`sum`/`avg`/`min`/`max` ustuni `filterable` ichida bo'lishi shart (`site: "aggregate"`).
+- `findById`: faqat mijoz `filter`i tekshiriladi; `idKey` — server tanlovi.
+- Jadvalda **yo'q** kalit (`nope`) avvalgidek `unknown-key` — skip yoki `strict`da xato.
+- Mutatsiya metodlari (`updateMany`, `deleteMany`, …) filtri server kodi deb hisoblanadi va tekshirilmaydi.
+- Operator aliaslari bitta: `["="]` `eq`ni ham, `["contains"]` `%_%`ni ham ochadi. `"*"` — barcha operatorlar.
+- Brendsiz xom Mongo filtri (`{ $where: … }`, `{ secret: { $regex: … } }`, `{ $expr: … }`) JSON'dan kelishi mumkin — `forbidden-key`, so'rov yuborilmaydi (R19). Server kodi `raw({...})` bilan belgilaydi; ⚠️ `raw()` `filterable` bilan tekshirilmaydi.
+- LIKE naqshi: `maxLikeWildcards` (2) dan ko'p `%`/`_` → `limit-exceeded`; ketma-ket `%%` bitta hisoblanadi.
+- Har o'qish (`find`, `findOne`, `countDocuments`, `aggregate`) `maxTimeMS` (default 2 000) bilan; oshsa `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`) — uni 503/504 qiling, 400 emas.
+
 ## Ilg'or filterlar
 
 Filter — maydon shartlari va mantiqiy guruhlar (`and`/`or`/`not`) daraxti. Yassi massiv = implicit `AND`. `id` — `_id`ga o'giriladi.
@@ -288,6 +323,34 @@ await mine.create({ ... });        // supervisorId majburan user.id
 Scope'ni `registry.repository(Model, { scope })` bilan ham berish mumkin.
 Noma'lum scope kaliti — repository yaratilishida **xato** (jimgina tashlansa
 RBAC filtri yo'qolib ketardi).
+
+## Migrating to 3.0
+
+3.0 da siyosatsiz repository **tor**: faqat `allowedColumns` / `forcedColumns` / `_id` bo'yicha `=` va `in`, sort — `_id` va `createdAt`. 2.x xulqini bitta repository uchun ataylab qaytarish:
+
+```ts
+const open = registry.repository(User, {
+  filterable: { _id: "*", name: "*", email: "*", status: "*", createdAt: "*" },
+  sortable: ["_id", "name", "email", "status", "createdAt"],
+});
+```
+
+Xom Mongo filtri endi `raw()` bilan (R19):
+
+```ts
+import { raw } from "@querykitjs/core";
+
+// 2.x — 3.0 da forbidden-key:
+// await usersRepository.findAll({ filter: { age: { $gt: 18 } } });
+
+// 3.0:
+await usersRepository.findAll({ filter: raw({ age: { $gt: 18 } }) });
+```
+
+- Yangi `reason`lar: `forbidden-key`, `forbidden-operator`, `limit-exceeded`; yangi `site`: `page` — 400 qiling.
+- Offset 10 000 dan chuqur sahifalar rad etiladi — `findCursor` ishlating yoki `limits: { maxOffset }` bilan oshiring.
+- Har o'qish `maxTimeMS: 2000` bilan; uzoqroq hisobot so'rovlari uchun repository'da `maxTimeMS`ni oshiring. Vaqt tugasa `QueryKitTimeoutError`.
+- LIKE naqshida 2 tadan ko'p wildcard rad etiladi (`maxLikeWildcards`).
 
 ## Wire (JSON) qiymatlari va DbService'dan migratsiya
 

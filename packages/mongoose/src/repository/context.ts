@@ -1,6 +1,6 @@
 import type { ClientSession, Model } from "mongoose";
-import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
-import type { Diagnostics } from "@querykitjs/core/internal";
+import { QueryKitError, QueryKitTimeoutError, type QueryLimits, type SkippedCondition } from "@querykitjs/core";
+import { resolvePolicy, type Diagnostics, type Policy } from "@querykitjs/core/internal";
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
 import { hasPath, resolveField, type AnyModel } from "../internal/fields";
@@ -22,6 +22,10 @@ export interface RepoRuntime {
   strict: boolean;
   /** Called for every dropped condition (also when `strict` is off). */
   onSkippedCondition?: (info: SkippedCondition) => void;
+  /** Registry-level request limits; a repository's own `limits` win. */
+  limits?: Partial<QueryLimits>;
+  /** Read time limit in ms; a repository's own `maxTimeMS` wins. */
+  maxTimeMS: number;
 }
 
 // Mongoose's Query generics are extremely deep; we drive queries untyped
@@ -52,6 +56,10 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
   /** User filter + scope + soft-delete guard as one Mongo query. */
+  /** `filterable` / `sortable` / `limits` — every client-facing read checks through it. */
+  policy: Policy;
+  /** This repository's read time limit, in ms. */
+  maxTimeMS: number;
   composeWhere: (userFilter?: Filter<TDoc>, withDeleted?: boolean) => Query;
   /** `filter AND idKey = id`. */
   withId: (filter: Filter<TDoc> | undefined, idKey: string, id: Id) => Filter<TDoc>;
@@ -104,9 +112,11 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
 
   const guards = buildProjection(m, config);
 
+  const maxTimeMS = config.maxTimeMS ?? runtime.maxTimeMS;
   const attachSession = (q: AnyQuery): AnyQuery => {
     const s = runtime.getSession();
     if (s) q.session(s);
+    if (READ_OPS.has((q as unknown as { op?: string }).op ?? "")) timeLimit(q, m.modelName, maxTimeMS);
     return q;
   };
 
@@ -121,8 +131,23 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
 
   const countWhere = (where: Query): Promise<number> => attachSession(m.countDocuments(where)).exec() as Promise<number>;
 
+  const policy = resolvePolicy({
+    source: m.modelName,
+    // `id` is `_id` on the wire, like everywhere else in this adapter.
+    fieldOf: key => resolveField(m, key),
+    primaryKey: "_id",
+    createdAt: resolveField(m, "createdAt") ?? resolveField(m, "created_at"),
+    filterable: config.filterable as never,
+    sortable: config.sortable as readonly string[] | undefined,
+    allowedColumns: config.allowedColumns as readonly string[] | undefined,
+    forcedColumns: config.forcedColumns as Record<string, unknown> | undefined,
+    limits: { ...runtime.limits, ...config.limits },
+  });
+
   return {
     ...guards,
+    policy,
+    maxTimeMS,
     runtime,
     m,
     diag,
@@ -170,4 +195,26 @@ function buildScopeWhere<TDoc>(m: AnyModel, config: RepositoryOptions<TDoc>): Qu
     }
   }
   return scopeConditions.length ? buildWhere(m, scopeConditions) : undefined;
+}
+
+/** Reads that get a time limit; writes are never cut off half-way. */
+const READ_OPS: ReadonlySet<string> = new Set(["find", "findOne", "countDocuments", "distinct"]);
+
+/** MongoDB's error for a read past `maxTimeMS` (code 50). */
+export const isTimeLimitError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  ((error as { codeName?: unknown }).codeName === "MaxTimeMSExpired" || (error as { code?: unknown }).code === 50);
+
+/** Set `maxTimeMS` on a read and turn a time-limit failure into `QueryKitTimeoutError`. */
+function timeLimit(q: AnyQuery, source: string, maxTimeMS: number): void {
+  q.maxTimeMS(maxTimeMS);
+  const exec = q.exec.bind(q);
+  q.exec = (async (...args: unknown[]) => {
+    try {
+      return await (exec as (...a: unknown[]) => Promise<unknown>)(...args);
+    } catch (error) {
+      throw isTimeLimitError(error) ? new QueryKitTimeoutError(source, maxTimeMS, { cause: error }) : error;
+    }
+  }) as typeof q.exec;
 }

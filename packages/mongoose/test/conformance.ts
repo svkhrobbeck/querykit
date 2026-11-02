@@ -61,11 +61,17 @@ const normalize = (row: Record<string, unknown>) => {
   return { id: _id, ...rest };
 };
 
+/** The 2.x behaviour for the cases that predate the policy: every fixture path, every operator, every sort path. */
+const PATHS = ["_id", "name", "email", "age", "createdAt"];
+const OPEN_POLICY = { filterable: Object.fromEntries(PATHS.map(key => [key, "*"])), sortable: PATHS };
+const policyOptions = (policy: CaseOptions["policy"]) => (policy === undefined ? OPEN_POLICY : policy === "default" ? {} : policy);
+
 export const mongooseHarness: Harness = {
   name: "mongoose",
   async run(call: Call, options: CaseOptions, onSkipped) {
     const registry = createRegistry(mongoose.connection, { strict: options.strict, onSkippedCondition: onSkipped });
     const repository = registry.repository(ConformanceUser, {
+      ...policyOptions(options.policy),
       forcedColumns: options.forcedColumns,
       allowedColumns: options.allowedColumns,
     } as never) as unknown as Record<string, (params: unknown) => Promise<unknown>>;
@@ -83,6 +89,7 @@ export function assertNoConnection(): boolean {
 }
 
 if ((import.meta as { main?: boolean }).main) {
+  await import("./policy"); // task 011 attack tests — only when this file is the entry point, not when web/conformance imports it
   const summary = await runConformance(mongooseHarness);
   const offline = assertNoConnection();
   if (summary.failed > 0 || !offline) process.exitCode = 1;

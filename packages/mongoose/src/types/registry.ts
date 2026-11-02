@@ -32,6 +32,18 @@ export interface RegistryOptions {
    * path: watch with the hook first, flip `strict: true` once the log is clean.
    */
   onSkippedCondition?: (info: Core.SkippedCondition) => void;
+  /**
+   * Server-side request limits (core `DEFAULT_QUERY_LIMITS`) — enforced even when
+   * validation was bypassed. Past one ⇒ `QueryKitError` (`reason: "limit-exceeded"`).
+   * A repository's own `limits` win.
+   */
+  limits?: Partial<Core.QueryLimits>;
+  /**
+   * Time limit for every read (`find`, `findOne`, `countDocuments`, `aggregate`), in ms.
+   * Default `2000`. Past it MongoDB aborts the read and the repository throws
+   * `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`). A repository's own `maxTimeMS` wins.
+   */
+  maxTimeMS?: number;
 }
 
 /** Extends a base repository with custom, model-specific methods (drizzle-pg style). */

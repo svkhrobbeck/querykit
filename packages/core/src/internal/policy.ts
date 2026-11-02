@@ -16,7 +16,7 @@ import { resolveLimits, type QueryLimits } from "../defaults";
 import { QueryKitError } from "../errors";
 import type { Filterable, SkipReason, SkipSite } from "../types";
 import { isRaw } from "../raw";
-import { findFilterLimitViolation, offsetOf } from "./limits";
+import { findFilterLimitViolation, isLikeOperator, likeWildcards, offsetOf } from "./limits";
 
 export interface PolicyOptions {
   /** Table / model name for the error. */
@@ -107,6 +107,9 @@ export function resolvePolicy(options: PolicyOptions): Policy {
     const rule = rules.get(field);
     if (!rule) refuse("filter", key, "forbidden-key", operation);
     if (rule !== "*" && !rule!.has(tokenOf(operation))) refuse("filter", key, "forbidden-operator", operation);
+    if (isLikeOperator(operation) && typeof node.value === "string" && likeWildcards(node.value) > limits.maxLikeWildcards) {
+      refuse("filter", "maxLikeWildcards", "limit-exceeded", operation);
+    }
   };
 
   const checkSortKey = (site: SkipSite, key: string): void => {

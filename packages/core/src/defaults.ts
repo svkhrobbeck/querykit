@@ -44,6 +44,13 @@ export const DEFAULT_MAX_OFFSET = 10_000;
 /** Fields in one `sort` array. */
 export const DEFAULT_MAX_SORT_FIELDS = 3;
 
+/**
+ * Wildcards (`%`, `_`) in one `like` / `ilike` / `notLike` pattern, after a run
+ * of `%` counts as one. Each extra wildcard multiplies the matcher's backtracking
+ * (`%a%a%a…%b`), on MongoDB's regex engine and on Postgres alike.
+ */
+export const DEFAULT_MAX_LIKE_WILDCARDS = 2;
+
 /** The six request limits, by the option name every package uses. */
 export interface QueryLimits {
   maxDepth: number;
@@ -52,6 +59,7 @@ export interface QueryLimits {
   maxStringLength: number;
   maxOffset: number;
   maxSortFields: number;
+  maxLikeWildcards: number;
 }
 
 /** The core defaults as one object. */
@@ -62,6 +70,7 @@ export const DEFAULT_QUERY_LIMITS: Readonly<QueryLimits> = Object.freeze({
   maxStringLength: DEFAULT_MAX_STRING_LENGTH,
   maxOffset: DEFAULT_MAX_OFFSET,
   maxSortFields: DEFAULT_MAX_SORT_FIELDS,
+  maxLikeWildcards: DEFAULT_MAX_LIKE_WILDCARDS,
 });
 
 /**

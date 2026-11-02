@@ -7,12 +7,13 @@ type Builder = (value: FilterValue | undefined) => Fragment;
 /** Escape a literal string for use inside a regex (contains/startsWith/endsWith). */
 const esc = (s: unknown): string => String(s ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Translate a SQL LIKE pattern (`%` → any, `_` → one char) to an anchored regex. */
+/** Translate a SQL LIKE pattern (`%` → any, `_` → one char) to an anchored regex. A run of `%` is one `.*`. */
 const sqlLikeToRegex = (pattern: unknown): string => {
   let out = "";
   for (const ch of String(pattern ?? "")) {
-    if (ch === "%") out += ".*";
-    else if (ch === "_") out += ".";
+    if (ch === "%") {
+      if (!out.endsWith(".*")) out += ".*";
+    } else if (ch === "_") out += ".";
     else out += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   return `^${out}$`;
