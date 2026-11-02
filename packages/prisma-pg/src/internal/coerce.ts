@@ -34,6 +34,8 @@ export const isTextOperator = (operator: FilterOperator): boolean => TEXT_OPERAT
  * have performed, and a value that genuinely cannot be represented is dropped
  * and reported instead of crashing the request.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function castForField(meta: ModelMeta, field: string, value: unknown): unknown | typeof INVALID_VALUE {
   if (value === null || value === undefined) return value;
   const type = fieldMeta(meta, field)?.type;
@@ -70,6 +72,10 @@ export function castForField(meta: ModelMeta, field: string, value: unknown): un
     if (value === "false" || value === "0" || value === 0) return false;
     return INVALID_VALUE;
   }
+
+  // Task 021 B8: a `@db.Uuid` field (known from the runtime model or the `fields`
+  // override) takes only a uuid — Postgres would answer 22P02 / Prisma P2023.
+  if (meta.fields.get(field)?.nativeType === "Uuid") return typeof value === "string" && UUID.test(value) ? value : INVALID_VALUE;
 
   // Task 021 B8: an enum value outside the enum can never match — invalid-value.
   const enumValues = meta.fields.get(field)?.enumValues;

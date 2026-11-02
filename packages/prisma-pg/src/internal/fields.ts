@@ -27,6 +27,8 @@ export interface FieldMeta {
   dbName?: string;
   /** `false` for an optional (nullable) field — Prisma accepts `nulls` in `orderBy` only there (task 021 B11). */
   isRequired?: boolean;
+  /** The database type (`"Uuid"` for `@db.Uuid`) — from the runtime model when it has one, or the `fields` override (task 021 B8). */
+  nativeType?: string;
   /** An enum field's values (from the runtime data model), for the task 021 B8 cast. */
   enumValues?: readonly string[];
 }
@@ -87,6 +89,7 @@ interface RuntimeField {
   isList?: unknown;
   dbName?: unknown;
   isRequired?: unknown;
+  nativeType?: unknown;
 }
 
 const KINDS = new Set(["scalar", "enum", "object", "unsupported"]);
@@ -130,6 +133,7 @@ function fromRuntimeDataModel(
       ...(typeof field.dbName === "string" && field.dbName ? { dbName: field.dbName } : {}),
       ...enumValuesOf(rdm?.enums, field),
       ...(typeof field.isRequired === "boolean" ? { isRequired: field.isRequired } : {}),
+      ...nativeTypeOf(field.nativeType),
     });
   }
   return fields.length ? { name: modelName, fields, primaryKey: models[modelName]?.primaryKey ?? null } : undefined;
@@ -299,4 +303,10 @@ function mergeFields(discovered: readonly FieldMeta[], override: readonly FieldO
     if (!known.has(entry.name)) merged.push({ type: "", kind: "scalar", isId: false, isUpdatedAt: false, isList: false, ...entry });
   }
   return merged;
+}
+
+/** `{ nativeType }` from the runtime model's `nativeType` (`"Uuid"` or `["Uuid", []]`), else nothing. */
+function nativeTypeOf(nativeType: unknown): { nativeType?: string } {
+  const name = Array.isArray(nativeType) ? nativeType[0] : nativeType;
+  return typeof name === "string" && name ? { nativeType: name } : {};
 }

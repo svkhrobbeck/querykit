@@ -419,6 +419,7 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 Bu farqlar `test/contract.ts` bilan qadalgan — uchala adapter bir xil payloaddan bir xil natija berishi shu yerda tekshiriladi.
 
 - **`like` / `ilike` da `_`.** Prisma'da bitta belgili wildcard yo'q: qochirilmagan `_` → `invalid-value` (strict'da xato). Literal `_` uchun `\\_` yozing.
+- **uuid maydonlari.** Runtime model `@db.Uuid` ni bermasa, noto'g'ri uuid Postgres'ga yetadi (22P02 / P2023) — maydonni e'lon qiling: `fields: [{ name: "ref", nativeType: "Uuid" }]`, shunda `invalid-value`.
 - **NULL tartibi Prisma 7 da.** Prisma 7 runtime modeli maydon ixtiyoriymi-yo'qligini bermaydi; `nulls` faqat ma'lum bo'lsa qo'yiladi. Ixtiyoriy maydonni e'lon qiling: `registry.repository(prisma.user, { fields: [{ name: "age", isRequired: false }] })` — aks holda o'sha maydonda PostgreSQL tartibi.
 
 ## API ma'lumotnoma

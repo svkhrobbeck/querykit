@@ -419,6 +419,7 @@ await usersRepository.findAll({ filter: raw({ posts: { some: { published: true }
 These are pinned by `test/contract.ts`, which asserts all three adapters agree on the same payload.
 
 - **`_` in `like` / `ilike`.** Prisma has no one-character wildcard: an unescaped `_` is `invalid-value` (an error under strict). Write `\\_` for a literal underscore.
+- **uuid fields.** When the runtime model does not expose `@db.Uuid`, a malformed uuid reaches Postgres (22P02 / P2023) unless the field is declared: `fields: [{ name: "ref", nativeType: "Uuid" }]` — then it is `invalid-value`.
 - **NULL order on Prisma 7.** Prisma 7's runtime model does not say whether a field is optional; `nulls` is emitted only when that is known. Declare it: `registry.repository(prisma.user, { fields: [{ name: "age", isRequired: false }] })` — otherwise that field keeps PostgreSQL's order.
 
 ## API reference

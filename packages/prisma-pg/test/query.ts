@@ -507,6 +507,14 @@ console.log("\n=== 6. value coercion ===");
     coerceCondition(castMeta, "role", "=", "OWNER") === INVALID_VALUE && coerceCondition(castMeta, "role", "=", "ADMIN") === "ADMIN",
   );
   check("Int: 'abc' is invalid-value", coerceCondition(userMeta, "age", "=", "abc") === INVALID_VALUE);
+  // Task 021 B8: a @db.Uuid field is cast when its native type is known — the runtime model or the fields override.
+  const uuidMeta = readModelMeta(prisma as never, "user", [{ name: "email", nativeType: "Uuid" }]);
+  check(
+    "declared Uuid: a malformed uuid is invalid-value, a uuid passes",
+    coerceCondition(uuidMeta, "email", "=", "not-a-uuid") === INVALID_VALUE &&
+      coerceCondition(uuidMeta, "email", "=", "0f8fad5b-d9cb-469f-a165-70867728950e") === "0f8fad5b-d9cb-469f-a165-70867728950e",
+  );
+  check("undeclared String field: not uuid-checked (README Limitations)", coerceCondition(userMeta, "email", "=", "not-a-uuid") === "not-a-uuid");
   check("castValue leaves unparseable values alone", castValue(userMeta, "createdAt", "nope") === "nope");
 
   // Prisma type-checks arguments client-side, so a wire string on an Int field
