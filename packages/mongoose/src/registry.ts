@@ -5,6 +5,9 @@ import { createContextStore } from "@querykitjs/core/internal";
 import type { RelationDocs, RelationMap, Registry, RegistryOptions, Repository, RepositoryExtender, RepositoryOptions } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
 
+/** Default read time limit (task 011): long enough for an indexed page, short enough to stop a COLLSCAN. */
+const DEFAULT_MAX_TIME_MS = 2000;
+
 /**
  * Create the DB **registry** once. It holds the Mongoose connection (for
  * transactions) and yields a {@link Repository} per model. Transactions flow
@@ -31,6 +34,7 @@ export function createRegistry(connection: Connection, options: RegistryOptions 
     strict: options.strict ?? false,
     onSkippedCondition: options.onSkippedCondition,
     limits: options.limits,
+    maxTimeMS: options.maxTimeMS ?? DEFAULT_MAX_TIME_MS,
   };
 
   function repository<TDoc>(model: Model<TDoc>): Repository<TDoc>;

@@ -1,12 +1,13 @@
+import { QueryKitTimeoutError } from "@querykitjs/core";
 import { reportSkip } from "@querykitjs/core/internal";
 
 import type { AggregateRow, AggregateSpec } from "../types";
 import { resolveField } from "../internal/fields";
-import { toArr, type RepoContext } from "./context";
+import { toArr, type RepoContext, isTimeLimitError } from "./context";
 
 /** `aggregate` — `$match` + `$group` with `count`/`$sum`/`$avg`/`$min`/`$max`. */
 export function aggregateMethods<TDoc>(ctx: RepoContext<TDoc>) {
-  const { runtime, m, diag, permits, policy, composeWhere } = ctx;
+  const { runtime, m, diag, permits, policy, maxTimeMS, composeWhere } = ctx;
 
   // An aggregate spec can also come from a request, and `min(password)` or a
   // `groupBy` on a hidden field leaks just as much as a projection — so the
@@ -59,7 +60,13 @@ export function aggregateMethods<TDoc>(ctx: RepoContext<TDoc>) {
       let agg = m.aggregate([{ $match: match }, { $group: group }] as never);
       const session = runtime.getSession();
       if (session) agg = agg.session(session);
-      const rows = (await agg.exec()) as Record<string, unknown>[];
+      agg = agg.option({ maxTimeMS });
+      let rows: Record<string, unknown>[];
+      try {
+        rows = (await agg.exec()) as Record<string, unknown>[];
+      } catch (error) {
+        throw isTimeLimitError(error) ? new QueryKitTimeoutError(m.modelName, maxTimeMS, { cause: error }) : error;
+      }
       // Flatten the group `_id` fields back into each row (matches drizzle's shape).
       return rows.map(({ _id, ...rest }) => ({ ...(typeof _id === "object" && _id ? _id : {}), ...rest })) as AggregateRow[];
     },

@@ -38,6 +38,12 @@ export interface RegistryOptions {
    * A repository's own `limits` win.
    */
   limits?: Partial<Core.QueryLimits>;
+  /**
+   * Time limit for every read (`find`, `findOne`, `countDocuments`, `aggregate`), in ms.
+   * Default `2000`. Past it MongoDB aborts the read and the repository throws
+   * `QueryKitTimeoutError` (`code: "QUERYKIT_TIMEOUT"`). A repository's own `maxTimeMS` wins.
+   */
+  maxTimeMS?: number;
 }
 
 /** Extends a base repository with custom, model-specific methods (drizzle-pg style). */

@@ -10,8 +10,8 @@ import { QueryKitError, raw, type SkippedCondition } from "@querykitjs/core";
 
 import { createRegistry } from "../src/index";
 
-/** Nothing of 011 is built yet (phase 01): every mismatch is a todo, not a failure. */
-const PENDING = true;
+/** 011 is built: a mismatch fails. */
+const PENDING = false;
 
 const accountSchema = new Schema({
   status: { type: String, required: true },

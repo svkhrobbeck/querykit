@@ -74,6 +74,8 @@ export interface RepositoryOptions<TDoc = any, TRel extends RelationMap = Relati
   sortable?: readonly (FieldKey<TDoc> | "_id")[];
   /** Request limits for this repository — over the registry's `limits`. */
   limits?: Partial<Core.QueryLimits>;
+  /** Read time limit for this repository, in ms — over the registry's `maxTimeMS`. */
+  maxTimeMS?: number;
 }
 
 /* --------------------------- result-type inference ------------------------ */
