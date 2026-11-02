@@ -35,6 +35,7 @@
   },
   "files": [
     "dist",
+    "skills/querykit-zod",
     "README.md",
     "README.en.md",
     "LICENSE"

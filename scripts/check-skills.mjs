@@ -5,11 +5,12 @@
  *
  * 1. Shape: frontmatter with only `name` (= folder name) and `description` (1–600 chars);
  *    the first `##` heading is `## Safety rules`; `packages/<pkg>/skills/` holds only `querykit-<pkg>`.
- * 2. Examples: every ```ts / ```tsx block is written to `.cache/skill-examples/` and the whole set is
- *    typechecked by one `tsc --noEmit` against the package sources (`paths` → `packages/<pkg>/src`),
- *    so an example cannot drift from the version it ships with. A block may import fixture types from
+ * 2. Examples: every ```ts / ```tsx block is written to `.cache/skill-examples/` and typechecked by
+ *    `tsc --noEmit` against the package sources (`paths` → `packages/<pkg>/src`), so an example cannot
+ *    drift from the version it ships with. A block may import fixture types from
  *    `@querykitjs/<pkg>/skill-prelude` when `packages/<pkg>/test/skill-prelude.ts` exists (never published).
- *    Other fences (`bash`, `json`, `text`) are not checked.
+ *    `packages/<pkg>/skills/tsconfig.skill.json` adds that package's `compilerOptions` (decorators, DOM,
+ *    JSX) in a program of its own; all other packages share one program. Other fences are not checked.
  *
  * Errors name the SKILL.md file and line; any error ⇒ exit code 1.
  */
@@ -28,6 +29,8 @@ const FRONTMATTER_KEYS = ["name", "description"];
 const MAX_DESCRIPTION = 600;
 const FIRST_SECTION = "## Safety rules";
 const CHECKED_FENCES = new Set(["ts", "tsx"]);
+/** Optional per-package compilerOptions for the examples (decorators, DOM, JSX); never published. */
+const SKILL_TSCONFIG = "tsconfig.skill.json";
 /** Sub-path entry points published next to a package's main entry. */
 const EXTRA_ENTRIES = { "@querykitjs/web/react": "packages/web/src/react/index.ts" };
 
@@ -164,23 +167,43 @@ function buildPaths() {
   return paths;
 }
 
-/** Writes the blocks and a tsconfig; returns a map from generated file name to its block. */
-function writeExamples(blocks) {
-  rmSync(OUT_DIR, { recursive: true, force: true });
-  mkdirSync(OUT_DIR, { recursive: true });
-  const byFile = new Map();
+/** A package's own compilerOptions for its examples (`skills/tsconfig.skill.json`), or `undefined`. */
+function skillCompilerOptions(pkg) {
+  const file = join(PACKAGES_DIR, pkg, "skills", SKILL_TSCONFIG);
+  return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")).compilerOptions ?? {}) : undefined;
+}
+
+/**
+ * One tsc program per option set, so options never leak between packages: every package
+ * without a `tsconfig.skill.json` shares one program; each package with one gets its own.
+ */
+function groupPrograms(blocks) {
+  const programs = new Map();
   for (const block of blocks) {
+    const options = skillCompilerOptions(block.pkg);
+    const name = options ? block.pkg : "shared";
+    if (!programs.has(name)) programs.set(name, { name, options: options ?? {}, blocks: [] });
+    programs.get(name).blocks.push(block);
+  }
+  return [...programs.values()];
+}
+
+/** Writes one program's blocks and its tsconfig; returns the tsconfig path and a map from file name to block. */
+function writeExamples(program, paths) {
+  const byFile = new Map();
+  for (const block of program.blocks) {
     const name = `${block.pkg}-block-${block.index}.${block.lang}`;
     writeFileSync(join(OUT_DIR, name), `${block.body.join("\n")}\n`);
     byFile.set(name, block);
   }
   const tsconfig = {
     extends: toPosix(relative(OUT_DIR, join(ROOT, "tsconfig.base.json"))),
-    compilerOptions: { noEmit: true, noUnusedLocals: false, paths: buildPaths() },
+    compilerOptions: { noEmit: true, noUnusedLocals: false, paths, ...program.options },
     files: [...byFile.keys()],
   };
-  writeFileSync(join(OUT_DIR, "tsconfig.json"), `${JSON.stringify(tsconfig, null, 2)}\n`);
-  return byFile;
+  const tsconfigPath = join(OUT_DIR, `tsconfig.${program.name}.json`);
+  writeFileSync(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
+  return { tsconfigPath, byFile };
 }
 
 /** Maps `file(line,col): error TS…` to the SKILL.md line it came from; other errors are kept verbatim. */
@@ -199,12 +222,17 @@ function reportTscOutput(output, byFile) {
 
 function typecheck(blocks) {
   if (blocks.length === 0) return;
-  const byFile = writeExamples(blocks);
+  rmSync(OUT_DIR, { recursive: true, force: true });
+  mkdirSync(OUT_DIR, { recursive: true });
+  const paths = buildPaths();
   try {
-    const result = spawnSync(process.execPath, [TSC, "--noEmit", "--pretty", "false", "-p", join(OUT_DIR, "tsconfig.json")], { encoding: "utf8" });
-    if (result.status === 0) return;
-    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-    if (reportTscOutput(output, byFile) === 0) errors.push(`tsc failed (exit ${result.status}): ${output.trim() || result.error?.message}`);
+    for (const program of groupPrograms(blocks)) {
+      const { tsconfigPath, byFile } = writeExamples(program, paths);
+      const result = spawnSync(process.execPath, [TSC, "--noEmit", "--pretty", "false", "-p", tsconfigPath], { encoding: "utf8" });
+      if (result.status === 0) continue;
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      if (reportTscOutput(output, byFile) === 0) errors.push(`tsc failed (exit ${result.status}): ${output.trim() || result.error?.message}`);
+    }
   } finally {
     // Generated files would otherwise be picked up by `eslint .`.
     rmSync(OUT_DIR, { recursive: true, force: true });
