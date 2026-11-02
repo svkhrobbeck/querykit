@@ -1,11 +1,12 @@
-import { and, asc, desc, gt, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt, or } from "drizzle-orm";
+import type { AnyPgColumn, AnyPgTable as PgTable } from "drizzle-orm/pg-core";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 import { QueryKitError } from "@querykitjs/core";
-import { clampPageSize, cursorPage, decodeCursor } from "@querykitjs/core/internal";
+import { clampPageSize, cursorPage, decodeCursorToken } from "@querykitjs/core/internal";
 
 import type { CursorParams, CursorResult, SortDirection } from "../types";
 import { castForColumn, INVALID_VALUE } from "../internal/coerce";
-import { resolveColumn } from "../internal/columns";
+import { resolveColumn, tableColumns } from "../internal/columns";
 import type { RepoContext } from "./context";
 
 /** `findCursor` — keyset pagination on one column. */
@@ -29,16 +30,27 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       // 400 the same way as any other bad condition (both adapters agree).
       if (!column) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
-      // A cursor token carries dates as ISO strings, so re-cast to the column's
-      // type — otherwise `gt(timestampColumn, "2026-…")` crashes in drizzle's
-      // driver mapping and page 2 of a date-keyed feed 500s. A token that does
-      // not fit the column is treated as "no cursor" (like an undecodable one).
-      const decoded = castForColumn(column, decodeCursor(params.cursor));
-      const cursorValue = decoded === INVALID_VALUE ? undefined : decoded;
+      // Task 012: the token carries the cursor value and the primary key (tie-break),
+      // both re-cast to their column's type; a token that does not fit is invalid-value.
+      const [idKey, idColumn] = primaryKeyOf(table);
+      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret });
+      const cursorValue = token === undefined ? undefined : castForColumn(column, token.k);
+      const idValue = token === undefined ? undefined : castForColumn(idColumn, token.id);
+      if (cursorValue === INVALID_VALUE || idValue === INVALID_VALUE) {
+        throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "invalid-value" });
+      }
       const baseWhere = composeWhere(params.filter, params.withDeleted);
 
       const ascInQuery = direction === "forward" ? order === "asc" : order === "desc";
-      const seek = cursorValue !== undefined ? (ascInQuery ? gt(column, cursorValue) : lt(column, cursorValue)) : undefined;
+      const past = ascInQuery ? gt : lt;
+      // (k > v) OR (k = v AND id > i); a primary-key cursor needs no tie-break.
+      const tieBreak = column !== idColumn;
+      const seek =
+        token === undefined
+          ? undefined
+          : tieBreak
+            ? or(past(column, cursorValue), and(eq(column, cursorValue), past(idColumn, idValue)))
+            : past(column, cursorValue);
       const where = seek && baseWhere ? and(baseWhere, seek) : (seek ?? baseWhere);
 
       // Force-include the cursor column when a columns selection is given —
@@ -47,28 +59,43 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       // read a forbidden column: keep it in the query (pagination needs it) but
       // strip it from the rows we hand back.
       const selected = pickColumns(params.columns);
-      const columns = selected ? { ...selected, [cursorKey]: true } : undefined;
-      const leaksCursorColumn = guarded && selected !== undefined && !permits(cursorKey);
+      const columns = selected ? { ...selected, [cursorKey]: true, [idKey]: true } : undefined;
+      // The cursor and tie-break columns are queried for the tokens; under a projection guard
+      // the ones the caller may not see are stripped from the rows afterwards.
+      const hidden = guarded && selected !== undefined ? [cursorKey, idKey].filter(key => !permits(key) || !selected[key as keyof typeof selected]) : [];
 
       const rows = (await handle().findMany({
         where,
-        orderBy: [ascInQuery ? asc(column) : desc(column)],
+        orderBy: tieBreak ? [ascInQuery ? asc(column) : desc(column), ascInQuery ? asc(idColumn) : desc(idColumn)] : [ascInQuery ? asc(column) : desc(column)],
         limit: limit + 1,
         columns,
         with: params.with,
       })) as Record<string, unknown>[];
 
-      const page = cursorPage(rows, { limit, direction, hasCursor: cursorValue !== undefined, cursorField: cursorKey });
+      const page = await cursorPage(rows, {
+        limit,
+        direction,
+        hasCursor: cursorValue !== undefined,
+        cursorField: cursorKey,
+        idField: idKey,
+        secret: runtime.cursorSecret,
+      });
 
-      // Cursor values are read above, so the column can go now.
-      if (leaksCursorColumn) {
-        page.data = page.data.map(row => {
-          const { [cursorKey]: _cursor, ...rest } = row;
-          return rest;
-        });
+      // Token values are read above, so the hidden columns can go now.
+      if (hidden.length > 0) {
+        page.data = page.data.map(row => Object.fromEntries(Object.entries(row).filter(([key]) => !hidden.includes(key))));
       }
 
       return page as CursorResult<never>;
     },
   };
+}
+
+/** The primary-key column (JS key and column): the tie-break of every cursor seek (task 012). */
+function primaryKeyOf(table: PgTable): [string, AnyPgColumn] {
+  const columns = tableColumns(table);
+  const primary = columns.find(([, column]) => column.primary) ?? columns.find(([key]) => key === "id");
+  if (!primary)
+    throw new Error(`findCursor: table "${String((table as unknown as { _: { name?: string } })._?.name ?? "?")}" has no primary key to break cursor ties`);
+  return primary;
 }

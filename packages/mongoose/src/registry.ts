@@ -34,6 +34,7 @@ export function createRegistry(connection: Connection, options: RegistryOptions 
     strict: options.strict ?? false,
     onSkippedCondition: options.onSkippedCondition,
     limits: options.limits,
+    cursorSecret: options.cursorSecret,
     maxTimeMS: options.maxTimeMS ?? DEFAULT_MAX_TIME_MS,
   };
 

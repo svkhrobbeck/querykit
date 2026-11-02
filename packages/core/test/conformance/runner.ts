@@ -102,7 +102,8 @@ export function compare(testCase: ConformanceCase, outcome: Outcome, adapter?: A
     const bad = rows.find(row => canonical(Object.keys(row).sort()) !== want);
     if (bad) problems.push(`row keys ${canonical(Object.keys(bad).sort())}, expected ${want}`);
   }
-  if (expect.meta && canonical(meta) !== canonical(expect.meta)) problems.push(`meta ${canonical(meta)}, expected ${canonical(expect.meta)}`);
+  if (expect.meta && canonical(tokenKeys(meta)) !== canonical(tokenKeys(expect.meta)))
+    problems.push(`meta ${canonical(meta)}, expected ${canonical(expect.meta)}`);
   const gotSkipped = sortedLabels(outcome.skipped);
   const wantSkipped = sortedLabels(expect.skipped ?? []);
   if (canonical(gotSkipped) !== canonical(wantSkipped)) problems.push(`skipped ${canonical(gotSkipped)}, expected ${canonical(wantSkipped)}`);
@@ -170,4 +171,21 @@ async function walk(
     }
   }
   return { rows, meta: { pages } };
+}
+
+/**
+ * Cursor tokens compared by their cursor value `k` only (task 012): the tie-break `id`
+ * is the adapter's own primary key (a number, or a Mongo ObjectId), so it differs by design.
+ */
+function tokenKeys(meta: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!meta) return meta;
+  const k = (token: unknown) => {
+    if (typeof token !== "string") return token;
+    try {
+      return { k: (JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { k?: unknown }).k };
+    } catch {
+      return token;
+    }
+  };
+  return { ...meta, next_cursor: k(meta.next_cursor), prev_cursor: k(meta.prev_cursor) };
 }

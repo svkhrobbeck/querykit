@@ -26,7 +26,6 @@ import { createRegistry } from "../src/index";
 import { readModelMeta } from "../src/internal/fields";
 import { buildWhere as pWhere } from "../src/internal/where";
 import { buildOrderBy as pOrderBy } from "../src/internal/order-by";
-import { decodeCursor } from "@querykitjs/core/internal";
 import type { OffsetParams, InfiniteParams, CursorParams } from "../src/types";
 
 /* --- the two adapters it must agree with --- */
@@ -411,7 +410,11 @@ console.log("\n=== C1–C3. real web payloads, over the wire, into the repositor
     eq(lastArgs(s2.calls, "findMany").where, { id: { gt: 8 } }),
     show(lastArgs(s2.calls, "findMany").where),
   );
-  check("…and the token itself is opaque base64url", typeof p1.meta.next_cursor === "string" && decodeCursor(p1.meta.next_cursor) === 8);
+  check(
+    "…and the token itself is opaque base64url (v2: { v: 2, k, id }, task 012)",
+    typeof p1.meta.next_cursor === "string" &&
+      (JSON.parse(Buffer.from(p1.meta.next_cursor, "base64url").toString("utf8")) as { v?: unknown; k?: unknown }).k === 8,
+  );
 
   // A custom-configured frontend (different field names are a web-side concern,
   // but the default builders must keep working).

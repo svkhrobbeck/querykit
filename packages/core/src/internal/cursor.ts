@@ -42,7 +42,13 @@ const isScalar = (value: unknown): value is CursorToken["k"] =>
   typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value));
 
 const scalarOf = (value: unknown): CursorToken["k"] | undefined => {
-  const normalized = value instanceof Date ? value.toISOString() : value;
+  // A Date becomes its ISO string; a driver id (a Mongo ObjectId) its own JSON form (hex).
+  const normalized =
+    value instanceof Date
+      ? value.toISOString()
+      : typeof value === "object" && value !== null && typeof (value as { toJSON?: unknown }).toJSON === "function"
+        ? (value as { toJSON: () => unknown }).toJSON()
+        : value;
   return isScalar(normalized) ? normalized : undefined;
 };
 

@@ -276,8 +276,16 @@ async function main() {
   );
   check("cursor backward on a timestamp key does not crash", allOk(back), firstError(back));
 
-  const idCursor = await capture(() => usersRepo.findCursor({ limit: 1, cursor: page1.meta.next_cursor }));
-  check("cursor on the default id key still works", allOk(idCursor), firstError(idCursor));
+  // Task 012: a createdAt token handed to the id cursor does not fit the column — invalid-value, not a 500.
+  let misfit = "";
+  try {
+    await usersRepo.findCursor({ limit: 1, cursor: page1.meta.next_cursor });
+  } catch (error) {
+    misfit = error instanceof QueryKitError ? `${error.info.reason}/${error.info.site}` : String(error);
+  }
+  check("a token whose value does not fit the cursor column → invalid-value / cursorKey", misfit === "invalid-value/cursorKey", misfit);
+  const idPage = await capture(() => usersRepo.findCursor({ limit: 1 }));
+  check("cursor on the default id key still works", allOk(idPage), firstError(idPage));
   rows = [];
 
   /* 12. count/exists share composeWhere → coercion applies there too */

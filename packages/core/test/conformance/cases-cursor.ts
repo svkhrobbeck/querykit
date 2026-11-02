@@ -15,8 +15,6 @@ const TIED: readonly ConformanceRow[] = Array.from({ length: 25 }, (_, index) =>
   createdAt: SAME_TIME,
 }));
 
-const TIE = "tie-break (012 p3): the seek uses cursorKey alone, so rows that share the key are skipped or repeated";
-
 export const CURSOR_CASES: readonly ConformanceCase[] = [
   {
     name: "A1: 25 rows with one createdAt, limit 10 → pages 10 + 10 + 5, every id once",
@@ -24,7 +22,6 @@ export const CURSOR_CASES: readonly ConformanceCase[] = [
     call: { method: "findCursor", params: { limit: 10, cursorKey: "createdAt", order: "asc" }, walk: "forward" },
     options: { rows: TIED },
     expect: { walk: { ids: 25, pages: [10, 10, 5] } },
-    knownDifference: { "drizzle-pg": TIE, "prisma-pg": TIE, mongoose: TIE },
     notBuiltByWeb: "a multi-page walk is a repository-level check",
   },
   {
@@ -33,7 +30,6 @@ export const CURSOR_CASES: readonly ConformanceCase[] = [
     call: { method: "findCursor", params: { limit: 10, cursorKey: "createdAt", order: "asc" }, walk: "forward-back" },
     options: { rows: TIED },
     expect: { walk: { ids: 25, pages: [10, 10, 5, 10, 10] } },
-    knownDifference: { "drizzle-pg": TIE, "prisma-pg": TIE, mongoose: TIE },
     notBuiltByWeb: "a multi-page walk is a repository-level check",
   },
 ];

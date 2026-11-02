@@ -610,6 +610,10 @@ function spyClient(results: Record<string, unknown> = {}) {
 /** A spy client pre-loaded with the rows `findMany` should return. */
 const spyOf = (rows: Record<string, unknown>[], results: Record<string, unknown> = {}) => spyClient({ findMany: rows, count: rows.length, ...results });
 
+/** Task 012 v2 cursor tokens: build one, read its cursor value. */
+const tokenV2 = (k: unknown, id: unknown) => Buffer.from(JSON.stringify({ v: 2, k, id }), "utf8").toString("base64url");
+const tokenK = (token: string | null | undefined) => (token ? (JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { k: unknown }).k : undefined);
+
 /** Args of the last call to `method`. */
 const lastArgs = (calls: Call[], method: string): Record<string, any> => [...calls].reverse().find(c => c.method === method)?.args ?? {};
 
@@ -699,7 +703,7 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
   check("orderBy follows order/direction", eq(args1.orderBy, [{ id: "asc" }]));
   check("take = limit + 1", args1.take === 3);
   check("page 1 meta", page1.meta.has_next && !page1.meta.has_prev && page1.data.length === 2);
-  check("next_cursor points at the last row of the page", decodeCursor(page1.meta.next_cursor) === 11, show(decodeCursor(page1.meta.next_cursor)));
+  check("next_cursor points at the last row of the page", tokenK(page1.meta.next_cursor) === 11, show(tokenK(page1.meta.next_cursor)));
 
   const s2 = spyOf(rows);
   await createRegistry(s2.client as never)
@@ -710,14 +714,14 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
   const s3 = spyOf(rows);
   await createRegistry(s3.client as never)
     .repository("user" as never, OPEN as never)
-    .findCursor({ limit: 2, cursor: encodeCursor(11), direction: "backward" });
+    .findCursor({ limit: 2, cursor: tokenV2(11, 11), direction: "backward" });
   const back = lastArgs(s3.calls, "findMany");
   check("backward+asc seeks with lt and flips orderBy", eq(back.where, { id: { lt: 11 } }) && eq(back.orderBy, [{ id: "desc" }]));
 
   const s4 = spyOf(rows);
   const backward = await createRegistry(s4.client as never)
     .repository("user" as never, OPEN as never)
-    .findCursor({ limit: 2, cursor: encodeCursor(11), direction: "backward" });
+    .findCursor({ limit: 2, cursor: tokenV2(11, 11), direction: "backward" });
   check(
     "backward page is reversed back into ascending order",
     eq(
@@ -730,9 +734,16 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
   const s5 = spyOf(rows);
   await createRegistry(s5.client as never)
     .repository("user" as never, OPEN as never)
-    .findCursor({ limit: 2, cursorKey: "createdAt", cursor: encodeCursor("2026-07-30T10:00:00.000Z") });
-  const dated = lastArgs(s5.calls, "findMany").where as { createdAt: { gt: Date } };
-  check("cursor value is re-cast to the field type (ISO → Date)", dated.createdAt.gt instanceof Date, String(dated.createdAt.gt));
+    .findCursor({ limit: 2, cursorKey: "createdAt", cursor: tokenV2("2026-07-30T10:00:00.000Z", 1) });
+  // Task 012: (createdAt > v) OR (createdAt = v AND id > i) — both values re-cast to their field type.
+  const dated = lastArgs(s5.calls, "findMany").where as {
+    OR: [{ createdAt: { gt: Date } }, { AND: [{ createdAt: { equals: Date } }, { id: { gt: number } }] }];
+  };
+  check(
+    "tie-break seek with the cursor value re-cast (ISO → Date) and the id",
+    dated.OR?.[0]?.createdAt.gt instanceof Date && dated.OR[1]?.AND[0]?.createdAt.equals instanceof Date && dated.OR[1]?.AND[1]?.id.gt === 1,
+    show(dated),
+  );
 
   const s6 = spyOf(rows);
   await createRegistry(s6.client as never)
@@ -753,7 +764,7 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
   const s7 = spyOf(rows);
   const filtered = await createRegistry(s7.client as never)
     .repository("user" as never, OPEN as never)
-    .findCursor({ limit: 2, cursor: encodeCursor(11), filter: [{ key: "name", value: "ali" }] });
+    .findCursor({ limit: 2, cursor: tokenV2(11, 11), filter: [{ key: "name", value: "ali" }] });
   check(
     "seek is ANDed with the base filter",
     eq(lastArgs(s7.calls, "findMany").where, { AND: [{ name: { equals: "ali" } }, { id: { gt: 11 } }] }),

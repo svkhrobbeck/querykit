@@ -65,8 +65,8 @@ export interface ConformanceCase {
   notBuiltByWeb?: string;
 }
 
-/** The cursor token every adapter emits: base64url of `{"v": <value>}` (dates as ISO strings). */
-export const cursorToken = (value: unknown): string => Buffer.from(JSON.stringify({ v: value }), "utf8").toString("base64url");
+/** A v2 cursor token for an expectation (task 012) — the runner compares tokens by their cursor value `k` only. */
+export const cursorToken = (value: unknown): string => Buffer.from(JSON.stringify({ v: 2, k: value, id: null }), "utf8").toString("base64url");
 
 /** Every fixture name, and the same in `createdAt` order. */
 export const ALL = ["Alice", "Bob", "Carol", "dave", "Eve_Ann", "Frank", "Alina"] as const;

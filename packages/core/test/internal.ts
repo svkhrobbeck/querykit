@@ -12,6 +12,7 @@ import {
   cursorPage,
   decodeCursor,
   encodeCursor,
+  encodeCursorToken,
   findFilterLimitViolation,
   formatLimit,
   infinitePage,
@@ -80,16 +81,19 @@ check("offsetMeta", same(offsetMeta(2, 3, 7), { total_items: 7, total_pages: 3, 
 const infinite = infinitePage([1, 2, 3], 2, 4);
 check("infinitePage drops the probe row", same(infinite, { data: [1, 2], meta: { limit: 2, offset: 4, count: 2, has_more: true, next_offset: 6 } }));
 const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
-const forward = cursorPage(rows, { limit: 2, direction: "forward", hasCursor: false, cursorField: "id" });
+const forward = await cursorPage(rows, { limit: 2, direction: "forward", hasCursor: false, cursorField: "id", idField: "id" });
 check(
-  "cursorPage forward",
+  "cursorPage forward (v2 tokens carry k and id)",
   same(forward.data, [{ id: 1 }, { id: 2 }]) &&
-    same(forward.meta, { limit: 2, has_next: true, has_prev: false, next_cursor: encodeCursor(2), prev_cursor: null }),
+    same(forward.meta, { limit: 2, has_next: true, has_prev: false, next_cursor: await encodeCursorToken({ k: 2, id: 2 }), prev_cursor: null }),
 );
-const backward = cursorPage([{ id: 5 }, { id: 4 }, { id: 3 }], { limit: 2, direction: "backward", hasCursor: true, cursorField: "id" });
+const backward = await cursorPage([{ id: 5 }, { id: 4 }, { id: 3 }], { limit: 2, direction: "backward", hasCursor: true, cursorField: "id", idField: "id" });
 check(
   "cursorPage backward flips to display order",
-  same(backward.data, [{ id: 4 }, { id: 5 }]) && backward.meta.has_prev && backward.meta.has_next && backward.meta.prev_cursor === encodeCursor(4),
+  same(backward.data, [{ id: 4 }, { id: 5 }]) &&
+    backward.meta.has_prev &&
+    backward.meta.has_next &&
+    backward.meta.prev_cursor === (await encodeCursorToken({ k: 4, id: 4 })),
 );
 
 /* request limits (task 008) — the walk judges the filter cases of the shared limit table */

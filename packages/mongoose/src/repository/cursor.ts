@@ -1,8 +1,9 @@
 import { QueryKitError } from "@querykitjs/core";
-import { clampPageSize, cursorPage, decodeCursor } from "@querykitjs/core/internal";
+import { clampPageSize, cursorPage, decodeCursorToken } from "@querykitjs/core/internal";
 
 import type { CursorParams, CursorResult, SortDirection } from "../types";
-import { castValue, resolveField } from "../internal/fields";
+import { resolveField } from "../internal/fields";
+import { castForPath, INVALID_VALUE } from "../internal/coerce";
 import type { Query } from "../internal/where";
 import type { AnyQuery, RepoContext } from "./context";
 
@@ -26,12 +27,26 @@ export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
       // 400 the same way as any other bad condition (both adapters agree).
       if (!field) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
-      const decoded = decodeCursor(params.cursor);
-      const cursorValue = decoded !== undefined ? castValue(m, field, decoded) : undefined;
+      // Task 012: the token carries the cursor value and _id (tie-break), both cast
+      // to their path's type; a token that does not fit is invalid-value.
+      const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret });
+      const cursorValue = token === undefined ? undefined : castForPath(m, field, token.k);
+      const idValue = token === undefined ? undefined : castForPath(m, "_id", token.id);
+      if (cursorValue === INVALID_VALUE || idValue === INVALID_VALUE) {
+        throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "invalid-value" });
+      }
       const baseWhere = composeWhere(params.filter, params.withDeleted);
 
       const ascInQuery = direction === "forward" ? order === "asc" : order === "desc";
-      const seek: Query | undefined = cursorValue !== undefined ? { [field]: ascInQuery ? { $gt: cursorValue } : { $lt: cursorValue } } : undefined;
+      const past = ascInQuery ? "$gt" : "$lt";
+      // (k > v) OR (k = v AND _id > i); an _id cursor needs no tie-break.
+      const tieBreak = field !== "_id";
+      const seek: Query | undefined =
+        token === undefined
+          ? undefined
+          : tieBreak
+            ? { $or: [{ [field]: { [past]: cursorValue } }, { [field]: cursorValue, _id: { [past]: idValue } }] }
+            : { [field]: { [past]: cursorValue } };
       const where: Query = seek ? (Object.keys(baseWhere).length ? { $and: [baseWhere, seek] } : seek) : baseWhere;
 
       // Force-include the cursor field in the projection so next/prev tokens work.
@@ -40,23 +55,27 @@ export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
       // it) but strip it from the documents we hand back.
       const selected = projection(params.columns);
       const proj = selected ? { ...selected, [field]: 1 } : undefined;
-      const leaksCursorField = guarded && selected !== undefined && !permits(cursorKey) && !permits(field);
+      const hidden = guarded && selected !== undefined ? [field, "_id"].filter(key => !permits(key) || !(selected as Record<string, unknown>)[key]) : [];
 
       let q: AnyQuery = m
         .find(where, proj)
-        .sort({ [field]: ascInQuery ? 1 : -1 })
+        .sort(tieBreak ? { [field]: ascInQuery ? 1 : -1, _id: ascInQuery ? 1 : -1 } : { [field]: ascInQuery ? 1 : -1 })
         .limit(limit + 1);
       q = applyPopulate(q, params.with);
       const rows = (await attachSession(q).lean().exec()) as Record<string, unknown>[];
 
-      const page = cursorPage(rows, { limit, direction, hasCursor: cursorValue !== undefined, cursorField: field });
+      const page = await cursorPage(rows, {
+        limit,
+        direction,
+        hasCursor: token !== undefined,
+        cursorField: field,
+        idField: "_id",
+        secret: runtime.cursorSecret,
+      });
 
-      // Cursor values are read above, so the field can go now.
-      if (leaksCursorField) {
-        page.data = page.data.map(row => {
-          const { [field]: _cursor, ...rest } = row;
-          return rest;
-        });
+      // Token values are read above, so the hidden fields can go now.
+      if (hidden.length > 0) {
+        page.data = page.data.map(row => Object.fromEntries(Object.entries(row).filter(([key]) => !hidden.includes(key))));
       }
 
       return page as CursorResult<never>;
