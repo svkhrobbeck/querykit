@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Tree-shake check (task 016, REQUIREMENTS R14) — run after `bun run build`.
+ * Tree-shake check (REQUIREMENTS R14) — run after `bun run build`.
  *
  *   node scripts/check-treeshake.mjs
  *
@@ -21,9 +21,10 @@ import { bundle, entriesOf, packageDirs } from "./bundle-entry.mjs";
 const SMALL_EXPORT_BYTES = 2048;
 const MAX_SHARE = 0.6;
 /**
- * ENTRY_POINTS — exports that wire every other part of their package, so they pull most of
- * it by design: exempt from the 60 % rule, still listed with their size as "entry point".
- * Every other export keeps the 60 % / 2 KB rule (thinker decision, task 016).
+ * ENTRY_POINTS — exports that wire every other part of their package or entry, so they pull
+ * most of it by design: exempt from the 60 % / 2 KB rule, still listed with their size as
+ * "entry point". A router hook is the whole job of its entry; `size-budget.json` still limits
+ * that entry's growth. Every other export keeps the 60 % / 2 KB rule.
  */
 const ENTRY_POINTS = {
   "@querykitjs/drizzle-pg": ["createRegistry", "buildRepository"],
@@ -31,6 +32,9 @@ const ENTRY_POINTS = {
   "@querykitjs/mongoose": ["createRegistry", "buildRepository"],
   "@querykitjs/mongodb": ["createRegistry", "buildRepository"],
   "@querykitjs/web": ["createRegistry"],
+  "@querykitjs/web/react": ["useListParams"],
+  "@querykitjs/web/vue": ["useListParams"],
+  "@querykitjs/web/angular": ["injectListParams"],
 };
 /** Workspace packages: external when an export is measured on its package's own code. */
 const WORKSPACE = ["@querykitjs/*"];
