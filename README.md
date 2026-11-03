@@ -9,18 +9,19 @@ result types inferred automatically.
 
 ## Packages
 
-| Package                                                     | Status       | Description                                                    |
-| ----------------------------------------------------------- | ------------ | -------------------------------------------------------------- |
-| [`@querykitjs/core`](./packages/core)                       | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared)      |
-| [`@querykitjs/drizzle-pg`](./packages/drizzle-pg)           | ✅ available | Drizzle ORM + PostgreSQL (backend repository)                  |
-| [`@querykitjs/prisma-pg`](./packages/prisma-pg)             | ✅ available | Prisma + PostgreSQL (backend repository)                       |
-| [`@querykitjs/mongoose`](./packages/mongoose)               | ✅ available | Mongoose + MongoDB (backend repository)                        |
-| [`@querykitjs/mongodb`](./packages/mongodb)                 | ✅ available | MongoDB official driver (backend repository, no mongoose)      |
-| [`@querykitjs/web`](./packages/web)                         | ✅ available | Frontend query-building (filters, pagination, URL sync)        |
-| [`@querykitjs/zod`](./packages/zod)                         | ✅ available | Zod schemas validating the request contract (backend)          |
-| [`@querykitjs/class-validator`](./packages/class-validator) | ✅ available | class-validator decorators + DTOs for the same contract (Nest) |
-| `@querykitjs/drizzle-sqlite`                                | 🚧 planned   | Drizzle ORM + SQLite                                           |
-| `@querykitjs/prisma-sqlite`                                 | 🚧 planned   | Prisma + SQLite                                                |
+| Package                                                     | Status       | Description                                                                                                                    |
+| ----------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| [`@querykitjs/core`](./packages/core)                       | ✅ available | ORM-agnostic DSL: filters, operators, wire types (shared)                                                                      |
+| [`@querykitjs/drizzle-pg`](./packages/drizzle-pg)           | ✅ available | Drizzle ORM + PostgreSQL (backend repository)                                                                                  |
+| [`@querykitjs/prisma-pg`](./packages/prisma-pg)             | ✅ available | Prisma + PostgreSQL (backend repository)                                                                                       |
+| [`@querykitjs/mongoose`](./packages/mongoose)               | ✅ available | Mongoose + MongoDB (backend repository)                                                                                        |
+| [`@querykitjs/mongodb`](./packages/mongodb)                 | ✅ available | MongoDB official driver (backend repository, no mongoose)                                                                      |
+| [`@querykitjs/web`](./packages/web)                         | ✅ available | Frontend query-building (filters, pagination, URL sync)                                                                        |
+| [`@querykitjs/zod`](./packages/zod)                         | ✅ available | Zod schemas validating the request contract (backend)                                                                          |
+| [`@querykitjs/class-validator`](./packages/class-validator) | ✅ available | class-validator decorators + DTOs for the same contract (Nest)                                                                 |
+| [`@querykitjs/standard-schema`](./packages/standard-schema) | ✅ available | Standard Schema v1 validators for the same contract (valibot, arktype, Effect, Hono `sValidator`, tRPC) — no validator library |
+| `@querykitjs/drizzle-sqlite`                                | 🚧 planned   | Drizzle ORM + SQLite                                                                                                           |
+| `@querykitjs/prisma-sqlite`                                 | 🚧 planned   | Prisma + SQLite                                                                                                                |
 
 Versions and changelogs live in each package (`packages/<name>/package.json`,
 `packages/<name>/CHANGELOG.md`) and on npm. Every package has an English README

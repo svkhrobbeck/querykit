@@ -27,7 +27,7 @@
     },
     "packages/class-validator": {
       "name": "@querykitjs/class-validator",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -47,11 +47,11 @@
     },
     "packages/core": {
       "name": "@querykitjs/core",
-      "version": "1.2.0",
+      "version": "2.0.0",
     },
     "packages/drizzle-pg": {
       "name": "@querykitjs/drizzle-pg",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -65,7 +65,7 @@
     },
     "packages/mongodb": {
       "name": "@querykitjs/mongodb",
-      "version": "0.0.0",
+      "version": "1.0.1",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -81,7 +81,7 @@
     },
     "packages/mongoose": {
       "name": "@querykitjs/mongoose",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -95,7 +95,7 @@
     },
     "packages/prisma-pg": {
       "name": "@querykitjs/prisma-pg",
-      "version": "1.0.1",
+      "version": "2.0.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -110,9 +110,22 @@
         "@prisma/client": "^6.19 || ^7.10",
       },
     },
+    "packages/standard-schema": {
+      "name": "@querykitjs/standard-schema",
+      "version": "0.0.0",
+      "dependencies": {
+        "@querykitjs/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@hono/standard-validator": "0.4.0",
+        "@standard-schema/spec": "1.1.0",
+        "@trpc/server": "11.19.0",
+        "hono": "4.13.13",
+      },
+    },
     "packages/web": {
       "name": "@querykitjs/web",
-      "version": "3.1.0",
+      "version": "4.0.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -134,7 +147,7 @@
     },
     "packages/zod": {
       "name": "@querykitjs/zod",
-      "version": "2.1.0",
+      "version": "3.0.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -327,6 +340,8 @@
 
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.7.3", "", { "dependencies": { "@eslint/core": "^1.2.1", "levn": "^0.4.1" } }, "sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q=="],
 
+    "@hono/standard-validator": ["@hono/standard-validator@0.4.0", "", { "peerDependencies": { "@standard-schema/spec": "^1.0.0", "hono": ">=4.11.2" } }, "sha512-MxOm1asDh9j7c1D0KiWwppSbFgAQxTRO4YEhjMrJn3lF1BIcXenPdgjSGKDRfQmZdaTaMA8slQLETgVOKyJxFw=="],
+
     "@humanfs/core": ["@humanfs/core@0.19.2", "", { "dependencies": { "@humanfs/types": "^0.15.0" } }, "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA=="],
 
     "@humanfs/node": ["@humanfs/node@0.16.8", "", { "dependencies": { "@humanfs/core": "^0.19.2", "@humanfs/types": "^0.15.0", "@humanwhocodes/retry": "^0.4.0" } }, "sha512-gE1eQNZ3R++kTzFUpdGlpmy8kDZD/MLyHqDwqjkVQI0JMdI1D51sy1H958PNXYkM2rAac7e5/CnIKZrHtPh3BQ=="],
@@ -404,6 +419,8 @@
     "@querykitjs/mongoose": ["@querykitjs/mongoose@workspace:packages/mongoose"],
 
     "@querykitjs/prisma-pg": ["@querykitjs/prisma-pg@workspace:packages/prisma-pg"],
+
+    "@querykitjs/standard-schema": ["@querykitjs/standard-schema@workspace:packages/standard-schema"],
 
     "@querykitjs/web": ["@querykitjs/web@workspace:packages/web"],
 
@@ -484,6 +501,8 @@
     "@sindresorhus/is": ["@sindresorhus/is@4.6.0", "", {}, "sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw=="],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
+
+    "@trpc/server": ["@trpc/server@11.19.0", "", { "peerDependencies": { "typescript": ">=5.7.2" }, "bin": { "intent": "bin/intent.js" } }, "sha512-7C1goiDurz82yFKtZUbEzjXd0Rg/jyisaIZQhdvus+1l7E6mwcEYZXjZ1US/HF8kOyz1LERL8UN3bcboJtjcyQ=="],
 
     "@types/d3-array": ["@types/d3-array@3.0.3", "", {}, "sha512-Reoy+pKnvsksN0lQUlcH6dOGjRZ/3WRwXR//m+/8lt1BXeI4xyaUZoqULNjyXXRuh0Mj4LNpkCvhUpQlY3X5xQ=="],
 
@@ -830,6 +849,8 @@
     "hashery": ["hashery@1.5.1", "", { "dependencies": { "hookified": "^1.15.0" } }, "sha512-iZyKG96/JwPz1N55vj2Ie2vXbhu440zfUfJvSwEqEbeLluk7NnapfGqa7LH0mOsnDxTF85Mx8/dyR6HfqcbmbQ=="],
 
     "highlight.js": ["highlight.js@10.7.3", "", {}, "sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A=="],
+
+    "hono": ["hono@4.13.13", "", {}, "sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA=="],
 
     "hookified": ["hookified@1.15.1", "", {}, "sha512-MvG/clsADq1GPM2KGo2nyfaWVyn9naPiXrqIe4jYjXNZQt238kWyOGrsyc/DmRAQ+Re6yeo6yX/yoNCG5KAEVg=="],
 

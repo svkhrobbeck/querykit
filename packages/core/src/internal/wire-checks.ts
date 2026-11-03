@@ -250,7 +250,8 @@ const accepts = (expected: Expected, value: unknown): boolean =>
 const typed =
   (expected: Expected): FieldCheck =>
   (value, path, issues) => {
-    if (!accepts(expected, value)) issues.push(wireIssue("querykit.params.invalid_type", path, { expected }));
+    if (!accepts(expected, value))
+      issues.push(wireIssue("querykit.params.invalid_type", path, { expected: `${expected === "object" ? "an" : "a"} ${expected}` }));
   };
 
 const oneOf =
@@ -263,7 +264,7 @@ const oneOf =
 const integer =
   (min: number, max: number, overLimit?: keyof QueryLimits): FieldCheck =>
   (value, path, issues) => {
-    if (typeof value !== "number" || !Number.isFinite(value)) issues.push(wireIssue("querykit.params.invalid_type", path, { expected: "number" }));
+    if (typeof value !== "number" || !Number.isFinite(value)) issues.push(wireIssue("querykit.params.invalid_type", path, { expected: "a number" }));
     else if (!Number.isInteger(value)) issues.push(wireIssue("querykit.params.not_integer", path));
     else if (value < min) issues.push(wireIssue("querykit.params.out_of_range", path, { min }));
     else if (value > max && overLimit) issues.push(wireIssue("querykit.limit.exceeded", path, { limit: overLimit, max }));
@@ -314,7 +315,7 @@ function fieldChecks(kind: WireParamsKind, options: WireParamsOptions, limits: Q
  * ```
  */
 export function checkParams(kind: WireParamsKind, value: unknown, options: WireParamsOptions = {}): WireParamsResult {
-  if (!isRecord(value)) return { issues: [wireIssue("querykit.params.invalid_type", [], { expected: "object" })] };
+  if (!isRecord(value)) return { issues: [wireIssue("querykit.params.invalid_type", [], { expected: "an object" })] };
 
   const limits = resolveLimits(options.limits);
   const checks = fieldChecks(kind, options, limits);

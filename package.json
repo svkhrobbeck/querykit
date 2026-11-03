@@ -9,7 +9,7 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "build": "bun run --filter @querykitjs/core build && bun run --filter @querykitjs/zod build && bun run --filter @querykitjs/class-validator build && bun run --filter @querykitjs/drizzle-pg build && bun run --filter @querykitjs/prisma-pg build && bun run --filter @querykitjs/mongoose build && bun run --filter @querykitjs/mongodb build && bun run --filter @querykitjs/web build",
+    "build": "bun run --filter @querykitjs/core build && bun run --filter @querykitjs/zod build && bun run --filter @querykitjs/standard-schema build && bun run --filter @querykitjs/class-validator build && bun run --filter @querykitjs/drizzle-pg build && bun run --filter @querykitjs/prisma-pg build && bun run --filter @querykitjs/mongoose build && bun run --filter @querykitjs/mongodb build && bun run --filter @querykitjs/web build",
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -28,7 +28,8 @@
     "release:check": "node scripts/release-check.mjs",
     "release:pending": "node scripts/release-check.mjs --pending",
     "release:wait": "node scripts/release-wait.mjs",
-    "test:publish-plan": "node scripts/test-publish-plan.mjs",
+    "release:first": "node scripts/first-publish.mjs",
+    "test:publish-plan": "node scripts/test-publish-plan.mjs && node scripts/first-publish.mjs --self-test",
     "release": "bun run build && node scripts/pin-workspace-deps.mjs && node scripts/ci-publish.mjs",
     "prepare": "husky"
   },

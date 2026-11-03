@@ -6,7 +6,17 @@
  * Imported by `internal.ts`; sets `process.exitCode` on failure.
  */
 import { DEFAULT_MAX_PER_PAGE } from "../src/defaults";
-import { checkFilter, checkParams, checkSort, type WireIssue } from "../src/internal";
+import {
+  QUERYKIT_MESSAGES_EN,
+  QUERYKIT_PARAMS_MESSAGES_EN,
+  checkFilter,
+  checkParams,
+  checkSort,
+  formatMessage,
+  interpolate,
+  type WireIssue,
+  type WireIssueKey,
+} from "../src/internal";
 import { HOSTILE_DEPTH, notChain } from "./conformance/cases-limits";
 import { WIRE_FILTER_CASES, WIRE_PARAMS_CASES, WIRE_SORT_CASES, type WireExpectedIssue } from "./conformance/cases-wire";
 
@@ -57,6 +67,18 @@ for (const [name, value] of hostile) {
   if (issues.length === 1 && (first === "querykit.filter.max_depth" || first === "querykit.limit.exceeded") && elapsed < HOSTILE_BUDGET_MS) passed++;
   else problems.push(`hostile ${name}: ${issues.length} issue(s), first ${first}, ${elapsed.toFixed(1)} ms`);
 }
+
+/* Every wire issue key has an English message, and the catalogs hold nothing else. */
+type Expect<T extends true> = T;
+type CatalogKey = keyof typeof QUERYKIT_MESSAGES_EN | keyof typeof QUERYKIT_PARAMS_MESSAGES_EN;
+export type CatalogCoversWireKeys = Expect<[WireIssueKey] extends [CatalogKey] ? ([CatalogKey] extends [WireIssueKey] ? true : false) : false>;
+
+const message = formatMessage("querykit.limit.exceeded", { path: "filter", limit: "maxConditions", max: 30 });
+if (message === "filter exceeds maxConditions (30)") passed++;
+else problems.push(`formatMessage: ${message}`);
+const kept = interpolate("{path} must be {expected}", { path: "page" });
+if (kept === "page must be {expected}") passed++;
+else problems.push(`interpolate keeps a missing placeholder: ${kept}`);
 
 for (const problem of problems) console.log(`❌ [core wire] ${problem}`);
 console.log(`${problems.length ? "❌" : "✅"} [core wire] ${passed} passed, ${problems.length} failed`);

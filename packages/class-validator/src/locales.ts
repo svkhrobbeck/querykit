@@ -12,37 +12,14 @@
  * beradi va eskirib qololmaydi.
  */
 
-/**
- * Inglizcha katalog — kalitlarning kanonik ro'yxati va default fallback.
- * `{placeholder}` lar `formatMessage` bilan to'ldiriladi.
- */
-export const QUERYKIT_MESSAGES_EN = {
-  "querykit.filter.invalid_node": "{path} must be a filter condition or an and/or/not group",
-  "querykit.filter.missing_key": "{path} is missing the required `key` string",
-  "querykit.filter.unknown_key": "{path}: `{key}` is not an allowed filter key",
-  "querykit.filter.invalid_operator": "{path}: `{operation}` is not a supported filter operator",
-  "querykit.filter.invalid_value": "{path} must be a string, number, boolean, null, or an array of those",
-  "querykit.filter.invalid_group": "{path} must be an array of filter nodes",
-  "querykit.filter.max_depth": "{path} exceeds maxDepth ({max})",
-  "querykit.filter.value_requires_array": "{path}: `{operation}` requires an array value",
-  "querykit.filter.value_requires_tuple": "{path}: `{operation}` requires exactly two values",
-  "querykit.filter.value_forbidden": "{path}: `{operation}` must not carry a value",
-  "querykit.sort.not_array": "{path} must be an array of { key, direction } items",
-  "querykit.sort.invalid_item": "{path} must be an object with a `key` string",
-  "querykit.sort.missing_key": "{path} is missing the required `key` string",
-  "querykit.sort.unknown_key": "{path}: `{key}` is not an allowed sort key",
-  "querykit.sort.invalid_direction": "{path}: direction must be `asc` or `desc`",
-  "querykit.limit.exceeded": "{path} exceeds {limit} ({max})",
-} as const satisfies Record<string, string>;
+import { QUERYKIT_MESSAGES_EN, type QueryKitMessageCatalog } from "@querykitjs/core/internal";
 
 /**
- * Har bir validatsiya xatosining i18n kaliti. Union inglizcha katalogdan chiqadi —
- * yangi xabar qo'shilsa tip o'zi kengayadi, qo'lda ro'yxat yuritilmaydi.
+ * Inglizcha katalog (kalitlarning kanonik ro'yxati), `QueryKitMessageKey` va
+ * `QueryKitMessageCatalog` — core'dan (boshqa validatorlar bilan bitta matn).
  */
-export type QueryKitMessageKey = keyof typeof QUERYKIT_MESSAGES_EN;
-
-/** Bitta tilning to'liq katalogi — barcha kalitlar majburiy. */
-export type QueryKitMessageCatalog = Record<QueryKitMessageKey, string>;
+export { QUERYKIT_MESSAGES_EN };
+export type { QueryKitMessageCatalog, QueryKitMessageKey } from "@querykitjs/core/internal";
 
 /** O'zbekcha katalog. Placeholder nomlari inglizchasi bilan bir xil. */
 export const QUERYKIT_MESSAGES_UZ: QueryKitMessageCatalog = {
