@@ -46,7 +46,7 @@ function UsersPage() {
 - **Registry** — `adapter` + default'larni bir joyda sozlang, `resource<T>()` entity'ga tipli, adapter-aware builder/filter/schema/keys/parser beradi.
 - **Ikkala filter uslubi** — `f.eq()...` builder (maydon tipiga qarab operator) VA object/massiv (`{key, operation, value}`). Legacy `IFilter[]` bilan to'liq mos.
 - **3 pagination** — offset (`list`), infinite (`infinite`), cursor/keyset (`cursor`); har birining meta'si alohida `parse*` bilan camelCase'ga o'giriladi.
-- **Adapter-aware `with`** — `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg` uchun faqat **wire-safe** (JSON) relation opsiyalari intellisense'да; funksiya/SQL formalarи ko'rsatilmaydi.
+- **Adapter-aware `with`** — `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg` uchun faqat **wire-safe** (JSON) relation opsiyalari intellisense'da; funksiya/SQL formalari ko'rsatilmaydi. `mongodb` da `with` yo'q — relation'larni ikkinchi so'rov bilan yuklang.
 - **Declarative schema** — `resource.schema` / `defineListSchema` bilan URL param → filter; har sahifadagi qo'lda qurishni yo'q qiladi.
 - **React hook** — `useListParams` (`react-router` ichida), `useListParamsBase` (router-agnostik). Core framework'siz — Vue ham shu core'ga bog'lanadi.
 - **SSR** — `resource.fromSearchParams(sp, {schema})` hook'siz, `URLSearchParams`'dan to'g'ridan-to'g'ri payload.
@@ -89,7 +89,7 @@ import { buildListParams, f } from "@querykitjs/web";
 
 ```ts
 export const qk = createRegistry({
-  adapter: "mongoose", // "mongoose" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg"
+  adapter: "mongoose", // "mongoose" | "mongodb" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg"
   defaults: {
     perPage: 20, // list (offset) sahifa hajmi
     limit: 20, // infinite + cursor hajmi
@@ -254,11 +254,12 @@ const { meta } = users.parseList(res.data); // meta.totalCount === null, meta.to
 
 Registry `with`ni adapter bo'yicha tiplaydi — **faqat serializable** opsiyalar:
 
-| adapter                         | `with[rel]` intellisense                                           | Ko'rsatilmaydi                                    |
-| ------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
-| `mongoose`                      | `boolean \| { select?, populate?, match?, options? }`              | —                                                 |
-| `drizzle-pg` / `drizzle-sqlite` | `boolean \| { columns?, with?, limit?, offset? }`                  | `where:(f,op)=>…`, `orderBy:(f,op)=>…`, raw `sql` |
-| `prisma-pg`                     | `boolean \| { select?, include?, where?, orderBy?, take?, skip? }` | funksiya formalar                                 |
+| adapter                         | `with[rel]` intellisense                                           | Ko'rsatilmaydi                                      |
+| ------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------- |
+| `mongoose`                      | `boolean \| { select?, populate?, match?, options? }`              | —                                                   |
+| `mongodb`                       | `with` yo'q — relation'larni ikkinchi so'rov bilan yuklang         | har qanday `with` (TS xato; server `forbidden-key`) |
+| `drizzle-pg` / `drizzle-sqlite` | `boolean \| { columns?, with?, limit?, offset? }`                  | `where:(f,op)=>…`, `orderBy:(f,op)=>…`, raw `sql`   |
+| `prisma-pg`                     | `boolean \| { select?, include?, where?, orderBy?, take?, skip? }` | funksiya formalar                                   |
 
 ```ts
 // adapter: "mongoose"
@@ -267,7 +268,7 @@ users.list({ with: { author: { select: "name email" } } }); // ✓ `select`
 users.list({ with: { author: { columns: { name: true } } } }); // ✓ `columns`; `where`-fn yashirin
 ```
 
-Runtime o'zgarmaydi (pass-through) — bu sof DX. Funksiya/SQL formalarини JSON'да yubora olmaganingiz uchun ular umuman taklif qilinmaydi.
+Runtime o'zgarmaydi (pass-through) — bu sof DX. Funksiya/SQL formalarini JSON'da yubora olmaganingiz uchun ular umuman taklif qilinmaydi.
 
 ## Declarative list schema — URL ↔ filter
 

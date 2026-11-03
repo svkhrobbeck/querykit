@@ -46,7 +46,7 @@ function UsersPage() {
 - **Registry** — configure `adapter` + defaults once; `resource<T>()` gives entity-typed, adapter-aware builders/filters/schema/keys/parsers.
 - **Two filter styles** — `f.eq()...` builder (operators typed per field) AND object/array (`{key, operation, value}`). Fully compatible with legacy `IFilter[]`.
 - **3 pagination modes** — offset (`list`), infinite (`infinite`), cursor/keyset (`cursor`); each has its own `parse*` to camelCase the meta.
-- **Adapter-aware `with`** — only **wire-safe** (JSON) per-relation options are suggested for `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg`; function/SQL forms are never offered.
+- **Adapter-aware `with`** — only **wire-safe** (JSON) per-relation options are suggested for `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg`; function/SQL forms are never offered. `mongodb` has no `with` — load relations with a second request.
 - **Declarative schema** — `resource.schema` / `defineListSchema` maps URL params → filter; kills the per-page hand-building.
 - **React hooks** — `useListParams` (react-router inside), `useListParamsBase` (router-agnostic). Framework-agnostic core — Vue can bind the same core.
 - **SSR** — `resource.fromSearchParams(sp, {schema})` builds a payload straight from `URLSearchParams`, no hook.
@@ -89,7 +89,7 @@ Use (A) when you want defaults in one place, autocomplete, adapter `with`, query
 
 ```ts
 export const qk = createRegistry({
-  adapter: "mongoose", // "mongoose" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg"
+  adapter: "mongoose", // "mongoose" | "mongodb" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg"
   defaults: {
     perPage: 20, // list (offset) page size
     limit: 20, // infinite + cursor page size
@@ -254,11 +254,12 @@ const { meta } = users.parseList(res.data); // meta.totalCount === null, meta.to
 
 The registry types `with` per adapter — **serializable options only**:
 
-| adapter                         | `with[rel]` intellisense                                           | Hidden (not offered)                              |
-| ------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
-| `mongoose`                      | `boolean \| { select?, populate?, match?, options? }`              | —                                                 |
-| `drizzle-pg` / `drizzle-sqlite` | `boolean \| { columns?, with?, limit?, offset? }`                  | `where:(f,op)=>…`, `orderBy:(f,op)=>…`, raw `sql` |
-| `prisma-pg`                     | `boolean \| { select?, include?, where?, orderBy?, take?, skip? }` | function forms                                    |
+| adapter                         | `with[rel]` intellisense                                           | Hidden (not offered)                                      |
+| ------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------- |
+| `mongoose`                      | `boolean \| { select?, populate?, match?, options? }`              | —                                                         |
+| `mongodb`                       | no `with` — load relations with a second request                   | any `with` (TS error; the server answers `forbidden-key`) |
+| `drizzle-pg` / `drizzle-sqlite` | `boolean \| { columns?, with?, limit?, offset? }`                  | `where:(f,op)=>…`, `orderBy:(f,op)=>…`, raw `sql`         |
+| `prisma-pg`                     | `boolean \| { select?, include?, where?, orderBy?, take?, skip? }` | function forms                                            |
 
 ```ts
 // adapter: "mongoose"

@@ -33,7 +33,7 @@ interface User {
 }
 
 export const qk = createRegistry({
-  adapter: "drizzle-pg", // "mongoose" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg" — types `with` only
+  adapter: "drizzle-pg", // "mongoose" | "mongodb" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg" — types `with` only
   defaults: { perPage: 20, limit: 20 },
   timestamps: { createdAt: "createdAt" }, // same name as the backend; the default sort is this field, desc
 });
@@ -103,6 +103,11 @@ const posts = createRegistry({ adapter: "drizzle-pg" }).resource<{ id: number; t
 // only relations and columns the backend lists in `relations`
 const body = posts.list({ with: { author: { columns: { name: true } } }, page: 1 });
 console.log(body.with);
+
+// `@querykitjs/mongodb` loads no relations: `with` is a type error there — fetch the author with a second request
+const comments = createRegistry({ adapter: "mongodb" }).resource<{ _id: string; authorId: string }>("comments");
+const page = comments.list({ page: 1 });
+console.log(page.page);
 ```
 
 ### Filters in the URL

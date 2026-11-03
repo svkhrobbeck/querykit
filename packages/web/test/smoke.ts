@@ -194,6 +194,13 @@ check("registry with (mongoose select) passthrough", eq((withPayload.with as { a
 // @ts-expect-error `columns` is drizzle-only — not offered for adapter "mongoose"
 users.list({ with: { author: { columns: { name: true } } } });
 
+// adapter "mongodb": the same payload as "mongoose"; `with` is a compile-time error (the server answers forbidden-key)
+const mongodbQk = createRegistry({ adapter: "mongodb", defaults: { perPage: 20, sort: ["-createdAt"], cursor: { order: "asc" } }, pruneEmpty: true });
+const mongodbUsers = mongodbQk.resource<Buyer>("users");
+check("registry mongodb list payload equals mongoose", eq(mongodbUsers.list({ page: 1 }), users.list({ page: 1 })));
+// @ts-expect-error the mongodb adapter loads no relations — no `with`
+mongodbUsers.list({ with: { author: true } });
+
 // search preset — OR of contains across fields
 const searchFilter = users.search("ali", ["buyerName", "status"]);
 check(

@@ -33,11 +33,13 @@ export interface PrismaInclude {
 }
 
 /** Supported registry backend adapters. */
-export type AdapterName = "mongoose" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg";
+export type AdapterName = "mongoose" | "mongodb" | "drizzle-pg" | "drizzle-sqlite" | "prisma-pg";
 
 /** The per-relation `with` value shape for each adapter. */
 export interface AdapterWithConfig {
   mongoose: boolean | MongoosePopulate;
+  /** `never`: `@querykitjs/mongodb` loads no relations and refuses any `with` (`forbidden-key`) — load them with a second request. */
+  mongodb: never;
   "drizzle-pg": boolean | DrizzleWith;
   "drizzle-sqlite": boolean | DrizzleWith;
   "prisma-pg": boolean | PrismaInclude;
