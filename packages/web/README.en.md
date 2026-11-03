@@ -48,10 +48,10 @@ function UsersPage() {
 - **3 pagination modes** — offset (`list`), infinite (`infinite`), cursor/keyset (`cursor`); each has its own `parse*` to camelCase the meta.
 - **Adapter-aware `with`** — only **wire-safe** (JSON) per-relation options are suggested for `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg`; function/SQL forms are never offered. `mongodb` has no `with` — load relations with a second request.
 - **Declarative schema** — `resource.schema` / `defineListSchema` maps URL params → filter; kills the per-page hand-building.
-- **React hooks** — `useListParams` (react-router inside), `useListParamsBase` (router-agnostic). Framework-agnostic core — Vue can bind the same core.
+- **React hooks and Vue composables** — `useListParams` (react-router / vue-router inside), `useListParamsBase` (router-agnostic), in `/react` and `/vue`. `createListState` — the same logic, framework-free.
 - **SSR** — `resource.fromSearchParams(sp, {schema})` builds a payload straight from `URLSearchParams`, no hook.
 - **Query keys** — `resource.keys` gives stable keys for TanStack/SWR.
-- **Zero dependency** — no axios/react-query/dayjs. `react` (+ `react-router` for the hook) are optional peers.
+- **Zero dependency** — no axios/react-query/dayjs. `react` (+ `react-router` for the hook) and `vue` (+ `vue-router`) are optional peers.
 
 ## Install
 
@@ -59,6 +59,7 @@ function UsersPage() {
 bun add @querykitjs/web
 # React hook: react (peer). `useListParams` also peers react-router.
 # The router-agnostic `useListParamsBase` needs no react-router.
+# Vue composable: vue (peer). `useListParams` also peers vue-router.
 ```
 
 ### Requirements
@@ -68,8 +69,10 @@ bun add @querykitjs/web
 | Node.js                                              | `>=22.12`            | 24                             |
 | `react` (optional peer)                              | `^18.3 \|\| ^19.2.7` | 18.3.1, 19.3.1                 |
 | `react-router` (optional peer, `useListParams` only) | `^7.0 \|\| ^8.0`     | 7.18.5, 8.5.1                  |
+| `vue` (optional peer)                                | `^3.5`               | 3.5.0, 3.5.44                  |
+| `vue-router` (optional peer, `useListParams` only)   | `^4.6 \|\| ^5`       | 4.6.4, 5.4.0                   |
 
-Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested.
+Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested. Vue has one supported major: its range starts at 3.5, the oldest minor vue-router 4.6 accepts.
 
 **`react-router-dom` → `react-router`.** `useListParams` now imports from `react-router` (v7 and v8 both export `useSearchParams`). A project that has `react-router-dom` installs `react-router` too — on v7 it is already a dependency of `react-router-dom`: `npm i react-router`.
 
@@ -339,6 +342,49 @@ import { useListParamsBase } from "@querykitjs/web/react";
 const { params, setPage } = useListParamsBase(users, { schema: usersSchema, searchParams, setSearchParams });
 ```
 
+## Vue composable
+
+```ts
+import { useListParams } from "@querykitjs/web/vue"; // uses vue-router internally
+import { useQuery } from "@tanstack/vue-query";
+import { computed } from "vue";
+
+const users = qk.resource<IUser>("users");
+const usersSchema = users.schema({ name: { operation: "%_%", trim: true }, status: { operation: "=" } });
+
+// inside <script setup>
+const { params, clamped, setParam, setPage, setSort, reset } = useListParams(users, { schema: usersSchema });
+
+const q = useQuery({
+  queryKey: computed(() => users.keys.list(params.value)),
+  queryFn: async () => users.parseList((await axios.post("/users/list", params.value)).data),
+});
+// setParam("status", "active") → router.push({ query }) (a new history entry), page reset
+```
+
+The same reads, clamping and setters as the React hook — `params`, `clamped` and `searchParams` are computed refs.
+A repeated key (`?status=a&status=b`) is kept; `?q` (no `=`) reads as an empty value. Works under SSR (Nuxt): no `window` access.
+
+**Router-agnostic** — pass `searchParams` (a ref, a getter or a value) to the base composable:
+
+```ts
+import { useListParamsBase } from "@querykitjs/web/vue";
+const { params, setPage } = useListParamsBase(users, { schema: usersSchema, searchParams: () => currentSearchParams.value, setSearchParams });
+```
+
+## Any framework — `createListState`
+
+The logic behind both hooks, framework-free (Svelte, Solid, vanilla). Pure: it reads search params and returns the next ones; you navigate.
+
+```ts
+import { createListState } from "@querykitjs/web";
+
+const list = createListState(users, { schema: usersSchema });
+const { params, clamped } = list.read(new URLSearchParams(location.search));
+const next = list.actions(new URLSearchParams(location.search)).setPage(2); // a new URLSearchParams
+history.pushState(null, "", `?${next}`);
+```
+
 ## SSR — `fromSearchParams` (no hook)
 
 For server components / `getServerSideProps` — a payload straight from the URL:
@@ -588,6 +634,8 @@ const { data, meta } = users.parseList(await res.json());
 | `encodeSort/decodeSort`                                                           | `[{key,direction}]` ↔ `"-createdAt,id"` (multi-field)   |
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router)                            |
 | `useListParamsBase(resource, {schema, searchParams, setSearchParams})` (`/react`) | router-agnostic hook                                    |
+| `useListParams` / `useListParamsBase` (`/vue`)                                    | the same as Vue composables (computed refs)             |
+| `createListState(resource, {schema, url?, with?})`                                | framework-free `read(sp)` / `actions(sp)`               |
 
 ## Development
 

@@ -32,7 +32,10 @@ const CHECKED_FENCES = new Set(["ts", "tsx"]);
 /** Optional per-package compilerOptions for the examples (decorators, DOM, JSX); never published. */
 const SKILL_TSCONFIG = "tsconfig.skill.json";
 /** Sub-path entry points published next to a package's main entry. */
-const EXTRA_ENTRIES = { "@querykitjs/web/react": "packages/web/src/react/index.ts" };
+const EXTRA_ENTRIES = {
+  "@querykitjs/web/react": "packages/web/src/react/index.ts",
+  "@querykitjs/web/vue": "packages/web/src/vue/index.ts",
+};
 
 const errors = [];
 const toPosix = p => p.split("\\").join("/");

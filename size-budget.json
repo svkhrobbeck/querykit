@@ -10,6 +10,7 @@
   "@querykitjs/standard-schema": 3441,
   "@querykitjs/tanstack-query": 419,
   "@querykitjs/web": 3591,
-  "@querykitjs/web/react": 675,
+  "@querykitjs/web/react": 787,
+  "@querykitjs/web/vue": 953,
   "@querykitjs/zod": 1781
 }

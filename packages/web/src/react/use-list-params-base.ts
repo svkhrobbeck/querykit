@@ -1,11 +1,11 @@
 import { useCallback, useMemo } from "react";
 
 import type { AdapterName, WithFor } from "../adapter";
+import { createListState } from "../list-state";
 import type { Resource } from "../registry";
 import type { ListSchema } from "../schema";
 import type { ListPayload, SortInput } from "../types";
 import type { UrlConfig } from "../url";
-import { resetParams, setPage, setParam, setSize, setSort } from "../url";
 
 export interface UseListParamsBaseOptions<A extends AdapterName> {
   /** URL↔filter schema ({@link defineListSchema} / `resource.schema`). Memoize it. */
@@ -47,16 +47,18 @@ export interface UseListParamsResult {
 export function useListParamsBase<T, A extends AdapterName>(resource: Resource<T, A>, options: UseListParamsBaseOptions<A>): UseListParamsResult {
   const { schema, searchParams, setSearchParams, url, with: withRel } = options;
 
-  const params = useMemo(() => resource.fromSearchParams(searchParams, { schema, url, with: withRel }), [resource, schema, searchParams, url, withRel]);
+  const state = useMemo(() => createListState(resource, { schema, url, with: withRel }), [resource, schema, url, withRel]);
+  const { params, clamped } = useMemo(() => state.read(searchParams), [state, searchParams]);
+  const actions = useMemo(() => state.actions(searchParams), [state, searchParams]);
 
   return {
     params,
-    clamped: params.clamped === true,
+    clamped,
     searchParams,
-    setParam: useCallback((name, value) => setSearchParams(setParam(searchParams, name, value, url)), [searchParams, setSearchParams, url]),
-    setPage: useCallback((page: number) => setSearchParams(setPage(searchParams, page, url)), [searchParams, setSearchParams, url]),
-    setSize: useCallback((size: number) => setSearchParams(setSize(searchParams, size, url)), [searchParams, setSearchParams, url]),
-    setSort: useCallback((sort: SortInput) => setSearchParams(setSort(searchParams, sort, url)), [searchParams, setSearchParams, url]),
-    reset: useCallback((keep?: string[]) => setSearchParams(resetParams(searchParams, keep)), [searchParams, setSearchParams]),
+    setParam: useCallback((name, value) => setSearchParams(actions.setParam(name, value)), [actions, setSearchParams]),
+    setPage: useCallback((page: number) => setSearchParams(actions.setPage(page)), [actions, setSearchParams]),
+    setSize: useCallback((size: number) => setSearchParams(actions.setSize(size)), [actions, setSearchParams]),
+    setSort: useCallback((sort: SortInput) => setSearchParams(actions.setSort(sort)), [actions, setSearchParams]),
+    reset: useCallback((keep?: string[]) => setSearchParams(actions.reset(keep)), [actions, setSearchParams]),
   };
 }

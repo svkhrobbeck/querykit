@@ -1,6 +1,6 @@
 ---
 name: querykit-web
-description: Use when frontend code builds or reads a querykit list request (@querykitjs/web, @querykitjs/web/react) - createRegistry({ adapter }), qk.resource<T>(name), f filters, sort, list / infinite / cursor payloads, withTotal, parseList / parseInfinite / parseCursor, search, adapter-aware with, defineListSchema and URL helpers (readListParams, setPage, setSort), useListParams / useListParamsBase (clamped), fromSearchParams for SSR, query keys, or reading a 400 with isQueryKitError.
+description: Use when frontend code builds or reads a querykit list request (@querykitjs/web, @querykitjs/web/react, @querykitjs/web/vue) - createRegistry({ adapter }), qk.resource<T>(name), f filters, sort, list / infinite / cursor payloads, withTotal, parseList / parseInfinite / parseCursor, search, adapter-aware with, defineListSchema and URL helpers (readListParams, setPage, setSort), useListParams / useListParamsBase (clamped) for React and Vue, createListState, fromSearchParams for SSR, query keys, or reading a 400 with isQueryKitError.
 ---
 
 ## Safety rules
@@ -15,7 +15,7 @@ description: Use when frontend code builds or reads a querykit list request (@qu
 
 ## When to use
 
-- A browser or SSR frontend (React, Next.js, any fetch client) that talks to a querykit backend.
+- A browser or SSR frontend (React, Next.js, Vue, Nuxt, any fetch client) that talks to a querykit backend.
 - Building list, infinite-scroll or cursor request bodies, keeping filters in the URL, and caching with TanStack Query or SWR.
 
 The package builds the payload only. You send the request yourself.
@@ -149,6 +149,41 @@ export function UsersListPage() {
     </div>
   );
 }
+```
+
+### Vue list page with `useListParams`
+
+`@querykitjs/web/vue` has the same composables (peers `vue` ^3.5, `vue-router` 4 / 5). `params`, `clamped` and `searchParams` are computed refs; a setter calls `router.push({ query })`.
+
+```ts
+import { createRegistry } from "@querykitjs/web";
+import { useListParams } from "@querykitjs/web/vue";
+import { computed } from "vue";
+
+const users = createRegistry({ adapter: "drizzle-pg" }).resource<{ id: number; name: string; status: string }>("users");
+const usersSchema = users.schema({ name: { operation: "%_%", trim: true }, status: { operation: "=" } });
+
+// call inside <script setup> or setup()
+export function useUsersList() {
+  const { params, clamped, setParam, setPage } = useListParams(users, { schema: usersSchema });
+  if (clamped.value) setPage(params.value.page ?? 1); // fix a hand-edited URL
+  const queryKey = computed(() => users.keys.list(params.value));
+  return { params, queryKey, setName: (name: string) => setParam("name", name) };
+}
+```
+
+### Any other framework with `createListState`
+
+```ts
+import { createListState, createRegistry } from "@querykitjs/web";
+
+const users = createRegistry({ adapter: "prisma-pg" }).resource<{ id: number; name: string }>("users");
+const list = createListState(users, { schema: users.schema({ name: { operation: "%_%" } }) });
+
+const current = new URLSearchParams("name=ali&page=3");
+const { params } = list.read(current); // the payload to send
+const next = list.actions(current).setSort([{ key: "name", direction: "asc" }]); // new params, page reset
+history.pushState(null, "", `?${next.toString()}`);
 ```
 
 ### SSR payload and a refused request

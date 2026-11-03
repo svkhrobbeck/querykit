@@ -48,10 +48,10 @@ function UsersPage() {
 - **3 pagination** — offset (`list`), infinite (`infinite`), cursor/keyset (`cursor`); har birining meta'si alohida `parse*` bilan camelCase'ga o'giriladi.
 - **Adapter-aware `with`** — `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg` uchun faqat **wire-safe** (JSON) relation opsiyalari intellisense'da; funksiya/SQL formalari ko'rsatilmaydi. `mongodb` da `with` yo'q — relation'larni ikkinchi so'rov bilan yuklang.
 - **Declarative schema** — `resource.schema` / `defineListSchema` bilan URL param → filter; har sahifadagi qo'lda qurishni yo'q qiladi.
-- **React hook** — `useListParams` (`react-router` ichida), `useListParamsBase` (router-agnostik). Core framework'siz — Vue ham shu core'ga bog'lanadi.
+- **React hook va Vue composable** — `useListParams` (`react-router` / `vue-router` ichida), `useListParamsBase` (router-agnostik), `/react` va `/vue` da. `createListState` — shu mantiq, framework'siz.
 - **SSR** — `resource.fromSearchParams(sp, {schema})` hook'siz, `URLSearchParams`'dan to'g'ridan-to'g'ri payload.
 - **Query keys** — `resource.keys` TanStack/SWR uchun barqaror kalitlar.
-- **Zero dependency** — axios/react-query/dayjs YO'Q. `react` (+ hook uchun `react-router`) ixtiyoriy peer.
+- **Zero dependency** — axios/react-query/dayjs YO'Q. `react` (+ hook uchun `react-router`) va `vue` (+ `vue-router`) ixtiyoriy peer.
 
 ## O'rnatish
 
@@ -59,6 +59,7 @@ function UsersPage() {
 bun add @querykitjs/web
 # React hook uchun: react (peer). `useListParams` uchun qo'shimcha: react-router (peer).
 # Router-agnostik `useListParamsBase` react-router talab qilmaydi.
+# Vue composable uchun: vue (peer). `useListParams` uchun qo'shimcha: vue-router (peer).
 ```
 
 ### Talablar
@@ -68,8 +69,10 @@ bun add @querykitjs/web
 | Node.js                                                | `>=22.12`            | 24                                   |
 | `react` (ixtiyoriy peer)                               | `^18.3 \|\| ^19.2.7` | 18.3.1, 19.3.1                       |
 | `react-router` (ixtiyoriy peer, faqat `useListParams`) | `^7.0 \|\| ^8.0`     | 7.18.5, 8.5.1                        |
+| `vue` (ixtiyoriy peer)                                 | `^3.5`               | 3.5.0, 3.5.44                        |
+| `vue-router` (ixtiyoriy peer, faqat `useListParams`)   | `^4.6 \|\| ^5`       | 4.6.4, 5.4.0                         |
 
-Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda.
+Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda. Vue'ning bitta qo'llab-quvvatlanadigan major'i bor: diapazon 3.5 dan — vue-router 4.6 qabul qiladigan eng eski minor.
 
 **`react-router-dom` → `react-router`.** `useListParams` endi `react-router`dan import qiladi (v7 va v8 ikkalasi ham `useSearchParams` eksport qiladi). `react-router-dom` o'rnatilgan loyiha `react-router` ni ham o'rnatadi — v7 da u allaqachon `react-router-dom`ning bog'liqligi: `npm i react-router`.
 
@@ -339,6 +342,49 @@ import { useListParamsBase } from "@querykitjs/web/react";
 const { params, setPage } = useListParamsBase(users, { schema: usersSchema, searchParams, setSearchParams });
 ```
 
+## Vue composable
+
+```ts
+import { useListParams } from "@querykitjs/web/vue"; // ichida vue-router
+import { useQuery } from "@tanstack/vue-query";
+import { computed } from "vue";
+
+const users = qk.resource<IUser>("users");
+const usersSchema = users.schema({ name: { operation: "%_%", trim: true }, status: { operation: "=" } });
+
+// <script setup> ichida
+const { params, clamped, setParam, setPage, setSort, reset } = useListParams(users, { schema: usersSchema });
+
+const q = useQuery({
+  queryKey: computed(() => users.keys.list(params.value)),
+  queryFn: async () => users.parseList((await axios.post("/users/list", params.value)).data),
+});
+// setParam("status", "active") → router.push({ query }) (tarixda yangi yozuv), page reset
+```
+
+React hook bilan bir xil o'qish, clamp va setterlar — `params`, `clamped` va `searchParams` computed ref.
+Takroriy kalit (`?status=a&status=b`) saqlanadi; `?q` (`=` siz) bo'sh qiymat sifatida o'qiladi. SSR (Nuxt) da ishlaydi: `window` ga murojaat yo'q.
+
+**Router-agnostik** — base composable'ga `searchParams` (ref, getter yoki qiymat) bering:
+
+```ts
+import { useListParamsBase } from "@querykitjs/web/vue";
+const { params, setPage } = useListParamsBase(users, { schema: usersSchema, searchParams: () => currentSearchParams.value, setSearchParams });
+```
+
+## Istalgan framework — `createListState`
+
+Ikkala hook ortidagi mantiq, framework'siz (Svelte, Solid, vanilla). Toza: search params'ni o'qiydi va keyingisini qaytaradi; navigatsiya sizda.
+
+```ts
+import { createListState } from "@querykitjs/web";
+
+const list = createListState(users, { schema: usersSchema });
+const { params, clamped } = list.read(new URLSearchParams(location.search));
+const next = list.actions(new URLSearchParams(location.search)).setPage(2); // yangi URLSearchParams
+history.pushState(null, "", `?${next}`);
+```
+
 ## SSR — `fromSearchParams` (hook'siz)
 
 Server component / `getServerSideProps` uchun — URL'дан to'g'ridan-to'g'ri payload:
@@ -588,6 +634,8 @@ const { data, meta } = users.parseList(await res.json());
 | `encodeSort/decodeSort`                                                           | `[{key,direction}]` ↔ `"-createdAt,id"` (multi-field)  |
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router)                           |
 | `useListParamsBase(resource, {schema, searchParams, setSearchParams})` (`/react`) | router-agnostik hook                                   |
+| `useListParams` / `useListParamsBase` (`/vue`)                                    | Vue composable sifatida xuddi shu (computed ref)       |
+| `createListState(resource, {schema, url?, with?})`                                | framework'siz `read(sp)` / `actions(sp)`               |
 
 ## Ishlab chiqish
 

@@ -74,9 +74,17 @@ export const EDGES = [
     pkg: "web",
     label: "react 18.3.1 + react-router 7.18.5",
     deps: { react: "18.3.1", "react-dom": "18.3.1", "@types/react": "18.3.31", "@types/react-dom": "18.3.7", "react-router": "7.18.5" },
-    runs: ["test/smoke.ts", "test/hook.ts"],
+    runs: ["test/smoke.ts", "test/hook.ts", "test/url-state.ts"],
   },
-  { pkg: "web", label: "react 19.3.1 + react-router 8.5.1", runs: ["test/smoke.ts", "test/hook.ts"] },
+  { pkg: "web", label: "react 19.3.1 + react-router 8.5.1", runs: ["test/smoke.ts", "test/hook.ts", "test/url-state.ts"] },
+  // Vue 3 is the only supported major (REQUIREMENTS R15 exception); 3.5 is the oldest minor vue-router 4.6 accepts.
+  {
+    pkg: "web",
+    label: "vue 3.5.0 + vue-router 4.6.4",
+    deps: { vue: "3.5.0", "vue-router": "4.6.4" },
+    runs: ["test/url-state.ts", "test/vue.ts"],
+  },
+  { pkg: "web", label: "vue 3.5.44 + vue-router 5.4.0", runs: ["test/url-state.ts", "test/vue.ts"] },
   { pkg: "zod", label: "zod 4.6.7", runs: ["test/smoke.ts"] },
   // query-core lives on one major; the old end is its first release (REQUIREMENTS R15 exception).
   {
@@ -112,7 +120,7 @@ const CONSUMER_ENTRIES = {
   "prisma-pg": ["@querykitjs/prisma-pg"],
   mongoose: ["@querykitjs/mongoose"],
   mongodb: ["@querykitjs/mongodb", "@querykitjs/mongodb/testing"],
-  web: ["@querykitjs/web", "@querykitjs/web/react"],
+  web: ["@querykitjs/web", "@querykitjs/web/react", "@querykitjs/web/vue"],
 };
 
 // `process.exit` right after a write can lose output on Windows pipes; write synchronously.

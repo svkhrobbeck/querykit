@@ -42,6 +42,7 @@ export {
 export type { AdapterName, WithFor, MongoosePopulate, DrizzleWith, PrismaInclude } from "./adapter";
 export { isQueryKitError, type QueryKitErrorBody } from "./errors";
 export { defineListSchema, type FieldDescriptor, type ListSchema } from "./schema";
+export { createListState, type ListState, type ListStateActions, type ListStateOptions, type ListStateRead } from "./list-state";
 export {
   decodeSort,
   encodeSort,
