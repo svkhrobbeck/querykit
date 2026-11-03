@@ -5,8 +5,8 @@
  *
  * React reads through `useListParams` in react-router's `MemoryRouter`; its setters are checked
  * through `useListParamsBase` with a recording `setSearchParams` — server rendering runs no
- * effects, so react-router cannot navigate there (`useListParams` passes the next params through
- * unchanged). Angular runs the same cases in `test/angular.ts`.
+ * effects, so react-router cannot navigate there. `test/real-router-react.ts` runs the same setter
+ * cases through react-router; Angular runs them in `test/angular.ts`.
  */
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";

@@ -77,25 +77,30 @@ export const EDGES = [
     pkg: "web",
     label: "react 18.3.1 + react-router 7.18.5",
     deps: { react: "18.3.1", "react-dom": "18.3.1", "@types/react": "18.3.31", "@types/react-dom": "18.3.7", "react-router": "7.18.5" },
-    runs: ["test/smoke.ts", "test/hook.ts", "test/url-state.ts"],
+    runs: ["test/smoke.ts", "test/hook.ts", "test/url-state.ts", "test/real-router-react.ts"],
   },
-  { pkg: "web", label: "react 19.3.1 + react-router 8.5.1", runs: ["test/smoke.ts", "test/hook.ts", "test/url-state.ts"] },
+  { pkg: "web", label: "react 19.3.1 + react-router 8.5.1", runs: ["test/smoke.ts", "test/hook.ts", "test/url-state.ts", "test/real-router-react.ts"] },
   // Vue 3 is the only supported major (REQUIREMENTS R15 exception); 3.5 is the oldest minor vue-router 4.6 accepts.
   {
     pkg: "web",
     label: "vue 3.5.0 + vue-router 4.6.4",
     deps: { vue: "3.5.0", "vue-router": "4.6.4" },
-    runs: ["test/url-state.ts", "test/vue.ts"],
+    runs: ["test/url-state.ts", "test/vue.ts", "test/real-router-vue.ts"],
   },
-  { pkg: "web", label: "vue 3.5.44 + vue-router 5.4.0", runs: ["test/url-state.ts", "test/vue.ts"] },
+  { pkg: "web", label: "vue 3.5.44 + vue-router 5.4.0", runs: ["test/url-state.ts", "test/vue.ts", "test/real-router-vue.ts"] },
   {
     pkg: "web",
     label: "@angular/core 21.2.26 + @angular/router 21.2.26",
     deps: Object.fromEntries(ANGULAR_RUNTIME.map(name => [name, "21.2.26"])),
     peers: ["@angular/core", "@angular/router"],
-    runs: ["test/angular.ts"],
+    runs: ["test/angular.ts", "test/real-router-angular.ts"],
   },
-  { pkg: "web", label: "@angular/core 22.2.4 + @angular/router 22.2.4", peers: ["@angular/core", "@angular/router"], runs: ["test/angular.ts"] },
+  {
+    pkg: "web",
+    label: "@angular/core 22.2.4 + @angular/router 22.2.4",
+    peers: ["@angular/core", "@angular/router"],
+    runs: ["test/angular.ts", "test/real-router-angular.ts"],
+  },
   { pkg: "zod", label: "zod 4.6.7", runs: ["test/smoke.ts"] },
   // query-core lives on one major; the old end is its first release (REQUIREMENTS R15 exception).
   {

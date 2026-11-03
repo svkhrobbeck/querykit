@@ -94,8 +94,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test:smoke": "bun run test/smoke.ts && bun run test/url-state.ts && bun run test/vue.ts && bun run test/angular.ts",
+    "test:smoke": "bun run test/smoke.ts && bun run test/url-state.ts && bun run test/vue.ts && bun run test/angular.ts && bun run test:real-routers",
     "test:angular": "bun run test/angular.ts",
+    "test:real-routers": "bun run test/real-router-react.ts && bun run test/real-router-vue.ts && bun run test/real-router-angular.ts",
     "test:url-state": "bun run test/url-state.ts",
     "test:hook": "bun run test/hook.ts",
     "test:vue": "bun run test/vue.ts"
@@ -143,6 +144,7 @@
     "@angular/router": "22.2.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "happy-dom": "21.0.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-router": "8.5.1",

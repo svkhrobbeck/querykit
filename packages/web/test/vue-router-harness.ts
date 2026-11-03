@@ -1,9 +1,10 @@
 /**
- * A vue-router on memory history inside a Vue app, with no DOM: composables run through
- * `app.runWithContext` (so `useRoute`/`useRouter` resolve) and `push` calls are counted.
+ * A vue-router inside a Vue app: composables run through `app.runWithContext` (so
+ * `useRoute`/`useRouter` resolve) and `push` calls are counted. Memory history needs no DOM;
+ * `test/real-router-vue.ts` passes `createWebHistory` under happy-dom.
  */
 import { type App, createApp, createSSRApp, type Component } from "vue";
-import { createMemoryHistory, createRouter, type Router } from "vue-router";
+import { createMemoryHistory, createRouter, type Router, type RouterHistory } from "vue-router";
 
 export interface RouterHarness {
   app: App;
@@ -18,8 +19,7 @@ export interface RouterHarness {
 }
 
 /** A router already at `path` (e.g. `/users?page=2`); `root` makes it an SSR app with that root component. */
-export async function routerAt(path: string, root?: Component): Promise<RouterHarness> {
-  const history = createMemoryHistory();
+export async function routerAt(path: string, root?: Component, history: RouterHistory = createMemoryHistory()): Promise<RouterHarness> {
   let pushes = 0;
   let replaces = 0;
   const push = history.push.bind(history);

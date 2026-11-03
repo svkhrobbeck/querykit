@@ -1,7 +1,7 @@
 /**
  * `@querykitjs/web/angular` in a real injection context — no DOM, no network. `TestBed` needs a
  * DOM platform, so `Injector.create` + `runInInjectionContext` host it with a fake `ActivatedRoute`
- * and `Router`; Angular's own `DefaultUrlSerializer` parses each URL. The real Router is not run here.
+ * and `Router`; Angular's own `DefaultUrlSerializer` parses each URL. `test/real-router-angular.ts` runs the real Router.
  *
  *   bun run test/angular.ts
  *
