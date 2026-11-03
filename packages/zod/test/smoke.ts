@@ -13,6 +13,7 @@ import {
   offsetParamsSchema,
 } from "../src/index";
 import "./limits";
+import "./wire";
 
 let passed = 0;
 let failed = 0;
@@ -169,7 +170,7 @@ check(
   "offset-depth issue sits on `page` and names `maxOffset (10000)`",
   !offsetIssue.success && offsetIssue.error.issues[0]?.path.join(".") === "page" && offsetIssue.error.issues[0].message.includes("maxOffset (10000)"),
 );
-/* 18. `withTotal` (task 015, R11): the offset schemas accept the client's `withTotal` flag. */
+/* 18. `withTotal` (R11): the offset schemas accept the client's `withTotal` flag. */
 const noTotal = makeOffsetParamsSchema().safeParse({ page: 1, perPage: 10, withTotal: false });
 check("factory: withTotal false accepted and kept", noTotal.success && noTotal.data.withTotal === false);
 check("factory: withTotal must be a boolean", !makeOffsetParamsSchema().safeParse({ withTotal: "no" }).success);

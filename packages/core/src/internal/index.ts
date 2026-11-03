@@ -2,7 +2,8 @@
  * `@querykitjs/core/internal` — **for adapter and validator authors only.** The
  * driver-neutral pieces the querykit packages share: cursor tokens, skip
  * diagnostics, the per-call repository context, sort normalization, pagination
- * metas, the request-limit walk, the request policy and the bulk-mutation guards. Not part of the application-facing API; it
+ * metas, the request-limit walk, the request policy, the bulk-mutation guards and the wire-contract
+ * checks (filter, sort, params) the validators share. Not part of the application-facing API; it
  * may change in a minor release.
  */
 export { decodeCursor, decodeCursorToken, encodeCursor, encodeCursorToken, type CursorToken } from "./cursor";
@@ -24,4 +25,21 @@ export {
   type LimitViolation,
 } from "./limits";
 export { resolvePolicy, type Policy, type PolicyOptions } from "./policy";
+export {
+  checkFilter,
+  checkParams,
+  checkSort,
+  type WireFilterIssueKey,
+  type WireFilterOptions,
+  type WireIssue,
+  type WireIssueArgs,
+  type WireIssueKey,
+  type WireParamsIssueKey,
+  type WireParamsKind,
+  type WireParamsOptions,
+  type WireParamsResult,
+  type WireServerOwnedField,
+  type WireSortIssueKey,
+  type WireSortOptions,
+} from "./wire-checks";
 export { isRaw } from "../raw";

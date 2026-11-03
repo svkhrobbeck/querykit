@@ -31,6 +31,7 @@ import "./dist";
 import "./cursor";
 import "./mutation";
 import "./with";
+import "./wire";
 
 let passed = 0;
 let failed = 0;
@@ -63,7 +64,7 @@ check("strict throws QueryKitError", thrown instanceof QueryKitError && thrown.i
 const store = createContextStore<{ executor?: string }>();
 const inside = store.run({ executor: "tx" }, () => store.get()?.executor);
 check("context is visible inside run and gone outside", inside === "tx" && store.get() === undefined);
-/* Task 016: node:async_hooks is loaded when a store is created; a runtime without it gets a clear error. */
+/* node:async_hooks is loaded when a store is created; a runtime without it gets a clear error. */
 const getBuiltinModule = process.getBuiltinModule;
 let missing = "";
 try {
@@ -110,7 +111,7 @@ check(
     backward.meta.prev_cursor === (await encodeCursorToken({ k: 4, id: 4 })),
 );
 
-/* request limits (task 008) — the walk judges the filter cases of the shared limit table */
+/* request limits — the walk judges the filter cases of the shared limit table */
 const filterLimitResult = runLimitCases(
   "core walk",
   testCase => findFilterLimitViolation(testCase.params.filter, resolveLimits(testCase.limits)) === undefined,
@@ -147,7 +148,7 @@ check(
 );
 check("formatLimit", formatLimit("maxInItems", 200) === "maxInItems (200)");
 
-/* request policy (task 009) */
+/* request policy */
 const FIELDS = new Map([
   ["id", "id"],
   ["status", "status"],
@@ -253,7 +254,7 @@ check(
     refusal(() => statusPolicy.checkAggregateKey("status")) === "ok",
 );
 
-/* LIKE wildcard limit (task 011) */
+/* LIKE wildcard limit */
 check(
   "likeWildcards: %% counts once, escapes skipped",
   likeWildcards("%%a%") === 2 && likeWildcards("%a%a%b") === 3 && likeWildcards("a\\%b_") === 1 && likeWildcards("abc") === 0,

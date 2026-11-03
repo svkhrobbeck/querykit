@@ -1,7 +1,7 @@
 {
   "@querykitjs/class-validator": 4849,
   "@querykitjs/core": 1208,
-  "@querykitjs/core/internal": 4337,
+  "@querykitjs/core/internal": 6069,
   "@querykitjs/drizzle-pg": 9739,
   "@querykitjs/mongodb": 10069,
   "@querykitjs/mongodb/testing": 183,

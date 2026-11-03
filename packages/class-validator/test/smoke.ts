@@ -10,6 +10,7 @@
  */
 import "reflect-metadata";
 import "./limits";
+import "./wire";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { plainToInstance } from "class-transformer";
@@ -264,7 +265,7 @@ check("factory: allow:[withDeleted] keeps it", admin.instance.withDeleted === tr
 check("factory: allow:[withDeleted] still strips columns", !("columns" in admin.instance));
 check("factory: allow:[withDeleted] type-checks the value", run(Admin, { withDeleted: "yes" }).errors.length === 1);
 
-/* `withTotal` (task 015, R11): a client flag, kept by the offset DTOs under `whitelist`. */
+/* `withTotal` (R11): a client flag, kept by the offset DTOs under `whitelist`. */
 const noTotal = run(makeOffsetParamsDto(), { page: 1, perPage: 10, withTotal: false }, { whitelist: true });
 check("factory: withTotal false kept", noTotal.errors.length === 0 && noTotal.instance.withTotal === false);
 check("factory: withTotal must be a boolean", run(makeOffsetParamsDto(), { withTotal: "no" }).errors.length === 1);
@@ -301,7 +302,7 @@ if (existsSync(fileURLToPath(distUrl))) {
   check("dist build: unknown key rejected", run(DistDto, { filter: [{ key: "b" }] }).errors.length === 1);
   check("dist build: allowed key accepted", run(DistDto, { filter: [{ key: "a" }] }).errors.length === 0);
   check("dist build: perPage cap survives bundling", run(dist.OffsetParamsDto, { perPage: 201 }).errors.length === 1);
-  /* Task 016 minify: exported class names reach Nest / Swagger, so the build keeps them. */
+  /* Minified build: exported class names reach Nest / Swagger, so the build keeps them. */
   check(
     "dist build: exported class names survive minify",
     dist.OffsetParamsDto.name === "OffsetParamsDto" && dist.IsQueryFilterConstraint.name === "IsQueryFilterConstraint" && DistDto.name === "OffsetParamsDto",

@@ -1,0 +1,326 @@
+{
+  "filter: absent": [],
+  "filter: empty array": [],
+  "filter: flat condition": [],
+  "filter: and/or/not tree": [],
+  "filter: node is a string": [
+    {
+      "path": "filter",
+      "key": "querykit.filter.invalid_node",
+      "message": "filter must be a filter condition or an and/or/not group",
+      "args": {
+        "path": "filter"
+      }
+    }
+  ],
+  "filter: flat item is a number": [
+    {
+      "path": "filter[0]",
+      "key": "querykit.filter.invalid_node",
+      "message": "filter[0] must be a filter condition or an and/or/not group",
+      "args": {
+        "path": "filter[0]"
+      }
+    }
+  ],
+  "filter: node without key or group": [
+    {
+      "path": "filter",
+      "key": "querykit.filter.missing_key",
+      "message": "filter is missing the required `key` string",
+      "args": {
+        "path": "filter"
+      }
+    }
+  ],
+  "filter: key is not a string": [
+    {
+      "path": "filter",
+      "key": "querykit.filter.missing_key",
+      "message": "filter is missing the required `key` string",
+      "args": {
+        "path": "filter"
+      }
+    }
+  ],
+  "filter: unknown key with allowedKeys": [
+    {
+      "path": "filter",
+      "key": "querykit.filter.unknown_key",
+      "message": "filter: `secret` is not an allowed filter key",
+      "args": {
+        "path": "filter",
+        "key": "secret"
+      }
+    }
+  ],
+  "filter: allowed key with allowedKeys": [],
+  "filter: unsupported operator": [
+    {
+      "path": "filter.operation",
+      "key": "querykit.filter.invalid_operator",
+      "message": "filter.operation: `~` is not a supported filter operator",
+      "args": {
+        "path": "filter.operation",
+        "operation": "~"
+      }
+    }
+  ],
+  "filter: operator outside allowedOperators": [
+    {
+      "path": "filter.operation",
+      "key": "querykit.filter.invalid_operator",
+      "message": "filter.operation: `like` is not a supported filter operator",
+      "args": {
+        "path": "filter.operation",
+        "operation": "like"
+      }
+    }
+  ],
+  "filter: object value": [
+    {
+      "path": "filter.value",
+      "key": "querykit.filter.invalid_value",
+      "message": "filter.value must be a string, number, boolean, null, or an array of those",
+      "args": {
+        "path": "filter.value"
+      }
+    }
+  ],
+  "filter: NaN value": [
+    {
+      "path": "filter.value",
+      "key": "querykit.filter.invalid_value",
+      "message": "filter.value must be a string, number, boolean, null, or an array of those",
+      "args": {
+        "path": "filter.value"
+      }
+    }
+  ],
+  "filter: array of objects": [
+    {
+      "path": "filter.value",
+      "key": "querykit.filter.invalid_value",
+      "message": "filter.value must be a string, number, boolean, null, or an array of those",
+      "args": {
+        "path": "filter.value"
+      }
+    }
+  ],
+  "filter: and is not an array": [
+    {
+      "path": "filter.and",
+      "key": "querykit.filter.invalid_group",
+      "message": "filter.and must be an array of filter nodes",
+      "args": {
+        "path": "filter.and"
+      }
+    }
+  ],
+  "filter: bad child in or": [
+    {
+      "path": "filter.or[1]",
+      "key": "querykit.filter.invalid_node",
+      "message": "filter.or[1] must be a filter condition or an and/or/not group",
+      "args": {
+        "path": "filter.or[1]"
+      }
+    }
+  ],
+  "filter: bad operator under not": [
+    {
+      "path": "filter.not.operation",
+      "key": "querykit.filter.invalid_operator",
+      "message": "filter.not.operation: `x` is not a supported filter operator",
+      "args": {
+        "path": "filter.not.operation",
+        "operation": "x"
+      }
+    }
+  ],
+  "filter: two bad conditions in order": [
+    {
+      "path": "filter[0].operation",
+      "key": "querykit.filter.invalid_operator",
+      "message": "filter[0].operation: `~` is not a supported filter operator",
+      "args": {
+        "path": "filter[0].operation",
+        "operation": "~"
+      }
+    },
+    {
+      "path": "filter[1].value",
+      "key": "querykit.filter.invalid_value",
+      "message": "filter[1].value must be a string, number, boolean, null, or an array of those",
+      "args": {
+        "path": "filter[1].value"
+      }
+    }
+  ],
+  "filter: strictValue in needs an array": [
+    {
+      "path": "filter.value",
+      "key": "querykit.filter.value_requires_array",
+      "message": "filter.value: `in` requires an array value",
+      "args": {
+        "path": "filter.value",
+        "operation": "in"
+      }
+    }
+  ],
+  "filter: strictValue between needs two": [
+    {
+      "path": "filter.value",
+      "key": "querykit.filter.value_requires_tuple",
+      "message": "filter.value: `between` requires exactly two values",
+      "args": {
+        "path": "filter.value",
+        "operation": "between"
+      }
+    }
+  ],
+  "filter: strictValue isNull takes no value": [
+    {
+      "path": "filter.value",
+      "key": "querykit.filter.value_forbidden",
+      "message": "filter.value: `isNull` must not carry a value",
+      "args": {
+        "path": "filter.value",
+        "operation": "isNull"
+      }
+    }
+  ],
+  "filter: in with a scalar without strictValue": [],
+  "filter: depth 5": [],
+  "filter: depth 6": [
+    {
+      "path": "filter.and[0].and[0].and[0].and[0].and[0]",
+      "key": "querykit.filter.max_depth",
+      "message": "filter.and[0].and[0].and[0].and[0].and[0] exceeds maxDepth (5)",
+      "args": {
+        "path": "filter.and[0].and[0].and[0].and[0].and[0]",
+        "limit": "maxDepth",
+        "max": 5
+      }
+    }
+  ],
+  "filter: not depth 6": [
+    {
+      "path": "filter.not.not.not.not.not",
+      "key": "querykit.filter.max_depth",
+      "message": "filter.not.not.not.not.not exceeds maxDepth (5)",
+      "args": {
+        "path": "filter.not.not.not.not.not",
+        "limit": "maxDepth",
+        "max": 5
+      }
+    }
+  ],
+  "filter: 30 conditions": [],
+  "filter: 31 conditions": [
+    {
+      "path": "filter[30]",
+      "key": "querykit.limit.exceeded",
+      "message": "filter[30] exceeds maxConditions (30)",
+      "args": {
+        "path": "filter[30]",
+        "limit": "maxConditions",
+        "max": 30
+      }
+    }
+  ],
+  "filter: in 200 items": [],
+  "filter: in 201 items": [
+    {
+      "path": "filter.value",
+      "key": "querykit.limit.exceeded",
+      "message": "filter.value exceeds maxInItems (200)",
+      "args": {
+        "path": "filter.value",
+        "limit": "maxInItems",
+        "max": 200
+      }
+    }
+  ],
+  "filter: string 256": [],
+  "filter: string 257": [
+    {
+      "path": "filter.value",
+      "key": "querykit.limit.exceeded",
+      "message": "filter.value exceeds maxStringLength (256)",
+      "args": {
+        "path": "filter.value",
+        "limit": "maxStringLength",
+        "max": 256
+      }
+    }
+  ],
+  "filter: maxInItems 500 override": [],
+  "sort: absent": [],
+  "sort: valid desc": [],
+  "sort: without direction": [],
+  "sort: not an array": [
+    {
+      "path": "sort",
+      "key": "querykit.sort.not_array",
+      "message": "sort must be an array of { key, direction } items",
+      "args": {
+        "path": "sort"
+      }
+    }
+  ],
+  "sort: 3 fields": [],
+  "sort: 4 fields": [
+    {
+      "path": "sort",
+      "key": "querykit.limit.exceeded",
+      "message": "sort exceeds maxSortFields (3)",
+      "args": {
+        "path": "sort",
+        "limit": "maxSortFields",
+        "max": 3
+      }
+    }
+  ],
+  "sort: item is a string": [
+    {
+      "path": "sort[0]",
+      "key": "querykit.sort.invalid_item",
+      "message": "sort[0] must be an object with a `key` string",
+      "args": {
+        "path": "sort[0]"
+      }
+    }
+  ],
+  "sort: item without key": [
+    {
+      "path": "sort[0]",
+      "key": "querykit.sort.missing_key",
+      "message": "sort[0] is missing the required `key` string",
+      "args": {
+        "path": "sort[0]"
+      }
+    }
+  ],
+  "sort: unknown key with allowedKeys": [
+    {
+      "path": "sort[0]",
+      "key": "querykit.sort.unknown_key",
+      "message": "sort[0]: `secret` is not an allowed sort key",
+      "args": {
+        "path": "sort[0]",
+        "key": "secret"
+      }
+    }
+  ],
+  "sort: bad direction": [
+    {
+      "path": "sort[0].direction",
+      "key": "querykit.sort.invalid_direction",
+      "message": "sort[0].direction: direction must be `asc` or `desc`",
+      "args": {
+        "path": "sort[0].direction"
+      }
+    }
+  ]
+}
