@@ -15,31 +15,24 @@
  * dev machine (and pin-workspace-deps also skips locally, so deps would still
  * be `workspace:*` anyway).
  */
-import { execFileSync } from "node:child_process";
-
-import { planPublish, publishablePackages } from "./lib/registry.mjs";
+import { planPublish, publishablePackages, publishPlanned, releaseFirstCommand } from "./lib/registry.mjs";
 
 if (process.env.CI !== "true") {
   console.log("[ci-publish] not CI — skipping (publishing happens in CI via OIDC).");
   process.exit(0);
 }
 
-// A 0.0.0 placeholder is skipped before the registry is asked (lib/registry.mjs planPublish).
-const toPublish = await planPublish(publishablePackages());
+// A 0.0.0 placeholder is skipped before the registry is asked; a name npm has never seen is
+// left out so the other packages still publish (lib/registry.mjs planPublish).
+const { publish, firstByHand } = await planPublish(publishablePackages());
 
-if (toPublish.length === 0) {
-  console.log("Nothing new to publish — release is a no-op.");
-  process.exit(0);
+if (publish.length === 0) console.log("Nothing new to publish — release is a no-op.");
+else {
+  publishPlanned(publish);
+  console.log(`\nPublished ${publish.length} package(s).`);
 }
 
-// @querykitjs/core has no internal deps and the others depend on it — first.
-toPublish.sort((a, b) => (a.name.endsWith("/core") ? -1 : b.name.endsWith("/core") ? 1 : 0));
-
-for (const p of toPublish) {
-  console.log(`\nPublishing ${p.name}@${p.version} ...`);
-  execFileSync("npm", ["publish", "--access", "public"], { cwd: p.dir, stdio: "inherit" });
-  // changesets/action greps the publish command's stdout for these lines and,
-  // for each, creates the git tag and a GitHub Release from the CHANGELOG.
-  console.log(`New tag: ${p.name}@${p.version}`);
+if (firstByHand.length > 0) {
+  const skipped = firstByHand.map(pkg => `${pkg.name}@${pkg.version} (${releaseFirstCommand(pkg)})`);
+  console.log(`\nSkipped (first publish by hand): ${skipped.join(", ")}`);
 }
-console.log(`\nPublished ${toPublish.length} package(s).`);

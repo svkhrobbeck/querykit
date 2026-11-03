@@ -7,7 +7,7 @@
  */
 import { writeSync } from "node:fs";
 
-import { isPlaceholderVersion, latestVersion, publishablePackages, REGISTRY } from "./lib/registry.mjs";
+import { isPlaceholderVersion, latestVersion, publishablePackages, REGISTRY, releaseFirstCommand } from "./lib/registry.mjs";
 
 // `process.exit` right after a write can lose output on Windows pipes; write synchronously.
 const print = text => writeSync(1, `${text}\n`);
@@ -24,7 +24,22 @@ function isNewer(a, b) {
 async function versions() {
   const packages = publishablePackages();
   const npm = await Promise.all(packages.map(pkg => latestVersion(pkg.name)));
-  return packages.map((pkg, index) => ({ name: pkg.name, local: pkg.version, npm: npm[index] }));
+  return packages.map((pkg, index) => ({ name: pkg.name, dir: pkg.dir, local: pkg.version, npm: npm[index] }));
+}
+
+/** A released version npm has never seen under this name: CI skips it (ci-publish), the user publishes it by hand. */
+const isFirstByHand = row => !isPlaceholderVersion(row.local) && row.npm === undefined;
+
+function checkStatus(row) {
+  if (row.npm === row.local) return "ok";
+  if (isPlaceholderVersion(row.local)) return "not ok — placeholder, waiting for the version bump";
+  if (isFirstByHand(row)) return `not ok — new on npm, first publish by hand (${releaseFirstCommand(row)})`;
+  return "not ok";
+}
+
+function pendingStatus(row) {
+  if (isPlaceholderVersion(row.local)) return "placeholder";
+  return isFirstByHand(row) ? "first publish by hand" : "pending";
 }
 
 function table(rows, status) {
@@ -35,7 +50,7 @@ function table(rows, status) {
 
 async function check() {
   const rows = await versions();
-  table(rows, row => (row.npm === row.local ? "ok" : isPlaceholderVersion(row.local) ? "not ok — placeholder, waiting for the version bump" : "not ok"));
+  table(rows, checkStatus);
   const bad = rows.filter(row => row.npm !== row.local).length;
   print(bad === 0 ? `\nrelease-check: all ${rows.length} packages match npm` : `\nrelease-check: ${bad}/${rows.length} packages differ from npm`);
   return bad === 0 ? 0 : 1;
@@ -45,7 +60,7 @@ async function check() {
 async function pending() {
   const rows = (await versions()).filter(row => isPlaceholderVersion(row.local) || row.npm === undefined || isNewer(row.local, row.npm));
   const publishable = rows.filter(row => !isPlaceholderVersion(row.local));
-  if (rows.length > 0) table(rows, row => (isPlaceholderVersion(row.local) ? "placeholder" : "pending"));
+  if (rows.length > 0) table(rows, pendingStatus);
   if (publishable.length === 0) print(`${rows.length > 0 ? "\n" : ""}release-check --pending: nothing waiting for a publish`);
   return 0;
 }
