@@ -4,7 +4,7 @@ import type { AdapterName, WithFor } from "../adapter";
 import type { Resource } from "../registry";
 import type { ListSchema } from "../schema";
 import type { UrlConfig } from "../url";
-import { queryToSearchParams, searchParamsToQuery } from "./query";
+import { queryToSearchParams, searchParamsToQuery } from "../route-query";
 import { useListParamsBase, type UseListParamsResult } from "./use-list-params-base";
 
 export interface UseListParamsOptions<A extends AdapterName> {

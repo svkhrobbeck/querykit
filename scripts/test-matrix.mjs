@@ -24,6 +24,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TSC = { 5.9: join(ROOT, "node_modules", "typescript-59", "bin", "tsc"), "6.0": join(ROOT, "node_modules", "typescript", "bin", "tsc") };
 const WORK = join(tmpdir(), "qk-matrix");
+const INSTALL_ATTEMPTS = 5;
+/** What `@querykitjs/web/angular` runs on: the router's peers and the compiler the unit test links with. */
+const ANGULAR_RUNTIME = ["@angular/core", "@angular/router", "@angular/common", "@angular/platform-browser", "@angular/compiler"];
 const MONGO_SHIM = "../mongoose/test/bun-v8-shim.ts";
 const SKIP_DIRS = new Set(["node_modules", "dist", ".cache", "generated"]);
 
@@ -85,6 +88,14 @@ export const EDGES = [
     runs: ["test/url-state.ts", "test/vue.ts"],
   },
   { pkg: "web", label: "vue 3.5.44 + vue-router 5.4.0", runs: ["test/url-state.ts", "test/vue.ts"] },
+  {
+    pkg: "web",
+    label: "@angular/core 21.2.26 + @angular/router 21.2.26",
+    deps: Object.fromEntries(ANGULAR_RUNTIME.map(name => [name, "21.2.26"])),
+    peers: ["@angular/core", "@angular/router"],
+    runs: ["test/angular.ts"],
+  },
+  { pkg: "web", label: "@angular/core 22.2.4 + @angular/router 22.2.4", peers: ["@angular/core", "@angular/router"], runs: ["test/angular.ts"] },
   { pkg: "zod", label: "zod 4.6.7", runs: ["test/smoke.ts"] },
   // query-core lives on one major; the old end is its first release (REQUIREMENTS R15 exception).
   {
@@ -120,7 +131,7 @@ const CONSUMER_ENTRIES = {
   "prisma-pg": ["@querykitjs/prisma-pg"],
   mongoose: ["@querykitjs/mongoose"],
   mongodb: ["@querykitjs/mongodb", "@querykitjs/mongodb/testing"],
-  web: ["@querykitjs/web", "@querykitjs/web/react", "@querykitjs/web/vue"],
+  web: ["@querykitjs/web", "@querykitjs/web/react", "@querykitjs/web/vue", "@querykitjs/web/angular"],
 };
 
 // `process.exit` right after a write can lose output on Windows pipes; write synchronously.
@@ -248,6 +259,44 @@ function runConsumers(version) {
   return ok;
 }
 
+/**
+ * A minimal app built by the Angular CLI against `@querykitjs/web/angular` as published (`dist`
+ * through `exports`): the plain ESM entry needs no Angular package format. A warning fails it.
+ */
+export function runAngularApp(version) {
+  const dir = join(WORK, `angular-app-${version}`);
+  rmSync(dir, { recursive: true, force: true });
+  cpSync(join(ROOT, "packages", "web", "test", "angular-app"), dir, { recursive: true });
+  const tooling = ["@angular/build", "@angular/cli", "@angular/compiler-cli"];
+  const rootManifest = readJson(join(ROOT, "package.json"));
+  const webManifest = readJson(join(ROOT, "packages", "web", "package.json"));
+  const dependencies = {
+    ...Object.fromEntries([...ANGULAR_RUNTIME, ...tooling].map(name => [name, version])),
+    rxjs: webManifest.devDependencies.rxjs,
+    // @angular/build 21 peers typescript <6.0; 22 needs 6.0.
+    typescript: version.startsWith("21.")
+      ? rootManifest.devDependencies["typescript-59"].replace("npm:typescript@", "")
+      : rootManifest.devDependencies.typescript,
+  };
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "qk-angular-app", private: true, dependencies }, null, 2));
+  // bun's tarball cache races on Windows (EPERM on rename) with this many packages; what it cached stays.
+  let install = run("bun", ["install", "--ignore-scripts"], dir);
+  for (let attempt = 1; !install.ok && attempt < INSTALL_ATTEMPTS; attempt++) install = run("bun", ["install", "--ignore-scripts"], dir);
+  let result = install;
+  if (install.ok) {
+    for (const name of ["core", "web"]) {
+      const target = join(dir, "node_modules", "@querykitjs", name);
+      cpSync(join(ROOT, "packages", name, "dist"), join(target, "dist"), { recursive: true });
+      cpSync(join(ROOT, "packages", name, "package.json"), join(target, "package.json"));
+    }
+    result = run("node", [join(dir, "node_modules", "@angular", "cli", "bin", "ng.js"), "build"], dir);
+  }
+  const ok = result.ok && !/\bWARNING\b/.test(result.output);
+  print(`${ok ? "✅" : "❌"} web · Angular ${version} app build (@angular/build)`);
+  if (!ok) print(result.output.split("\n").slice(-25).join("\n"));
+  return ok;
+}
+
 function main() {
   mkdirSync(WORK, { recursive: true });
   const build = run("bun", ["run", "build"], ROOT);
@@ -256,7 +305,7 @@ function main() {
     process.exitCode = 1;
     return;
   }
-  const results = [...EDGES.map(runEdge), runConsumers("5.9"), runConsumers("6.0")];
+  const results = [...EDGES.map(runEdge), runConsumers("5.9"), runConsumers("6.0"), runAngularApp("21.2.26"), runAngularApp("22.2.4")];
   const failed = results.filter(ok => !ok).length;
   print(`\ntest:matrix: ${results.length - failed}/${results.length} passed`);
   if (failed > 0) process.exitCode = 1;

@@ -48,10 +48,10 @@ function UsersPage() {
 - **3 pagination modes** — offset (`list`), infinite (`infinite`), cursor/keyset (`cursor`); each has its own `parse*` to camelCase the meta.
 - **Adapter-aware `with`** — only **wire-safe** (JSON) per-relation options are suggested for `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg`; function/SQL forms are never offered. `mongodb` has no `with` — load relations with a second request.
 - **Declarative schema** — `resource.schema` / `defineListSchema` maps URL params → filter; kills the per-page hand-building.
-- **React hooks and Vue composables** — `useListParams` (react-router / vue-router inside), `useListParamsBase` (router-agnostic), in `/react` and `/vue`. `createListState` — the same logic, framework-free.
+- **React hooks, Vue composables and Angular signals** — `useListParams` (react-router / vue-router inside) and `useListParamsBase` (router-agnostic) in `/react` and `/vue`; `injectListParams` and `injectListParamsBase` in `/angular`. `createListState` — the same logic, framework-free.
 - **SSR** — `resource.fromSearchParams(sp, {schema})` builds a payload straight from `URLSearchParams`, no hook.
 - **Query keys** — `resource.keys` gives stable keys for TanStack/SWR.
-- **Zero dependency** — no axios/react-query/dayjs. `react` (+ `react-router` for the hook) and `vue` (+ `vue-router`) are optional peers.
+- **Zero dependency** — no axios/react-query/dayjs. `react` (+ `react-router` for the hook) `vue` (+ `vue-router`) and `@angular/core` (+ `@angular/router`, `rxjs`) are optional peers.
 
 ## Install
 
@@ -60,17 +60,21 @@ bun add @querykitjs/web
 # React hook: react (peer). `useListParams` also peers react-router.
 # The router-agnostic `useListParamsBase` needs no react-router.
 # Vue composable: vue (peer). `useListParams` also peers vue-router.
+# Angular: @angular/core and rxjs (peers). `injectListParams` also peers @angular/router.
 ```
 
 ### Requirements
 
-|                                                      | Version              | Tested (`bun run test:matrix`) |
-| ---------------------------------------------------- | -------------------- | ------------------------------ |
-| Node.js                                              | `>=22.12`            | 24                             |
-| `react` (optional peer)                              | `^18.3 \|\| ^19.2.7` | 18.3.1, 19.3.1                 |
-| `react-router` (optional peer, `useListParams` only) | `^7.0 \|\| ^8.0`     | 7.18.5, 8.5.1                  |
-| `vue` (optional peer)                                | `^3.5`               | 3.5.0, 3.5.44                  |
-| `vue-router` (optional peer, `useListParams` only)   | `^4.6 \|\| ^5`       | 4.6.4, 5.4.0                   |
+|                                                            | Version              | Tested (`bun run test:matrix`) |
+| ---------------------------------------------------------- | -------------------- | ------------------------------ |
+| Node.js                                                    | `>=22.12`            | 24                             |
+| `react` (optional peer)                                    | `^18.3 \|\| ^19.2.7` | 18.3.1, 19.3.1                 |
+| `react-router` (optional peer, `useListParams` only)       | `^7.0 \|\| ^8.0`     | 7.18.5, 8.5.1                  |
+| `vue` (optional peer)                                      | `^3.5`               | 3.5.0, 3.5.44                  |
+| `vue-router` (optional peer, `useListParams` only)         | `^4.6 \|\| ^5`       | 4.6.4, 5.4.0                   |
+| `@angular/core` (optional peer)                            | `^21 \|\| ^22`       | 21.2.26, 22.2.4                |
+| `@angular/router` (optional peer, `injectListParams` only) | `^21 \|\| ^22`       | 21.2.26, 22.2.4                |
+| `rxjs` (optional peer, Angular's own)                      | `^7.8`               | 7.8.2                          |
 
 Node 20 is no longer supported (`engines`: `>=22.12`). Peer ranges cover the last two majors; both ends are tested. Vue has one supported major: its range starts at 3.5, the oldest minor vue-router 4.6 accepts.
 
@@ -372,9 +376,39 @@ import { useListParamsBase } from "@querykitjs/web/vue";
 const { params, setPage } = useListParamsBase(users, { schema: usersSchema, searchParams: () => currentSearchParams.value, setSearchParams });
 ```
 
+## Angular
+
+```ts
+import { Component, computed } from "@angular/core";
+import { injectListParams } from "@querykitjs/web/angular"; // uses the Angular Router
+
+const users = qk.resource<IUser>("users");
+const usersSchema = users.schema({ name: { operation: "%_%", trim: true }, status: { operation: "=" } });
+
+@Component({
+  selector: "app-users",
+  template: `<button (click)="list.setPage(2)">{{ list.params().page }}</button>`,
+})
+export class UsersPage {
+  readonly list = injectListParams(users, { schema: usersSchema });
+  readonly queryKey = computed(() => users.keys.list(this.list.params()));
+  // list.setParam("status", "active") → router.navigate (a new history entry), page reset
+}
+```
+
+The same reads, clamping and setters as the React and Vue versions — `params`, `clamped` and `searchParams` are signals. Call it in an injection context (a field initializer or a constructor); elsewhere Angular throws `NG0203`. A plain ESM entry: no decorator and no Angular package format, it builds with `@angular/build`.
+
+**Router-agnostic** — pass your own `searchParams` signal to the base function:
+
+```ts
+import { injectListParamsBase } from "@querykitjs/web/angular";
+const searchParams = signal(new URLSearchParams());
+const list = injectListParamsBase(users, { schema: usersSchema, searchParams, setSearchParams: next => searchParams.set(next) });
+```
+
 ## Any framework — `createListState`
 
-The logic behind both hooks, framework-free (Svelte, Solid, vanilla). Pure: it reads search params and returns the next ones; you navigate.
+The logic behind all of them, framework-free (Svelte, Solid, vanilla). Pure: it reads search params and returns the next ones; you navigate.
 
 ```ts
 import { createListState } from "@querykitjs/web";
@@ -635,6 +669,7 @@ const { data, meta } = users.parseList(await res.json());
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router)                            |
 | `useListParamsBase(resource, {schema, searchParams, setSearchParams})` (`/react`) | router-agnostic hook                                    |
 | `useListParams` / `useListParamsBase` (`/vue`)                                    | the same as Vue composables (computed refs)             |
+| `injectListParams` / `injectListParamsBase` (`/angular`)                          | the same as Angular signals                             |
 | `createListState(resource, {schema, url?, with?})`                                | framework-free `read(sp)` / `actions(sp)`               |
 
 ## Development

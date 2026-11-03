@@ -3,39 +3,21 @@
  *
  *   bun run test/url-state.ts
  *
- * The reference is the plain `url.ts` functions + `resource.fromSearchParams`. React reads
- * through `useListParams` in react-router's `MemoryRouter`; its setters are checked through
- * `useListParamsBase` with a recording `setSearchParams` — server rendering runs no effects,
- * so react-router cannot navigate there (`useListParams` passes the next params through unchanged).
+ * React reads through `useListParams` in react-router's `MemoryRouter`; its setters are checked
+ * through `useListParamsBase` with a recording `setSearchParams` — server rendering runs no
+ * effects, so react-router cannot navigate there (`useListParams` passes the next params through
+ * unchanged). Angular runs the same cases in `test/angular.ts`.
  */
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter, useSearchParams } from "react-router";
 
-import { createListState, resetParams, setPage, setParam, setSize, setSort } from "../src/index";
+import { createListState } from "../src/index";
 import { useListParams, useListParamsBase } from "../src/react/index";
 import type { UseListParamsResult } from "../src/react/index";
 import { useListParams as useVueListParams } from "../src/vue/index";
-import { type ListSetters, type ListStateDriver, runUrlStateCases, users, usersSchema as schema } from "./url-state-cases";
+import { type ListStateDriver, reference, runUrlStateCases, users, usersSchema as schema } from "./url-state-cases";
 import { routerAt } from "./vue-router-harness";
-
-const reference: ListStateDriver = {
-  async read(search) {
-    const params = users.fromSearchParams(new URLSearchParams(search), { schema });
-    return { params, clamped: params.clamped === true };
-  },
-  async act(search, action) {
-    const current = new URLSearchParams(search);
-    const setters: ListSetters = {
-      setParam: (name, value) => setParam(current, name, value),
-      setPage: page => setPage(current, page),
-      setSize: size => setSize(current, size),
-      setSort: sort => setSort(current, sort),
-      reset: keep => resetParams(current, keep),
-    };
-    return (action(setters) as URLSearchParams).toString();
-  },
-};
 
 function renderAt(search: string, probe: () => null) {
   renderToString(createElement(MemoryRouter, { initialEntries: [`/users?${search}`] }, createElement(probe)));

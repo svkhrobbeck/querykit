@@ -35,6 +35,7 @@ const SKILL_TSCONFIG = "tsconfig.skill.json";
 const EXTRA_ENTRIES = {
   "@querykitjs/web/react": "packages/web/src/react/index.ts",
   "@querykitjs/web/vue": "packages/web/src/vue/index.ts",
+  "@querykitjs/web/angular": "packages/web/src/angular/index.ts",
 };
 
 const errors = [];

@@ -16,7 +16,7 @@ result types inferred automatically.
 | [`@querykitjs/prisma-pg`](./packages/prisma-pg)             | ✅ available | Prisma + PostgreSQL (backend repository)                                                                                       |
 | [`@querykitjs/mongoose`](./packages/mongoose)               | ✅ available | Mongoose + MongoDB (backend repository)                                                                                        |
 | [`@querykitjs/mongodb`](./packages/mongodb)                 | ✅ available | MongoDB official driver (backend repository, no mongoose)                                                                      |
-| [`@querykitjs/web`](./packages/web)                         | ✅ available | Frontend query-building (filters, pagination, URL sync) · React · Vue                                                          |
+| [`@querykitjs/web`](./packages/web)                         | ✅ available | Frontend query-building (filters, pagination, URL sync) · React · Vue · Angular                                                |
 | [`@querykitjs/tanstack-query`](./packages/tanstack-query)   | ✅ available | Ready TanStack Query options from a web resource (list, infinite, cursor) — React, Vue, Solid, Svelte                          |
 | [`@querykitjs/zod`](./packages/zod)                         | ✅ available | Zod schemas validating the request contract (backend)                                                                          |
 | [`@querykitjs/class-validator`](./packages/class-validator) | ✅ available | class-validator decorators + DTOs for the same contract (Nest)                                                                 |

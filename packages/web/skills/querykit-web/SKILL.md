@@ -1,6 +1,6 @@
 ---
 name: querykit-web
-description: Use when frontend code builds or reads a querykit list request (@querykitjs/web, @querykitjs/web/react, @querykitjs/web/vue) - createRegistry({ adapter }), qk.resource<T>(name), f filters, sort, list / infinite / cursor payloads, withTotal, parseList / parseInfinite / parseCursor, search, adapter-aware with, defineListSchema and URL helpers (readListParams, setPage, setSort), useListParams / useListParamsBase (clamped) for React and Vue, createListState, fromSearchParams for SSR, query keys, or reading a 400 with isQueryKitError.
+description: Use when frontend code builds or reads a querykit list request (@querykitjs/web, /react, /vue, /angular) - createRegistry({ adapter }), qk.resource<T>(name), f filters, sort, list / infinite / cursor payloads, withTotal, parseList / parseInfinite / parseCursor, search, adapter-aware with, defineListSchema and URL helpers (readListParams, setPage, setSort), useListParams / useListParamsBase (clamped) for React and Vue, injectListParams for Angular, createListState, fromSearchParams for SSR, query keys, or reading a 400 with isQueryKitError.
 ---
 
 ## Safety rules
@@ -15,7 +15,7 @@ description: Use when frontend code builds or reads a querykit list request (@qu
 
 ## When to use
 
-- A browser or SSR frontend (React, Next.js, Vue, Nuxt, any fetch client) that talks to a querykit backend.
+- A browser or SSR frontend (React, Next.js, Vue, Nuxt, Angular, any fetch client) that talks to a querykit backend.
 - Building list, infinite-scroll or cursor request bodies, keeping filters in the URL, and caching with TanStack Query or SWR.
 
 The package builds the payload only. You send the request yourself.
@@ -169,6 +169,26 @@ export function useUsersList() {
   if (clamped.value) setPage(params.value.page ?? 1); // fix a hand-edited URL
   const queryKey = computed(() => users.keys.list(params.value));
   return { params, queryKey, setName: (name: string) => setParam("name", name) };
+}
+```
+
+### Angular list page with `injectListParams`
+
+`@querykitjs/web/angular` has the same state as signals (peers `@angular/core`, `@angular/router` 21 / 22, `rxjs`). A setter calls `router.navigate`. Call it in an injection context, or Angular throws `NG0203`.
+
+```ts
+import { computed } from "@angular/core";
+import { createRegistry } from "@querykitjs/web";
+import { injectListParams } from "@querykitjs/web/angular";
+
+const users = createRegistry({ adapter: "drizzle-pg" }).resource<{ id: number; name: string; status: string }>("users");
+const usersSchema = users.schema({ name: { operation: "%_%", trim: true }, status: { operation: "=" } });
+
+// call from a component field initializer or constructor
+export function injectUsersList() {
+  const list = injectListParams(users, { schema: usersSchema });
+  const queryKey = computed(() => users.keys.list(list.params()));
+  return { list, queryKey, setName: (name: string) => list.setParam("name", name) };
 }
 ```
 

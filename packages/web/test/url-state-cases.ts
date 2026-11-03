@@ -5,7 +5,7 @@
  */
 import { deepStrictEqual } from "node:assert";
 
-import { createRegistry, defineListSchema } from "../src/index";
+import { createRegistry, defineListSchema, resetParams, setPage, setParam, setSize, setSort } from "../src/index";
 import type { ListPayload, SortInput } from "../src/index";
 
 interface User {
@@ -96,6 +96,25 @@ export const URL_STATE_CASES: UrlStateCase[] = [
   { name: "setPage keeps an empty value", search: "q=&status=active", action: s => s.setPage(2), next: "q=&status=active&page=2" },
 ];
 
+/** The plain `url.ts` functions + `resource.fromSearchParams`: what every implementation is compared with. */
+export const reference: ListStateDriver = {
+  async read(search) {
+    const params = users.fromSearchParams(new URLSearchParams(search), { schema: usersSchema });
+    return { params, clamped: params.clamped === true };
+  },
+  async act(search, action) {
+    const current = new URLSearchParams(search);
+    const setters: ListSetters = {
+      setParam: (name, value) => setParam(current, name, value),
+      setPage: page => setPage(current, page),
+      setSize: size => setSize(current, size),
+      setSort: sort => setSort(current, sort),
+      reset: keep => resetParams(current, keep),
+    };
+    return (action(setters) as URLSearchParams).toString();
+  },
+};
+
 function equal(actual: unknown, expected: unknown): string {
   try {
     deepStrictEqual(actual, expected);
@@ -106,7 +125,7 @@ function equal(actual: unknown, expected: unknown): string {
 }
 
 /**
- * Runs every case on `driver` and compares it with `reference` (the plain `url.ts` functions).
+ * Runs every case on `driver` and compares it with `reference`.
  * Returns the failures; prints one line per case.
  */
 export async function runUrlStateCases(label: string, driver: ListStateDriver, reference: ListStateDriver): Promise<number> {

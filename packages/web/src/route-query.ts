@@ -1,5 +1,5 @@
 /**
- * A route query as vue-router gives it: v4 has `string | null | (string | null)[]` per key,
+^ * A route query as vue-router gives it: v4 has `string | null | (string | null)[]` per key,
  * v5 always an array. `null` is a key without `=` (`?q`).
  */
 export type RouteQuery = Record<string, string | null | (string | null)[] | undefined>;

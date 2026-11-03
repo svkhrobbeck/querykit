@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": false,
+    "outDir": "out-tsc",
+    "lib": ["ES2022", "DOM"]
+  },
+  "files": ["src/main.ts"]
+}

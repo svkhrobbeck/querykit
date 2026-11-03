@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/react/index.ts", "src/vue/index.ts"],
+  entry: ["src/index.ts", "src/react/index.ts", "src/vue/index.ts", "src/angular/index.ts"],
   format: ["esm", "cjs"],
   target: "es2020",
   platform: "neutral",

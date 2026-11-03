@@ -10,7 +10,7 @@
 import { defineComponent, h, version as vueVersion } from "vue";
 import { renderToString } from "vue/server-renderer";
 
-import { queryToSearchParams, searchParamsToQuery } from "../src/vue/query";
+import { queryToSearchParams, searchParamsToQuery } from "../src/route-query";
 import { useListParams } from "../src/vue/index";
 import { users, usersSchema as schema } from "./url-state-cases";
 import { routerAt } from "./vue-router-harness";

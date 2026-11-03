@@ -48,10 +48,10 @@ function UsersPage() {
 - **3 pagination** — offset (`list`), infinite (`infinite`), cursor/keyset (`cursor`); har birining meta'si alohida `parse*` bilan camelCase'ga o'giriladi.
 - **Adapter-aware `with`** — `mongoose`/`drizzle-pg`/`drizzle-sqlite`/`prisma-pg` uchun faqat **wire-safe** (JSON) relation opsiyalari intellisense'da; funksiya/SQL formalari ko'rsatilmaydi. `mongodb` da `with` yo'q — relation'larni ikkinchi so'rov bilan yuklang.
 - **Declarative schema** — `resource.schema` / `defineListSchema` bilan URL param → filter; har sahifadagi qo'lda qurishni yo'q qiladi.
-- **React hook va Vue composable** — `useListParams` (`react-router` / `vue-router` ichida), `useListParamsBase` (router-agnostik), `/react` va `/vue` da. `createListState` — shu mantiq, framework'siz.
+- **React hook, Vue composable va Angular signal** — `useListParams` (`react-router` / `vue-router` ichida) va `useListParamsBase` (router-agnostik) `/react` va `/vue` da; `injectListParams` va `injectListParamsBase` `/angular` da. `createListState` — shu mantiq, framework'siz.
 - **SSR** — `resource.fromSearchParams(sp, {schema})` hook'siz, `URLSearchParams`'dan to'g'ridan-to'g'ri payload.
 - **Query keys** — `resource.keys` TanStack/SWR uchun barqaror kalitlar.
-- **Zero dependency** — axios/react-query/dayjs YO'Q. `react` (+ hook uchun `react-router`) va `vue` (+ `vue-router`) ixtiyoriy peer.
+- **Zero dependency** — axios/react-query/dayjs YO'Q. `react` (+ hook uchun `react-router`) `vue` (+ `vue-router`) va `@angular/core` (+ `@angular/router`, `rxjs`) ixtiyoriy peer.
 
 ## O'rnatish
 
@@ -60,17 +60,21 @@ bun add @querykitjs/web
 # React hook uchun: react (peer). `useListParams` uchun qo'shimcha: react-router (peer).
 # Router-agnostik `useListParamsBase` react-router talab qilmaydi.
 # Vue composable uchun: vue (peer). `useListParams` uchun qo'shimcha: vue-router (peer).
+# Angular uchun: @angular/core va rxjs (peer). `injectListParams` uchun qo'shimcha: @angular/router (peer).
 ```
 
 ### Talablar
 
-|                                                        | Versiya              | Tekshiriladi (`bun run test:matrix`) |
-| ------------------------------------------------------ | -------------------- | ------------------------------------ |
-| Node.js                                                | `>=22.12`            | 24                                   |
-| `react` (ixtiyoriy peer)                               | `^18.3 \|\| ^19.2.7` | 18.3.1, 19.3.1                       |
-| `react-router` (ixtiyoriy peer, faqat `useListParams`) | `^7.0 \|\| ^8.0`     | 7.18.5, 8.5.1                        |
-| `vue` (ixtiyoriy peer)                                 | `^3.5`               | 3.5.0, 3.5.44                        |
-| `vue-router` (ixtiyoriy peer, faqat `useListParams`)   | `^4.6 \|\| ^5`       | 4.6.4, 5.4.0                         |
+|                                                              | Versiya              | Tekshiriladi (`bun run test:matrix`) |
+| ------------------------------------------------------------ | -------------------- | ------------------------------------ |
+| Node.js                                                      | `>=22.12`            | 24                                   |
+| `react` (ixtiyoriy peer)                                     | `^18.3 \|\| ^19.2.7` | 18.3.1, 19.3.1                       |
+| `react-router` (ixtiyoriy peer, faqat `useListParams`)       | `^7.0 \|\| ^8.0`     | 7.18.5, 8.5.1                        |
+| `vue` (ixtiyoriy peer)                                       | `^3.5`               | 3.5.0, 3.5.44                        |
+| `vue-router` (ixtiyoriy peer, faqat `useListParams`)         | `^4.6 \|\| ^5`       | 4.6.4, 5.4.0                         |
+| `@angular/core` (ixtiyoriy peer)                             | `^21 \|\| ^22`       | 21.2.26, 22.2.4                      |
+| `@angular/router` (ixtiyoriy peer, faqat `injectListParams`) | `^21 \|\| ^22`       | 21.2.26, 22.2.4                      |
+| `rxjs` (ixtiyoriy peer, Angular'ning o'ziniki)               | `^7.8`               | 7.8.2                                |
 
 Node 20 endi qo'llab-quvvatlanmaydi (`engines`: `>=22.12`). Peer diapazoni — oxirgi ikki major; ikkala cheti testda. Vue'ning bitta qo'llab-quvvatlanadigan major'i bor: diapazon 3.5 dan — vue-router 4.6 qabul qiladigan eng eski minor.
 
@@ -372,9 +376,39 @@ import { useListParamsBase } from "@querykitjs/web/vue";
 const { params, setPage } = useListParamsBase(users, { schema: usersSchema, searchParams: () => currentSearchParams.value, setSearchParams });
 ```
 
+## Angular
+
+```ts
+import { Component, computed } from "@angular/core";
+import { injectListParams } from "@querykitjs/web/angular"; // ichida Angular Router
+
+const users = qk.resource<IUser>("users");
+const usersSchema = users.schema({ name: { operation: "%_%", trim: true }, status: { operation: "=" } });
+
+@Component({
+  selector: "app-users",
+  template: `<button (click)="list.setPage(2)">{{ list.params().page }}</button>`,
+})
+export class UsersPage {
+  readonly list = injectListParams(users, { schema: usersSchema });
+  readonly queryKey = computed(() => users.keys.list(this.list.params()));
+  // list.setParam("status", "active") → router.navigate (tarixda yangi yozuv), page reset
+}
+```
+
+React va Vue bilan bir xil o'qish, clamp va setterlar — `params`, `clamped` va `searchParams` signal. Injection context'da chaqiring (field initializer yoki constructor); boshqa joyda Angular `NG0203` xatosini beradi. Oddiy ESM entry: decorator ham, Angular package format ham yo'q, `@angular/build` bilan build bo'ladi.
+
+**Router-agnostik** — base funksiyaga o'z `searchParams` signal'ingizni bering:
+
+```ts
+import { injectListParamsBase } from "@querykitjs/web/angular";
+const searchParams = signal(new URLSearchParams());
+const list = injectListParamsBase(users, { schema: usersSchema, searchParams, setSearchParams: next => searchParams.set(next) });
+```
+
 ## Istalgan framework — `createListState`
 
-Ikkala hook ortidagi mantiq, framework'siz (Svelte, Solid, vanilla). Toza: search params'ni o'qiydi va keyingisini qaytaradi; navigatsiya sizda.
+Ularning hammasi ortidagi mantiq, framework'siz (Svelte, Solid, vanilla). Toza: search params'ni o'qiydi va keyingisini qaytaradi; navigatsiya sizda.
 
 ```ts
 import { createListState } from "@querykitjs/web";
@@ -635,6 +669,7 @@ const { data, meta } = users.parseList(await res.json());
 | `useListParams(resource, {schema})` (`/react`)                                    | URL-sync hook (react-router)                           |
 | `useListParamsBase(resource, {schema, searchParams, setSearchParams})` (`/react`) | router-agnostik hook                                   |
 | `useListParams` / `useListParamsBase` (`/vue`)                                    | Vue composable sifatida xuddi shu (computed ref)       |
+| `injectListParams` / `injectListParamsBase` (`/angular`)                          | Angular signal sifatida xuddi shu                      |
 | `createListState(resource, {schema, url?, with?})`                                | framework'siz `read(sp)` / `actions(sp)`               |
 
 ## Ishlab chiqish
