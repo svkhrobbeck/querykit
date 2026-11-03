@@ -40,7 +40,7 @@ export function buildOrderBy<TTable extends AnyPgTable>(
 }
 
 /**
- * One ORDER BY term with MongoDB's NULL order on every adapter (task 021 B11): NULL
+ * One ORDER BY term with MongoDB's NULL order on every adapter: NULL
  * first on asc, last on desc. PostgreSQL's own default is the opposite on both.
  */
 function ordered(column: AnyPgColumn, direction: "asc" | "desc"): SQL {

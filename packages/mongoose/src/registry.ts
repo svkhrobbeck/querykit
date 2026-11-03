@@ -5,7 +5,7 @@ import { createContextStore } from "@querykitjs/core/internal";
 import type { RelationDocs, RelationMap, Registry, RegistryOptions, Repository, RepositoryExtender, RepositoryOptions } from "./types";
 import { buildRepository, type RepoRuntime } from "./repository";
 
-/** Default read time limit (task 011): long enough for an indexed page, short enough to stop a COLLSCAN. */
+/** Default read time limit: long enough for an indexed page, short enough to stop a COLLSCAN. */
 const DEFAULT_MAX_TIME_MS = 2000;
 
 /**

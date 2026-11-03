@@ -45,7 +45,7 @@ export function castForPath(model: AnyModel, field: string, value: unknown): unk
     const cast = path.cast(value) as unknown;
     if (cast instanceof Date) return Number.isNaN(cast.getTime()) ? INVALID_VALUE : cast;
     if (cast === null || cast === undefined) return INVALID_VALUE;
-    // `cast` does not check an enum; a value outside it can never match (task 021 B8).
+    // `cast` does not check an enum; a value outside it can never match.
     const enumValues = (path as unknown as { enumValues?: readonly unknown[] }).enumValues;
     if (path.instance === "String" && enumValues && enumValues.length > 0 && !enumValues.includes(cast)) return INVALID_VALUE;
     return cast;
@@ -55,7 +55,7 @@ export function castForPath(model: AnyModel, field: string, value: unknown): unk
 }
 
 /**
- * Paths cast here (task 021 B8): a value their type rejects — `age = "abc"`, a
+ * Paths cast here: a value their type rejects — `age = "abc"`, a
  * malformed ObjectId, `"maybe"` for a Boolean, a String outside its enum — is
  * invalid-value before the query runs, instead of a CastError 500 at exec.
  */

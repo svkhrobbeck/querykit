@@ -40,9 +40,9 @@ export interface RepoRuntime {
   onSkippedCondition?: (info: SkippedCondition) => void;
   /** Registry-level request limits; a repository's own `limits` win. */
   limits?: Partial<QueryLimits>;
-  /** Signs cursor tokens (task 012). */
+  /** Signs cursor tokens. */
   cursorSecret?: string;
-  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  /** createdAt / deletedAt field names; default `createdAt`, `deletedAt`. */
   timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
@@ -72,7 +72,7 @@ export interface RepoContext<TTable extends AnyPgTable> {
   /** ORDER BY for a sort; none given ⇒ createdAt desc, else the primary key. */
   sortBy: (sort?: Sort<TTable>) => SQL[];
   /**
-   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * The client's `with`, checked against `relations` (R21): an unlisted relation,
    * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
    * is selected even when the client asks with `true`.
    */
@@ -83,7 +83,7 @@ export interface RepoContext<TTable extends AnyPgTable> {
   /** User filter + scope + soft-delete guard as one WHERE. */
   composeWhere: (userFilter?: Filter<TTable>, withDeleted?: boolean) => SQL | undefined;
   /**
-   * The WHERE of `updateWhere` / `deleteWhere` (task 013): `{ all: true }` → scope and
+   * The WHERE of `updateWhere` / `deleteWhere`: `{ all: true }` → scope and
    * soft-delete guard only; an empty filter — also one whose every condition was skipped —
    * is `empty-filter`; the filter passes the request policy like a read's.
    */
@@ -114,7 +114,7 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
   // Auto-detected columns (by JS property name): updatedAt is bumped on update,
   // deletedAt enables soft-delete.
   const updatedAtCol = resolveColumn(table, "updatedAt");
-  // Task 014: the registry's `timestamps` names these columns (JS key or DB column name).
+  // The registry's `timestamps` names these columns (JS key or DB column name).
   const keyOf = (column: AnyPgColumn | undefined) => (column ? tableColumns(table).find(([, candidate]) => candidate === column)?.[0] : undefined);
   const deletedAtCol = resolveColumn(table, runtime.timestamps?.deletedAt ?? "deletedAt");
   const createdAtCol = resolveColumn(table, runtime.timestamps?.createdAt ?? "createdAt");
@@ -237,7 +237,7 @@ function requireTableKey(schema: Record<string, unknown>, table: AnyPgTable): st
 
 /** The scope as a precompiled WHERE (equality on each field), or `undefined`. */
 function buildScopeWhere<TTable extends AnyPgTable>(table: TTable, config: RepositoryOptions<TTable>): SQL | undefined {
-  // Task 014: an equality value or `{ in: [...] }`.
+  // An equality value or `{ in: [...] }`.
   const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition<TTable>[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this

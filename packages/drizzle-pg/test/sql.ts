@@ -146,7 +146,7 @@ function check(label: string, ok: boolean, extra = "") {
 }
 
 const registry = createRegistry(stubDb, schema);
-/** The 3.x behaviour (task 009 "Migrating to 4.0"): every column filterable with every operator, every column sortable. */
+/** The 3.x behaviour ("Migrating to 4.0"): every column filterable with every operator, every column sortable. */
 const OPEN = {
   filterable: { id: "*", name: "*", email: "*", age: "*", createdAt: "*", createdAtText: "*", deletedAt: "*" },
   sortable: ["id", "name", "email", "age", "createdAt", "createdAtText", "deletedAt"],
@@ -206,7 +206,7 @@ async function main() {
   const textCol = await capture(() => usersRepo.findAll({ filter: [uf.gte("createdAtText", ISO_FROM)] as never }));
   check("mode:'string' timestamp filter passes the raw string", allOk(textCol) && firstParams(textCol)[0] === ISO_FROM, JSON.stringify(firstParams(textCol)));
 
-  /* 6. R11 (task 024): a text pattern on a non-text column is skipped as invalid-value —
+  /* 6. R11: a text pattern on a non-text column is skipped as invalid-value —
    *    Postgres has no `timestamptz ~~* text` operator, so it used to be a 500. */
   const textOnNonText: [string, FilterOperator, string][] = [
     ["contains on a timestamp", "contains", "createdAt"],
@@ -249,7 +249,7 @@ async function main() {
   const invalidDate = await capture(() => usersRepo.findAll({ filter: [uf.gte("createdAt", new Date("nope"))] as never }));
   check("Invalid Date object is skipped too", allOk(invalidDate) && firstParams(invalidDate).length === 0, firstError(invalidDate));
 
-  /* 8. task 021 B8: a numeric column casts a numeric string; a non-numeric one is invalid-value */
+  /* 8. A numeric column casts a numeric string; a non-numeric one is invalid-value */
   const numeric = await capture(() => usersRepo.findAll({ filter: [uf.eq("id", "5")] as never }));
   check("numeric column casts a numeric string to a number", allOk(numeric) && firstParams(numeric)[0] === 5, JSON.stringify(firstParams(numeric)));
   const badNumber = await capture(() => usersRepo.findAll({ filter: [uf.eq("age", "abc")] as never }));
@@ -289,7 +289,7 @@ async function main() {
   );
   check("cursor backward on a timestamp key does not crash", allOk(back), firstError(back));
 
-  // Task 012: a createdAt token handed to the id cursor does not fit the column — invalid-value, not a 500.
+  // A createdAt token handed to the id cursor does not fit the column — invalid-value, not a 500.
   let misfit = "";
   try {
     await usersRepo.findCursor({ limit: 1, cursor: page1.meta.next_cursor });
@@ -299,7 +299,7 @@ async function main() {
   check("a token whose value does not fit the cursor column → invalid-value / cursorKey", misfit === "invalid-value/cursorKey", misfit);
   const idPage = await capture(() => usersRepo.findCursor({ limit: 1 }));
   check("cursor on the default id key still works", allOk(idPage), firstError(idPage));
-  // Task 012 A2: a primary-key cursor seeks on that one column; another cursorKey adds the id tie-break.
+  // A primary-key cursor seeks on that one column; another cursorKey adds the id tie-break.
   const { encodeCursorToken } = await import("@querykitjs/core/internal");
   const idToken = await encodeCursorToken({ k: 5, id: 5 });
   const dateToken = await encodeCursorToken({ k: ISO_FROM, id: 5 });
@@ -511,7 +511,7 @@ async function main() {
     String(badCursor),
   );
 
-  /* 26b. task 014 (R21): a client `with` opens only listed relations and columns, before any SQL. */
+  /* 26b. R21: a client `with` opens only listed relations and columns, before any SQL. */
   {
     recorded = [];
     const bare = await rejects(() => usersRepo.findAll({ with: { posts: true } as never }));

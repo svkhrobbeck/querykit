@@ -1,5 +1,5 @@
 /**
- * The built entries (task 009, `minify: true`): `QueryKitError` keeps its name and
+ * The built entries (`minify: true`): `QueryKitError` keeps its name and
  * class identity across `.` and `./internal`, in ESM and in CJS. Skipped when
  * `dist/` is not built. Imported by `internal.ts`; sets `process.exitCode` on failure.
  */
@@ -49,7 +49,7 @@ if (existsSync(dist("index.js")) && existsSync(dist("index.cjs"))) {
       `dist ${format}: QueryKitError.name survives the build`,
       (error as Error | undefined)?.name === "QueryKitError" && main.QueryKitError.name === "QueryKitError",
     );
-    /* Task 016: no keepNames — every exported error class sets `this.name` itself. */
+    /* No keepNames — every exported error class sets `this.name` itself. */
     const timeout = new main.QueryKitTimeoutError("users", 1);
     check(
       `dist ${format}: QueryKitTimeoutError.name survives the build`,

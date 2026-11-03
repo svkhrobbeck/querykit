@@ -60,7 +60,7 @@ function payloadMismatches(input: Record<string, unknown>, payload: Record<strin
 
 /**
  * The list builder for a case: a case with registry `timestamps` is built by a registry
- * configured the same way, so its default sort names the same createdAt field (task 015).
+ * configured the same way, so its default sort names the same createdAt field.
  */
 function listBuilderFor(testCase: ConformanceCase): (params: never) => unknown {
   const createdAt = testCase.options?.timestamps?.createdAt;
@@ -132,7 +132,7 @@ for (const webCase of webCases) {
 const builders = new Set(webCases.map(webCase => webCase.builder));
 console.log(`web payloads: ${webCases.length - shapeFailures}/${webCases.length} equal the table input (${[...builders].join(", ")})`);
 
-/** Cases added by tasks 008–014 (limits under a policy, policy, cursor, mutations, scope). */
+/** Hardening cases (limits under a policy, policy, cursor, mutations, scope). */
 const HARDENING_CASES = [...POLICY_CASES, ...CURSOR_CASES, ...MUTATION_CASES, ...SCOPE_CASES];
 const hardeningOnWeb = HARDENING_CASES.filter(testCase => !testCase.notBuiltByWeb).length;
 console.log(

@@ -1,7 +1,7 @@
 /**
  * The reference meaning of a wire request, evaluated in memory: which fixture
  * rows a filter selects (SQL three-valued logic), in which order a sort puts
- * them (NULL ordering: first on asc, last on desc — task 021 B11). Every case's `expect` is checked against it
+ * them (NULL ordering: first on asc, last on desc). Every case's `expect` is checked against it
  * (`self-check.ts`), so the table cannot drift from what the contract says.
  *
  * Text operators: `contains` / `startsWith` / `endsWith` / `ilike` are
@@ -84,7 +84,7 @@ export function referenceFilter<T extends Row>(rows: readonly T[], filter: Filte
 }
 
 /**
- * Rows in sort order (task 021 B11: NULL first on asc, last on desc — MongoDB's order, on every adapter; ties keep fixture order). Items
+ * Rows in sort order (NULL first on asc, last on desc — MongoDB's order, on every adapter; ties keep fixture order). Items
  * without a `key` (`null`, `{}`) are dropped, as every adapter does.
  */
 export function referenceSort<T extends Row>(rows: readonly T[], sort: Sort | undefined): T[] {

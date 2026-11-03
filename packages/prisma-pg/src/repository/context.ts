@@ -38,9 +38,9 @@ export interface RepoRuntime {
   onSkippedCondition?: (info: SkippedCondition) => void;
   /** Registry-level request limits; a repository's own `limits` win. */
   limits?: Partial<QueryLimits>;
-  /** Signs cursor tokens (task 012). */
+  /** Signs cursor tokens. */
   cursorSecret?: string;
-  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  /** createdAt / deletedAt field names; default `createdAt`, `deletedAt`. */
   timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
@@ -81,7 +81,7 @@ export interface RepoContext<TDelegate> {
   /** `orderBy` for a sort; none given ⇒ createdAt desc, else the id. */
   sortBy: (sort?: Sort) => Record<string, unknown>[];
   /**
-   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * The client's `with`, checked against `relations` (R21): an unlisted relation,
    * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
    * is selected even when the client asks with `true`.
    */
@@ -97,7 +97,7 @@ export interface RepoContext<TDelegate> {
   /** User filter + scope + soft-delete guard as one `where`. */
   composeWhere: (userFilter?: Filter<TDelegate>, withDeleted?: boolean) => Where | undefined;
   /**
-   * The WHERE of `updateWhere` / `deleteWhere` (task 013): `{ all: true }` → scope and
+   * The WHERE of `updateWhere` / `deleteWhere`: `{ all: true }` → scope and
    * soft-delete guard only; an empty filter — also one whose every condition was skipped —
    * is `empty-filter`; the filter passes the request policy like a read's.
    */
@@ -118,7 +118,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
     onSkipped: runtime.onSkippedCondition,
   };
 
-  // Task 014: the registry's `timestamps` names these fields.
+  // The registry's `timestamps` names these fields.
   const deletedAtField = resolveField(meta, runtime.timestamps?.deletedAt ?? "deletedAt");
   const createdAtField = resolveField(meta, runtime.timestamps?.createdAt ?? "createdAt");
   const sortBy = (sort?: Sort) => buildOrderBy(meta, sort as never, diag, createdAtField) as Record<string, unknown>[];
@@ -192,7 +192,7 @@ export const toArray = <T>(value: T | T[] | undefined): T[] => (value === undefi
 
 /** The scope as a precompiled `where` (equality on each field), or `undefined`. */
 function buildScopeWhere<TDelegate>(meta: ModelMeta, config: RepositoryOptions<TDelegate>): Where | undefined {
-  // Task 014: an equality value or `{ in: [...] }`.
+  // An equality value or `{ in: [...] }`.
   const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this

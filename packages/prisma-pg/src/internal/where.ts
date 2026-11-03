@@ -37,7 +37,7 @@ function buildCondition(meta: ModelMeta, condition: FieldCondition, diag?: Diagn
 
   // A text pattern cannot be matched against a non-String field: Prisma rejects
   // `contains`/`mode` on `Int`/`DateTime`, which would surface as a 500. Every adapter
-  // skips a text pattern on a non-text field (R11, task 024), reported through
+  // skips a text pattern on a non-text field (R11), reported through
   // `onSkippedCondition` instead of a stack trace.
   if (isTextOperator(operator) && !isString) {
     reportSkip(diag, { site: "filter", key: condition.key, operation: operator, reason: "invalid-value" });

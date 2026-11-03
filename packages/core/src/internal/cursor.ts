@@ -29,7 +29,7 @@ export function decodeCursor(cursor?: string | null): unknown | undefined {
 }
 
 /* ------------------------------- token v2 -------------------------------- */
-/* Task 012: `{ v: 2, k, id, s? }` — the cursor key's value and the primary key
+/* `{ v: 2, k, id, s? }` — the cursor key's value and the primary key
  * (tie-break), both scalars; `s` is an HMAC-SHA256 signature when the registry
  * has a `cursorSecret`. Anything else is invalid-value on site cursorKey. */
 

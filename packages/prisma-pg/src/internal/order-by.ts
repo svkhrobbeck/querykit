@@ -22,7 +22,7 @@ export function buildOrderBy(
 
   for (const { key, direction } of normalizeSort(sort, diag)) {
     const field = resolveField(meta, key);
-    // Task 021 B11: MongoDB's NULL order on every adapter — first on asc, last on desc.
+    // MongoDB's NULL order on every adapter — first on asc, last on desc.
     // Prisma takes `nulls` only on an optional field; a required one has no NULLs to place.
     if (field)
       orderBy.push({

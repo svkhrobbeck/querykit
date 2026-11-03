@@ -1,5 +1,5 @@
 /**
- * `filterable` / `sortable` policy and server-side limits (task 010) — attack
+ * `filterable` / `sortable` policy and server-side limits — attack
  * tests, the prisma-pg copy of drizzle-pg's `test/policy.ts` plus relation
  * filters. The delegates are spies: a refused request must never reach them.
  * Imported by `query.ts` (offline, in the gate); sets `process.exitCode` on failure.
@@ -169,7 +169,7 @@ refused(
   "page",
 );
 
-/* A6 — the same safe defaults as drizzle-pg (009 acceptance 7–8). */
+/* The same safe defaults as drizzle-pg. */
 const fromAllowed = { allowedColumns: ["id", "name"] };
 allowed("A6 default allowedColumns: name = x → allowed", await attempt(() => repositoryOf(fromAllowed).findAll!({ filter: [{ key: "name", value: "x" }] })));
 refused(

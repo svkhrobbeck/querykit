@@ -1,5 +1,5 @@
 /**
- * Attack tests for @querykitjs/mongodb (task 017 acceptance 2, 3, 3a, 4, 9; REQUIREMENTS R13) —
+ * Attack tests for @querykitjs/mongodb (REQUIREMENTS R13) —
  * no database: each attack payload must end in the expected `QueryKitError` (or a dropped
  * condition) with the driver not called.
  *

@@ -22,7 +22,7 @@ const prisma = createTestClient();
 
 type Where = Record<string, unknown> | undefined;
 
-/** `updateMany` / `updateManyAndReturn` / `deleteMany` on the case's rows (task 013). */
+/** `updateMany` / `updateManyAndReturn` / `deleteMany` on the case's rows. */
 function write(kind: "update" | "delete", args: { where?: Where; data?: Record<string, unknown> }): ConformanceRow[] {
   recordCall("write");
   const rows = cloneRows();
@@ -64,7 +64,7 @@ export const prismaHarness: Harness = {
         ...policyOptions(options.policy),
         forcedColumns: options.forcedColumns,
         allowedColumns: options.allowedColumns,
-        // Task 021 B11: Prisma 7's runtime model has no nullability, so the fixture declares it.
+        // Prisma 7's runtime model has no nullability, so the fixture declares it.
         fields: [{ name: "age", isRequired: false }],
         scope: options.scope,
       } as never,

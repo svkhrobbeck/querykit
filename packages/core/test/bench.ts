@@ -1,5 +1,5 @@
 /**
- * Filter hot path benchmark (task 016, Locked 4) — informational, not in the gate.
+ * Filter hot path benchmark — informational, not in the gate.
  *
  *   bun --preload ./packages/mongoose/test/bun-v8-shim.ts packages/core/test/bench.ts  (mongodb shares the shim)
  *

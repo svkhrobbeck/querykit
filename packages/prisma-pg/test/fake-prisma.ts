@@ -106,7 +106,7 @@ export function findMany<T extends Row>(rows: readonly T[], args: FindManyArgs =
       typeof value === "string" ? { key, direction: value, nulls: undefined } : { key, direction: value.sort, nulls: value.nulls },
     ),
   );
-  // `{ sort, nulls }` in MongoDB's order (task 021 B11) on every key, or Postgres' default on none.
+  // `{ sort, nulls }` in MongoDB's order on every key, or Postgres' default on none.
   const explicit = keys.filter(k => k.nulls !== undefined).length;
   if (keys.some(k => k.nulls !== undefined && (k.direction === "asc") !== (k.nulls === "first"))) throw new Error("fake-prisma: unsupported nulls order");
   const ordered = sortRows(filtered, keys, explicit ? mongoOrder : pgOrder);

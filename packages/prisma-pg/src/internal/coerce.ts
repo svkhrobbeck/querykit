@@ -73,11 +73,11 @@ export function castForField(meta: ModelMeta, field: string, value: unknown): un
     return INVALID_VALUE;
   }
 
-  // Task 021 B8: a `@db.Uuid` field (known from the runtime model or the `fields`
+  // A `@db.Uuid` field (known from the runtime model or the `fields`
   // override) takes only a uuid — Postgres would answer 22P02 / Prisma P2023.
   if (meta.fields.get(field)?.nativeType === "Uuid") return typeof value === "string" && UUID.test(value) ? value : INVALID_VALUE;
 
-  // Task 021 B8: an enum value outside the enum can never match — invalid-value.
+  // An enum value outside the enum can never match — invalid-value.
   const enumValues = meta.fields.get(field)?.enumValues;
   if (enumValues) return typeof value === "string" && enumValues.includes(value) ? value : INVALID_VALUE;
 

@@ -1,5 +1,5 @@
 /**
- * Cursor tie-break cases (task 012): 25 rows that share one `createdAt`.
+ * Cursor tie-break cases: 25 rows that share one `createdAt`.
  * With `cursorKey: "createdAt"` alone a keyset seek skips or repeats rows on
  * the tie; with the `(cursorKey, primaryKey)` seek every row appears once.
  */

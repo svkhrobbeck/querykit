@@ -144,7 +144,7 @@ function lastPage(perPage: number | undefined, limits: UrlLimits): number {
  * The URL is user input: a page past `maxOffset` becomes the last allowed page and a
  * sort past `maxSortFields` keeps its first fields, with `clamped: true` — so a
  * hand-edited `?page=9999` never throws during render. The builders still throw
- * for a direct call (task 008).
+ * for a direct call.
  */
 export function readListParams(schema: ListSchema, searchParams: URLSearchParams, url: UrlConfig = {}, limits: UrlLimits = {}): UrlListParams {
   const cfg = { ...URL_DEFAULTS, ...url };

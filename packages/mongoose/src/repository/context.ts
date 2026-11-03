@@ -37,9 +37,9 @@ export interface RepoRuntime {
   limits?: Partial<QueryLimits>;
   /** Read time limit in ms; a repository's own `maxTimeMS` wins. */
   maxTimeMS: number;
-  /** Signs cursor tokens (task 012). */
+  /** Signs cursor tokens. */
   cursorSecret?: string;
-  /** createdAt / deletedAt field names (task 014); default `createdAt`, `deletedAt`. */
+  /** createdAt / deletedAt field names; default `createdAt`, `deletedAt`. */
   timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
@@ -73,7 +73,7 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
   /**
-   * The client's `with`, checked against `relations` (task 014, R21): an unlisted relation,
+   * The client's `with`, checked against `relations` (R21): an unlisted relation,
    * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
    * is selected even when the client asks with `true`.
    */
@@ -85,7 +85,7 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   maxTimeMS: number;
   composeWhere: (userFilter?: Filter<TDoc>, withDeleted?: boolean) => Query;
   /**
-   * The WHERE of `updateWhere` / `deleteWhere` (task 013): `{ all: true }` → scope and
+   * The WHERE of `updateWhere` / `deleteWhere`: `{ all: true }` → scope and
    * soft-delete guard only; an empty filter — also one whose every condition was skipped —
    * is `empty-filter`; the filter passes the request policy like a read's.
    */
@@ -102,7 +102,7 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
 
 export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>, config: RepositoryOptions<TDoc>): RepoContext<TDoc> {
   const m = model as AnyModel;
-  // Task 014: the registry's `timestamps` names these paths.
+  // The registry's `timestamps` names these paths.
   const deletedAtPath = resolveField(m, runtime.timestamps?.deletedAt ?? "deletedAt") ?? "deletedAt";
   const hasDeletedAt = hasPath(m, deletedAtPath);
   const createdAtConfigured = runtime.timestamps?.createdAt !== undefined;
@@ -239,7 +239,7 @@ export const toArr = <T>(v?: T | T[]): T[] => (v === undefined ? [] : Array.isAr
 
 /** The scope as a precompiled Mongo query (equality on each field), or `undefined`. */
 function buildScopeWhere<TDoc>(m: AnyModel, config: RepositoryOptions<TDoc>): Query | undefined {
-  // Task 014: an equality value or `{ in: [...] }`.
+  // An equality value or `{ in: [...] }`.
   const conditions = scopeConditions(config.scope as Record<string, unknown> | undefined) as unknown as FieldCondition[];
   // A scope is the server's own RBAC / tenancy filter, so a key that does not
   // resolve must never be dropped: that would silently widen every query on this

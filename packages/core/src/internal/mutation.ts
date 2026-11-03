@@ -1,5 +1,5 @@
 /**
- * Bulk-mutation guards shared by every adapter (task 013): a filterless
+ * Bulk-mutation guards shared by every adapter: a filterless
  * `updateWhere` / `deleteWhere` runs only on an explicit `{ all: true }`.
  */
 import { QueryKitError } from "../errors";

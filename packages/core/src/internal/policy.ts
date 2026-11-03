@@ -1,7 +1,7 @@
 /**
- * The server-side request policy every adapter applies (task 009): which fields
+ * The server-side request policy every adapter applies: which fields
  * a client may filter by and with which operators (`filterable`), which it may
- * sort and page by (`sortable`), and the request limits (`limits`, task 008).
+ * sort and page by (`sortable`), and the request limits (`limits`).
  *
  * A plain object that is not a condition, a group, a branded `raw()` node or a
  * driver-native object (`isNative`) is refused as well (R19): it would otherwise

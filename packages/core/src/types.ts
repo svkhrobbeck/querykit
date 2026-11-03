@@ -69,7 +69,7 @@ export type Sort<TKey extends string = string> = SortItem<TKey>[];
 /* Generic shapes shared by every backend adapter (drizzle-pg, mongoose, …);
  * each binds its own key type (`ColumnKey`/`FieldKey`) and insert/filter types. */
 
-/** Scope qiymati ro'yxat bo'yicha (task 014): `{ in: [...] }`; bo'sh ro'yxat — hech qanday qator. */
+/** Scope qiymati ro'yxat bo'yicha: `{ in: [...] }`; bo'sh ro'yxat — hech qanday qator. */
 export interface ScopeIn {
   in: readonly FilterScalar[];
 }
@@ -237,7 +237,7 @@ export interface MutationRows<TRow> extends MutationCount {
 /* ------------------------------- relations -------------------------------- */
 
 /**
- * Bitta relation uchun mijoz `with` ruxsati (task 014, R21): `columns` majburiy — ro'yxat yoki aniq `"*"`;
+ * Bitta relation uchun mijoz `with` ruxsati (R21): `columns` majburiy — ro'yxat yoki aniq `"*"`;
  * `filterable` — relation filtrida (prisma `where`, mongoose `match`) ruxsat etilgan maydonlar;
  * `nested` — shu relation ichidagi `with` uchun xuddi shu shakl (yo'q ⇒ ichki `with` — `forbidden-key`).
  */

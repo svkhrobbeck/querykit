@@ -27,11 +27,11 @@ export const ROWS: readonly ConformanceRow[] = [
 
 const copy = (rows: readonly ConformanceRow[]): ConformanceRow[] => rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) }));
 
-/** The rows of the running case — a fake driver's write (task 013) changes them, the next case starts over. */
+/** The rows of the running case — a fake driver's write changes them, the next case starts over. */
 let current: ConformanceRow[] = copy(ROWS);
 
 /**
- * What the fake drivers were asked for, in order (task 013): `find:<limit>` (`find:all`
+ * What the fake drivers were asked for, in order: `find:<limit>` (`find:all`
  * without a limit), `count`, `write`. Lets a case prove "one write, no read before it"
  * or "no count" the same way on every adapter.
  */

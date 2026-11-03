@@ -58,7 +58,7 @@ check("rendered output carries the filter", html.includes("active"), html.slice(
 
 check("in-bounds URL → clamped false", captured?.clamped === false);
 
-/* Task 015 A7a: a too-deep page from the URL does not throw during render — it is clamped. */
+/* A too-deep page from the URL does not throw during render — it is clamped. */
 let deep: UseListParamsResult | undefined;
 function DeepProbe() {
   deep = useListParams(users, { schema });

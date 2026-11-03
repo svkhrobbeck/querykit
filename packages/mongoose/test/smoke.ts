@@ -16,7 +16,7 @@ import { createRegistry, createFilters } from "../src/index";
 import { User, type IUser } from "./user.model";
 import { Post } from "./post.model";
 
-/** The 2.x behaviour (task 011 "Migrating to 3.0"): every schema path filterable with every operator and sortable. */
+/** The 2.x behaviour ("Migrating to 3.0"): every schema path filterable with every operator and sortable. */
 const openPolicy = (model: { schema: { paths: Record<string, unknown> } }) => {
   const paths = Object.keys(model.schema.paths);
   return { filterable: Object.fromEntries(paths.map(path => [path, "*"])), sortable: paths };
@@ -38,7 +38,7 @@ async function main() {
 
   const registry = createRegistry(mongoose.connection);
   const usersRepo = registry.repository(User, OPEN_USER);
-  // Task 014 (R21): `with` opens only listed relations.
+  // R21: `with` opens only listed relations.
   const postsRepo = registry.repository(Post, { ...OPEN_POST, relations: { author: { model: User, columns: "*" } } });
   const uf = createFilters<IUser>();
 
@@ -355,7 +355,7 @@ async function main() {
     const tcBack = await usersRepo.findCursor({ limit: 2, cursorKey: "createdAt", order: "asc", cursor: tc1.meta.next_cursor, direction: "backward" });
     check("cursor on timestamp key: backward does not crash", Array.isArray(tcBack.data));
 
-    // Task 012 A1: 25 documents with one createdAt — the (createdAt, _id) seek pages 10 + 10 + 5, every _id once.
+    // 25 documents with one createdAt — the (createdAt, _id) seek pages 10 + 10 + 5, every _id once.
     const Tie = mongoose.models.Tie ?? mongoose.model("Tie", new mongoose.Schema({ n: Number, createdAt: Date }));
     await Tie.deleteMany({});
     const sameTime = new Date("2026-03-01T09:00:00.000Z");
@@ -390,7 +390,7 @@ async function main() {
     }
     check("A1 tied createdAt with columns { n }: 25 distinct n, no _id in rows", ns.size === 25 && !("_id" in (colPage.data[0] ?? {})), `${ns.size}`);
     check("A1 tied createdAt: walking back reaches the other 20 _id", backIds.size === 20 && [...backIds].every(id => tieSeen.has(id)), `${backIds.size}`);
-    // Task 014 P2: registry timestamps name snake_case paths — default sort, soft delete, restore.
+    // Registry timestamps name snake_case paths — default sort, soft delete, restore.
     // One Model type: mongoose 8 cannot call create on the `models.X ?? model()` union.
     const Snake = (mongoose.models.Snake ??
       mongoose.model("Snake", new mongoose.Schema({ title: String, created_at: Date, deleted_at: { type: Date, default: null } }))) as mongoose.Model<{

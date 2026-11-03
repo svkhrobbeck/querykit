@@ -173,7 +173,7 @@ export function rawLikePlan(pattern: string, ctx: OperatorContext, caseInsensiti
 
 const likeFragment = (value: FilterValue | undefined, ctx: OperatorContext, caseInsensitive: boolean): Fragment | WhereFragment | undefined => {
   const pattern = text(value);
-  // Task 021 B9: whether Prisma escapes `_` inside startsWith/endsWith/contains is
+  // Whether Prisma escapes `_` inside startsWith/endsWith/contains is
   // not part of its contract, so a one-character wildcard cannot be relied on —
   // an unescaped `_` is refused as invalid-value (skip, or QueryKitError under
   // strict). `\_` is a literal underscore.

@@ -208,7 +208,7 @@ export interface Repository<TTable extends AnyPgTable, TSchema extends Record<st
   /** `id` bo'yicha bitta qatorni yangilaydi (topilmasa `undefined`). */
   updateById(id: Id, patch: Partial<Insert<TTable>>, idKey?: ColumnKey<TTable>): Promise<Row<TTable> | undefined>;
   /**
-   * Filterga mos qatorlarni bitta atomar `UPDATE` bilan yangilaydi → `{ count }` (task 013).
+   * Filterga mos qatorlarni bitta atomar `UPDATE` bilan yangilaydi → `{ count }`.
    * Filtrsiz faqat `{ all: true }` bilan (scope baribir qo'llanadi); bo'sh yoki to'liq tashlab
    * yuborilgan filtr — `QueryKitError` `empty-filter`. Filtr o'qishdagidek siyosatdan o'tadi.
    */

@@ -46,7 +46,7 @@ export function readMethods<TDoc extends Document>(ctx: RepoContext<TDoc>) {
       const where = composeWhere(params.filter, params.withDeleted);
       const rows = (limit: number) => runFind(where, { sort: sortSpec(params.sort), columns: params.columns, limit, skip: (page - 1) * perPage });
 
-      // `withTotal: false` (task 013): one read of perPage + 1 rows, no count.
+      // `withTotal: false`: one read of perPage + 1 rows, no count.
       if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
       const [data, totalItems] = await Promise.all([rows(perPage), countWhere(where)]);
       return { data, meta: offsetMeta(page, perPage, totalItems) } as OffsetResult<never>;

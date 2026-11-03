@@ -1,8 +1,8 @@
 /**
- * Request limits (task 008) for @querykitjs/web: the list and infinite builders
+ * Request limits for @querykitjs/web: the list and infinite builders
  * refuse a payload past the offset limit or the sort-field limit (an `Error`,
- * never a silent clamp). Filter limits stay with the server (REQUIREMENTS R18,
- * task 008 Locked decision 5): the builders pass every filter case through.
+ * never a silent clamp). Filter limits stay with the server (REQUIREMENTS R18):
+ * the builders pass every filter case through.
  * Imported by `smoke.ts`; sets `process.exitCode` on failure.
  */
 import { LIMIT_CASES, type LimitCase } from "../../core/test/conformance/cases-limits";

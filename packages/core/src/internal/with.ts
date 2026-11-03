@@ -1,5 +1,5 @@
 /**
- * The client's `with` against the repository's `relations` allow-list (task 014, R21),
+ * The client's `with` against the repository's `relations` allow-list (R21),
  * one walker for every adapter. Each adapter names its own option keys (a "dialect");
  * the rules are the same: an unlisted relation, column, filter field, nested relation
  * or option is `QueryKitError` `forbidden-key`, `site: "with"`, before the driver runs.

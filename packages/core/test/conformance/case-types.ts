@@ -9,7 +9,7 @@ export type AdapterName = "drizzle-pg" | "prisma-pg" | "mongoose" | "mongodb";
 
 export type CaseGroup = "operator" | "group" | "sort" | "pagination" | "diagnostics" | "projection" | "policy" | "mutation" | "scope";
 
-/** Repository request policy (task 009). `"default"` — none given, the adapter's safe default applies. */
+/** Repository request policy. `"default"` — none given, the adapter's safe default applies. */
 export type CasePolicy = "default" | { filterable?: Filterable; sortable?: readonly string[]; limits?: Partial<QueryLimits> };
 
 export type Call =
@@ -24,15 +24,15 @@ export interface CaseOptions {
   strict?: boolean;
   forcedColumns?: Record<string, true>;
   allowedColumns?: readonly string[];
-  /** Rows for this case instead of the shared `ROWS` (task 012: 25 rows with one `createdAt`). */
+  /** Rows for this case instead of the shared `ROWS` (25 rows with one `createdAt`). */
   rows?: readonly import("./fixtures").ConformanceRow[];
   /** Absent ⇒ the open 3.x policy (every field and operator, every sort field), so the older cases keep their meaning. */
   policy?: CasePolicy;
-  /** Registry `cursorSecret` (task 012): tokens are signed and an unsigned one is refused. */
+  /** Registry `cursorSecret`: tokens are signed and an unsigned one is refused. */
   cursorSecret?: string;
-  /** Repository `scope` (RBAC / tenancy filter, task 013). */
+  /** Repository `scope` (RBAC / tenancy filter). */
   scope?: Record<string, unknown>;
-  /** Registry `timestamps` (task 014): the createdAt / deletedAt field names. */
+  /** Registry `timestamps`: the createdAt / deletedAt field names. */
   timestamps?: { createdAt?: string; deletedAt?: string };
 }
 
@@ -79,7 +79,7 @@ export interface ConformanceCase {
   notBuiltByWeb?: string;
 }
 
-/** A v2 cursor token for an expectation (task 012) — the runner compares tokens by their cursor value `k` only. */
+/** A v2 cursor token for an expectation — the runner compares tokens by their cursor value `k` only. */
 export const cursorToken = (value: unknown): string => Buffer.from(JSON.stringify({ v: 2, k: value, id: null }), "utf8").toString("base64url");
 
 /** Every fixture name, and the same in `createdAt` order. */

@@ -89,7 +89,7 @@ export function mutateMethods<TDoc extends Document>(ctx: RepoContext<TDoc>, con
       return updateOne(composeWhere(withId(undefined, idKey as string, id)), forUpdate(patch));
     },
 
-    /** One `updateMany` (task 013): no read before the write; `returning` reads after it. */
+    /** One `updateMany`: no read before the write; `returning` reads after it. */
     async updateWhere(filter: Filter<TDoc> | AllRows, patch: Partial<Insert<TDoc>>, options: MutationOptions = {}) {
       const where = mutationWhere(filter, "updateWhere");
       const { matchedCount: count } = await collection.updateMany(where as never, { $set: forUpdate(patch) } as never, session());

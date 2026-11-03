@@ -1,5 +1,5 @@
 /**
- * @querykitjs/mongodb against the shared conformance table (task 006) — **no database**.
+ * @querykitjs/mongodb against the shared conformance table — **no database**.
  *
  *   bun --preload ./packages/mongodb/test/bun-v8-shim.ts packages/mongodb/test/conformance.ts
  *

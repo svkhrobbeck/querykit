@@ -1,5 +1,5 @@
 /**
- * `filterable` / `sortable` policy and server-side limits (task 009) — attack
+ * `filterable` / `sortable` policy and server-side limits — attack
  * tests. The executor is a spy: a refused request must never reach it.
  * Imported by `sql.ts` (offline, in the gate); sets `process.exitCode` on failure.
  */

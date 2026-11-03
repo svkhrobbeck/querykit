@@ -45,12 +45,12 @@ export interface RegistryOptions {
    */
   maxTimeMS?: number;
   /**
-   * Signs cursor tokens (HMAC-SHA256, task 012). With it a token that was not
+   * Signs cursor tokens (HMAC-SHA256). With it a token that was not
    * issued by this server — or was changed — is `invalid-value`.
    */
   cursorSecret?: string;
   /**
-   * The createdAt / deletedAt field names (task 014; default `createdAt`, `deletedAt`): the default
+   * The createdAt / deletedAt field names (default `createdAt`, `deletedAt`): the default
    * sort and the default `sortable` use `createdAt`, soft delete uses `deletedAt`.
    */
   timestamps?: { createdAt?: string; deletedAt?: string };

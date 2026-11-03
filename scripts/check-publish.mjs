@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Publish check (task 016, miq LIB-06) — run after `bun run build`.
+ * Publish check (miq LIB-06) — run after `bun run build`.
  *
  *   node scripts/check-publish.mjs
  *

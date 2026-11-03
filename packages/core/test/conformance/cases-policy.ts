@@ -1,5 +1,5 @@
 /**
- * Request-policy cases (task 009): `filterable`, `sortable` and server-side
+ * Request-policy cases: `filterable`, `sortable` and server-side
  * `limits` on the repository. A case without `options.policy` runs under the
  * open 3.x policy (every field, every operator, every sort field); these set it.
  *

@@ -27,7 +27,7 @@ export function cursorMethods<TDoc>(ctx: RepoContext<TDoc>) {
       // 400 the same way as any other bad condition (both adapters agree).
       if (!field) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
-      // Task 012: the token carries the cursor value and _id (tie-break), both cast
+      // The token carries the cursor value and _id (tie-break), both cast
       // to their path's type; a token that does not fit is invalid-value.
       const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret, key: cursorKey });
       const cursorValue = token === undefined ? undefined : castForPath(m, field, token.k);

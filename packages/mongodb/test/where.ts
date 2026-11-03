@@ -1,10 +1,10 @@
 /**
- * Filter compilation for @querykitjs/mongodb (task 017, phase 2) — no database.
+ * Filter compilation for @querykitjs/mongodb — no database.
  *
  *   bun --preload ./test/bun-v8-shim.ts test/where.ts
  *
- * Values are cast by the zod field kind; an object value never reaches the driver (T-2,
- * acceptance 3); an unbranded raw node is refused and a branded one passes (R19, 3a).
+ * Values are cast by the zod field kind; an object value never reaches the driver (see
+ * `test/policy.ts`); an unbranded raw node is refused and a branded one passes (R19).
  * Imported by `smoke`-free test runs; sets `process.exitCode` on failure.
  */
 import { ObjectId } from "mongodb";

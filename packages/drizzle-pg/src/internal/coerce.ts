@@ -15,7 +15,7 @@ const TEXT_OPERATORS: ReadonlySet<FilterOperator> = new Set(TEXT_FILTER_OPERATOR
 /**
  * Columns Postgres can match a LIKE pattern against. Any other type (timestamp,
  * number, boolean, uuid, enum, json…) has no `~~` / `~~*` operator, so a text
- * pattern there is invalid-value (R11, task 024) — the same rule as the Mongo
+ * pattern there is invalid-value (R11) — the same rule as the Mongo
  * adapters — instead of a driver error. A custom column type is left to Postgres.
  */
 const TEXT_COLUMN_TYPES: ReadonlySet<string> = new Set(["PgText", "PgVarchar", "PgChar", "PgCustomColumn"]);
@@ -53,7 +53,7 @@ export function castForColumn(column: AnyPgColumn, value: unknown): unknown | ty
   }
 }
 
-/* Task 021 B8: a value Postgres would reject (22P02 / 22007 …) is invalid-value here,
+/* A value Postgres would reject (22P02 / 22007 …) is invalid-value here,
  * before the driver runs — skipped and reported, or a QueryKitError under strict. */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

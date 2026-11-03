@@ -5,7 +5,7 @@
  *   bun run test:smoke
  *
  * Covers what a fake Collection cannot: the driver's own option handling, the
- * (createdAt, _id) cursor walk over 25 equal timestamps (task 017 acceptance 5),
+ * (createdAt, _id) cursor walk over 25 equal timestamps,
  * updateWhere as one updateMany, scope { in }, and registry.transaction.
  */
 import { MongoClient, ObjectId } from "mongodb";

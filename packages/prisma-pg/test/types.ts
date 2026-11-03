@@ -70,7 +70,7 @@ async function reads() {
   // Pagination keeps `data` typed and `meta` shaped by core.
   const list = await users.findList({ page: 1, columns: { id: true } });
   const _listId: number = list.data[0]!.id;
-  const _totalPages: number | null = list.meta.total_pages; // task 013: null with withTotal: false
+  const _totalPages: number | null = list.meta.total_pages; // null with withTotal: false
   const _hasPrev: boolean = list.meta.has_prev;
 
   const infinite = await users.findInfinite({ limit: 5 });

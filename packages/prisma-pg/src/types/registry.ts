@@ -41,13 +41,13 @@ export interface RegistryOptions {
    */
   limits?: Partial<Core.QueryLimits>;
   /**
-   * Signs cursor tokens (HMAC-SHA256, task 012). With it a token that was not
+   * Signs cursor tokens (HMAC-SHA256). With it a token that was not
    * issued by this server — or was changed — is `invalid-value`. Without it tokens
    * are unsigned but still checked (scalar values, v2 shape).
    */
   cursorSecret?: string;
   /**
-   * The createdAt / deletedAt field names (task 014; default `createdAt`, `deletedAt`): the default
+   * The createdAt / deletedAt field names (default `createdAt`, `deletedAt`): the default
    * sort and the default `sortable` use `createdAt`, soft delete uses `deletedAt`.
    */
   timestamps?: { createdAt?: string; deletedAt?: string };
@@ -68,7 +68,7 @@ export interface RegistryOptions {
  */
 export interface RepositoryOptions<TDelegate = AnyDelegate> {
   /**
-   * Relations a client may open with `with` (task 014, R21): relation → `{ columns, filterable?, nested? }`.
+   * Relations a client may open with `with` (R21): relation → `{ columns, filterable?, nested? }`.
    * `columns` is required (a list or `"*"`); an unlisted relation, column, `where` field or nested
    * `include` is `QueryKitError` `forbidden-key`, `site: "with"`. Without it `with` opens nothing.
    */

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Size budget (task 016, REQUIREMENTS § Performance budgets) — run after `bun run build`.
+ * Size budget (REQUIREMENTS § Performance budgets) — run after `bun run build`.
  *
  *   node scripts/check-size.mjs           compare with size-budget.json, exit 1 when over
  *   node scripts/check-size.mjs --write   write size-budget.json from today's build (+10 %)

@@ -126,7 +126,7 @@ export interface Repository<TDelegate = AnyDelegate> {
   /** Update one row by id; returns the updated row (or `undefined`). */
   updateById(id: Id, patch: Partial<Insert<TDelegate>>, idKey?: FieldKey<TDelegate>): Promise<Row<TDelegate> | undefined>;
   /**
-   * Update every row matching the filter in one atomic `updateMany` → `{ count }` (task 013).
+   * Update every row matching the filter in one atomic `updateMany` → `{ count }`.
    * No filter only with `{ all: true }` (the scope still applies); an empty or fully skipped
    * filter is `QueryKitError` `empty-filter`. The filter passes the request policy like a read.
    */

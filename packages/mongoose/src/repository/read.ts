@@ -52,7 +52,7 @@ export function readMethods<TDoc>(ctx: RepoContext<TDoc>) {
       const rows = (limit: number) =>
         runFind(where, { sort: sortSpec(params.sort), columns: params.columns, with: withOf(params.with), limit, skip: (page - 1) * perPage });
 
-      // Task 013: no count — one extra row tells whether a next page exists.
+      // No count — one extra row tells whether a next page exists.
       if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
       const [data, totalItems] = await Promise.all([rows(perPage), countWhere(where)]);
       return { data, meta: offsetMeta(page, perPage, totalItems) } as OffsetResult<never>;

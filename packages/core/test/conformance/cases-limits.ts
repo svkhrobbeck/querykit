@@ -1,5 +1,5 @@
 /**
- * Request-limit table (task 008): one wire payload per case and whether a
+ * Request-limit table: one wire payload per case and whether a
  * validator must accept or reject it under the core default limits (or the
  * case's own `limits` override). Pure data — `@querykitjs/zod`,
  * `@querykitjs/class-validator` and `@querykitjs/web` each run it with their own
@@ -123,5 +123,5 @@ export const LIMIT_CASES: readonly LimitCase[] = [...DEPTH_CASES, ...CONDITION_C
 
 export const LIMIT_NAMES: readonly LimitName[] = ["maxDepth", "maxConditions", "maxInItems", "maxStringLength", "maxOffset", "maxSortFields"];
 
-/** The attack payload of acceptance 2: `{"not":{"not":…}}` this many levels deep. */
+/** The attack payload: `{"not":{"not":…}}` this many levels deep. */
 export const HOSTILE_DEPTH = 10_000;

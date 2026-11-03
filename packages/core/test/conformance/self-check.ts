@@ -23,7 +23,7 @@ const problems: string[] = [];
 function referenceNames(testCase: ConformanceCase): string[] | undefined {
   const { call, expect } = testCase;
   if (expect.error || (expect.skipped?.length ?? 0) > 0) return undefined;
-  // Repository options (task 014 scope / timestamps) are not modelled by the reference.
+  // Repository options (scope / timestamps) are not modelled by the reference.
   if (testCase.options?.scope || testCase.options?.timestamps) return undefined;
   const filtered = referenceFilter<Row>(ROWS, call.params.filter as Filter | undefined);
   const names = (rows: Row[]) => rows.map(row => row.name);
@@ -94,7 +94,7 @@ require(CASES.some(c => c.expect.error?.reason === "limit-exceeded" && c.expect.
 require(CASES.some(c => c.options?.policy === "default" && c.expect.names), "policy: safe default lets the primary key through");
 require(CASES.some(c => c.name.startsWith("R19") && c.expect.error?.reason === "forbidden-key"), "policy: unbranded raw object refused (R19)");
 
-/* Request-limit table (task 008): every limit has a case inside and a case outside it, and an override. */
+/* Request-limit table: every limit has a case inside and a case outside it, and an override. */
 for (const limit of LIMIT_NAMES) {
   const cases = LIMIT_CASES.filter(c => c.limit === limit);
   require(cases.some(c => c.verdict === "ok"), `limit ${limit} has no case inside it`);

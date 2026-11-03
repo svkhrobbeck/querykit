@@ -5,7 +5,7 @@ import type { LooseFieldKey, QueryParams, SortDirection } from "./common";
 export interface OffsetParams<TDoc = Record<string, unknown>> extends QueryParams<TDoc> {
   page?: number;
   perPage?: number;
-  /** `false` — no count query: `perPage + 1` rows are read, `total_items` / `total_pages` are `null` (task 013). Default `true`. */
+  /** `false` — no count query: `perPage + 1` rows are read, `total_items` / `total_pages` are `null`. Default `true`. */
   withTotal?: boolean;
 }
 export type OffsetMeta = Core.OffsetMeta;

@@ -185,7 +185,7 @@ export function orderRows<T extends Row>(rows: readonly T[], orderBy: readonly S
     if (!match) throw new Error(`fake-pg: unsupported ORDER BY "${sql}"`);
     const direction = match[2]!.toLowerCase() as Direction;
     const nulls = match[3]?.toLowerCase();
-    // `asc nulls first` / `desc nulls last` is MongoDB's order (task 021 B11); bare asc/desc is PostgreSQL's.
+    // `asc nulls first` / `desc nulls last` is MongoDB's order; bare asc/desc is PostgreSQL's.
     const mongoStyle = nulls === undefined ? false : (direction === "asc") === (nulls === "first");
     if (nulls !== undefined && !mongoStyle) throw new Error(`fake-pg: unsupported NULLS order "${sql}"`);
     return { key: columnKey(match[1]!), direction, mongoStyle };

@@ -11,7 +11,7 @@ export default defineConfig({
   // Shared chunk: `./internal` must throw the very `QueryKitError` class the main entry exports (instanceof).
   splitting: true,
   sourcemap: true,
-  // Minified (task 009) — syntax only (task 016): esbuild drops `/* @__PURE__ */` when it
+  // Minified — syntax only: esbuild drops `/* @__PURE__ */` when it
   // minifies whitespace, and keepNames adds top-level `__name()` calls; both stop consumers
   // tree-shaking. Identifiers are kept, so the exported classes keep their names.
   minifySyntax: true,

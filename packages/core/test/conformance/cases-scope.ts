@@ -1,7 +1,7 @@
 /**
- * Task 014: a `scope` value may be `{ in: [...] }` (P1), the registry's `timestamps`
- * names the createdAt / deletedAt fields (P2), and a client `with` needs the
- * repository's `relations` allow-list (P4, R21).
+ * A `scope` value may be `{ in: [...] }`, the registry's `timestamps`
+ * names the createdAt / deletedAt fields, and a client `with` needs the
+ * repository's `relations` allow-list (R21).
  */
 import { ALL, type ConformanceCase } from "./case-types";
 

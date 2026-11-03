@@ -36,7 +36,7 @@ function buildCondition(shape: DocShape, cond: FieldCondition, diag?: Diagnostic
   // A text pattern cannot be matched against a Date path: Mongo rejects
   // `$regex`/`$options` on a Date ("Can't use $options with Date"), which used to
   // surface as a 500. The SQL adapters skip a text pattern on a non-text field too
-  // (R11, task 024), reported via `onSkippedCondition` instead of a stack trace.
+  // (R11), reported via `onSkippedCondition` instead of a stack trace.
   if (isTextOperator(operator) && fieldKind(shape, field) === "date") {
     reportSkip(diag, { site: "filter", key: cond.key, operation: operator, reason: "invalid-value" });
     return undefined;
@@ -85,7 +85,7 @@ function buildNode(shape: DocShape, node: FilterNode, diag?: Diagnostics): Query
 
 /**
  * The rows where `node` is FALSE — SQL three-valued logic, so drizzle-pg and
- * prisma-pg agree (task 021 B10). MongoDB's `$nor` is two-valued: it also keeps
+ * prisma-pg agree. MongoDB's `$nor` is two-valued: it also keeps
  * rows where the predicate is UNKNOWN (a null / missing field). So:
  * `isFalse(and(…))` = `or(isFalse(…))`, `isFalse(or(…))` = `and(isFalse(…))`,
  * `isFalse(not(q))` = `isTrue(q)`, and a comparison is FALSE only on a non-null

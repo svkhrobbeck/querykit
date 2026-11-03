@@ -99,7 +99,7 @@ export function mutateMethods<TDoc>(ctx: RepoContext<TDoc>, config: RepositoryOp
     },
 
     async updateWhere(filter: Filter<TDoc> | AllRows, patch: Partial<Insert<TDoc>>, options: MutationOptions = {}) {
-      // Task 013: one updateMany with the filter — no read before the write.
+      // One updateMany with the filter — no read before the write.
       const where = mutationWhere(filter, "updateWhere");
       const { matchedCount: count } = (await attachSession(m.updateMany(where, forUpdate(patch))).exec()) as { matchedCount: number };
       if (!options.returning) return { count };

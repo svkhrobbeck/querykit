@@ -53,7 +53,7 @@ export interface RepoContext<TDoc extends Document> extends Projection<TDoc> {
   deletedAtPath: string;
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
-  /** `with` is refused in this version (no `$lookup`, task 017 L3): `forbidden-key`, site `with`. */
+  /** `with` is refused in this version (no `$lookup`): `forbidden-key`, site `with`. */
   withOf: (value: unknown) => void;
   policy: Policy;
   maxTimeMS: number;

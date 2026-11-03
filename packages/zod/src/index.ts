@@ -23,7 +23,7 @@ import { findFilterLimitViolation, formatLimit, offsetOf } from "@querykitjs/cor
 
 /**
  * Builds a module-level schema. A bundler cannot tell that a zod call has no side effect,
- * so without this every schema stays in the bundle when one is imported (task 016). The
+ * so without this every schema stays in the bundle when one is imported. The
  * call is marked pure and takes only an arrow function, so an unused schema is dropped.
  */
 const schema = <T>(build: () => T): T => build();
@@ -124,7 +124,7 @@ const offsetField = (maxOffset: number) =>
 /**
  * Umumiy params (paginatsiyasiz): filter/sort/columns/with/withDeleted.
  *
- * @deprecated Use `makeOffsetParamsSchema` / `makeInfiniteParamsSchema` / `makeCursorParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeOffsetParamsSchema` / `makeInfiniteParamsSchema` / `makeCursorParamsSchema` (safe defaults). Removed in the next major.
  */
 export const baseParamsSchema = /* @__PURE__ */ schema(() =>
   z.object({
@@ -139,7 +139,7 @@ export const baseParamsSchema = /* @__PURE__ */ schema(() =>
 /**
  * Offset (sahifali) params — `page` + `perPage`; `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`.
  *
- * @deprecated Use `makeOffsetParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeOffsetParamsSchema` (safe defaults). Removed in the next major.
  */
 export const offsetParamsSchema = /* @__PURE__ */ schema(() =>
   baseParamsSchema
@@ -154,7 +154,7 @@ export const offsetParamsSchema = /* @__PURE__ */ schema(() =>
 /**
  * Infinite-scroll params — `limit` + `offset` (`offset` ≤ `DEFAULT_MAX_OFFSET`).
  *
- * @deprecated Use `makeInfiniteParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeInfiniteParamsSchema` (safe defaults). Removed in the next major.
  */
 export const infiniteParamsSchema = /* @__PURE__ */ schema(() =>
   baseParamsSchema.extend({
@@ -167,7 +167,7 @@ export const infiniteParamsSchema = /* @__PURE__ */ schema(() =>
  * Cursor (keyset) params — `limit`/`cursor`/`cursorKey`/`order`/`direction`.
  * No `sort`: cursor pagination is driven by `order` + `direction`, not `sort`.
  *
- * @deprecated Use `makeCursorParamsSchema` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeCursorParamsSchema` (safe defaults). Removed in the next major.
  */
 export const cursorParamsSchema = /* @__PURE__ */ schema(() =>
   baseParamsSchema.omit({ sort: true }).extend({

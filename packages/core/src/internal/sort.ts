@@ -11,7 +11,7 @@ export interface NormalizedSortItem {
  * The wire `sort` array with a direction on every item. An item without a `key`
  * (`null`, `{}`) is dropped — sort comes from the client, and a malformed item
  * must not crash the query — and, with `diag`, reported as `invalid-value` on
- * `site: "sort"` (a `QueryKitError` under strict; task 021 B14).
+ * `site: "sort"` (a `QueryKitError` under strict).
  */
 export function normalizeSort(sort?: Sort, diag?: Diagnostics): NormalizedSortItem[] {
   if (!sort) return [];

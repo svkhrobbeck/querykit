@@ -16,7 +16,7 @@ const asTuple = (value: FilterValue | undefined): [unknown, unknown] | undefined
   Array.isArray(value) && value.length === 2 ? [value[0], value[1]] : undefined;
 
 /**
- * A value operator (`contains` / `startsWith` / `endsWith`) matches its value **literally** (task 021 B7):
+ * A value operator (`contains` / `startsWith` / `endsWith`) matches its value **literally**:
  * `%`, `_` and `\` are escaped with PostgreSQL's default LIKE escape (`\`). Wildcards belong to `like` / `ilike` only.
  */
 const literal = (v: FilterValue | undefined): string => text(v).replace(/[\\%_]/g, "\\$&");

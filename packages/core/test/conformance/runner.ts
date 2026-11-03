@@ -19,7 +19,7 @@ export interface Harness {
   run(call: Call, options: CaseOptions, onSkipped: (info: SkippedCondition) => void): Promise<HarnessResult>;
 }
 
-/** The rows left and the driver calls made — read after every call (task 013). */
+/** The rows left and the driver calls made — read after every call. */
 export interface After {
   remaining: string[];
   calls: string[];
@@ -158,7 +158,7 @@ export async function runConformanceCli(harness: Harness): Promise<void> {
 }
 
 /**
- * Follow `next_cursor` to the end (task 012), then — for `forward-back` — follow
+ * Follow `next_cursor` to the end, then — for `forward-back` — follow
  * `prev_cursor` from the last page back to the first. Rows of every page are
  * collected; `meta.pages` lists the page sizes, forward then back.
  */
@@ -192,7 +192,7 @@ async function walk(
 }
 
 /**
- * Cursor tokens compared by their cursor value `k` only (task 012): the tie-break `id`
+ * Cursor tokens compared by their cursor value `k` only: the tie-break `id`
  * is the adapter's own primary key (a number, or a Mongo ObjectId), so it differs by design.
  */
 function tokenKeys(meta: Record<string, unknown> | undefined): Record<string, unknown> | undefined {

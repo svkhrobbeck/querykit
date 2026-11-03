@@ -23,7 +23,7 @@ import type { CursorParams, CursorResult, InfiniteParams, InfiniteResult, Offset
 /* ------------------------------- relations -------------------------------- */
 
 /**
- * Relation field → its rule (task 014, R21): `{ model?, columns, filterable?, nested? }` opens it for a
+ * Relation field → its rule (R21): `{ model?, columns, filterable?, nested? }` opens it for a
  * client `with` (`columns` required — a list or `"*"`). A bare model (`{ author: User }`) still types
  * `with`, but opens nothing: `with: { author: … }` is `forbidden-key`, `site: "with"`.
  */
@@ -162,7 +162,7 @@ export interface Repository<TDoc = Record<string, unknown>, TRel extends Record<
   /** Update one document by id; returns the updated doc (or undefined). */
   updateById(id: Id, patch: Partial<Insert<TDoc>>, idKey?: FieldKey<TDoc>): Promise<Row<TDoc> | undefined>;
   /**
-   * Update every document matching the filter in one `updateMany` → `{ count }` (matched, task 013).
+   * Update every document matching the filter in one `updateMany` → `{ count }` (matched).
    * No filter only with `{ all: true }` (the scope still applies); an empty or fully skipped
    * filter is `QueryKitError` `empty-filter`. The filter passes the request policy like a read.
    */

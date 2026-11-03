@@ -41,11 +41,11 @@ import { buildListParams, buildInfiniteParams, buildCursorParams, createQuery } 
 import { users as usersTable, renderSql } from "../../drizzle-pg/test/fixtures";
 import { User as UserModel } from "../../mongoose/test/user.model";
 
-/** The 1.x behaviour (task 010 "Migrating to 2.0"): every scalar field filterable with every operator, every field sortable. */
+/** The 1.x behaviour ("Migrating to 2.0"): every scalar field filterable with every operator, every field sortable. */
 const OPEN = {
   filterable: { id: "*", name: "*", email: "*", age: "*", secret: "*", createdAt: "*", title: "*", authorId: "*", updatedAt: "*", deletedAt: "*" },
   sortable: ["id", "name", "email", "age", "secret", "createdAt", "title", "authorId", "updatedAt", "deletedAt"],
-  // Task 014 (R21): `with` opens only listed relations; these tests predate the allow-list.
+  // R21: `with` opens only listed relations; these tests predate the allow-list.
   relations: { posts: { columns: "*", filterable: { published: "*" } }, author: { columns: "*" } },
 } as const;
 

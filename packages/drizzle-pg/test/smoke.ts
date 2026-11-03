@@ -65,9 +65,9 @@ async function main() {
   const client = postgres(url!);
   const db = drizzle(client, { schema });
   const registry = createRegistry(db, schema);
-  // Task 009: fields are closed by default; the smoke exercises every operator, so it opens them all.
+  // Fields are closed by default; the smoke exercises every operator, so it opens them all.
   const usersRepo = registry.repository(users, OPEN_USERS);
-  // Task 014 (R21): `with` opens only listed relations.
+  // R21: `with` opens only listed relations.
   const postsRepo = registry.repository(posts, { relations: { author: { columns: "*" } }, filterable: { authorId: "*" } });
   const uf = createFilters<typeof users>();
 
@@ -288,14 +288,14 @@ async function main() {
       }
     };
 
-    // 16. a client-chosen cursorKey must not become a way around the guard (task 009: refused, not dropped)
+    // 16. a client-chosen cursorKey must not become a way around the guard (refused, not dropped)
     const cursorLeak = await refusal(() => forcedRepo.findCursor({ limit: 1, cursorKey: "email", order: "asc" }));
     check("cursorKey outside sortable is refused", cursorLeak === "forbidden-key", cursorLeak);
     const cursorAllowed = await forcedRepo.findCursor({ limit: 1, cursorKey: "id", order: "asc" });
     check("a permitted cursorKey stays in the row", keysOf(cursorAllowed.data[0]).includes("id"), keysOf(cursorAllowed.data[0]).join());
     check("…while pagination still works (token issued)", typeof cursorAllowed.meta.next_cursor === "string", String(cursorAllowed.meta.next_cursor));
 
-    // 17. aggregate honours the guard too — min(email) leaks as much as a column (task 009: refused)
+    // 17. aggregate honours the guard too — min(email) leaks as much as a column (refused)
     const aggGuarded = await refusal(() => forcedRepo.aggregate({ count: true, min: "email" }));
     check("aggregate: a forbidden min is refused", aggGuarded === "forbidden-key", aggGuarded);
     const aggOpen = await usersRepo.aggregate({ count: true, min: "email" });
@@ -336,7 +336,7 @@ async function main() {
       (await usersRepo.findAll({ filter: [{ key: "nope", operation: "=", value: 1 }] })).length === (await usersRepo.count()),
     );
 
-    // 21. the database side of tasks 012–014 (task 024 closes their UAT)
+    // 21. the database side of cursors, mutations and scope
     const timedRegistry = createRegistry(db, schema, { timestamps: { createdAt: "createdAt", deletedAt: "deletedAt" } });
     const tiesRepo = timedRegistry.repository(posts, { filterable: { title: "*", authorId: "*" }, sortable: ["id", "createdAt"] });
     const tieFilter = [{ key: "title", operation: "startsWith" as const, value: "tie-" }];

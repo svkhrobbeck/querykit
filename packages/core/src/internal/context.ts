@@ -7,7 +7,7 @@
  * `node:async_hooks` is loaded when a store is created (adapters, on the server),
  * not imported statically: the validators also import `@querykitjs/core/internal`
  * for the limit helpers, and a static import of a node built-in would stop a
- * browser bundle of `@querykitjs/zod` / `@querykitjs/class-validator` (task 016).
+ * browser bundle of `@querykitjs/zod` / `@querykitjs/class-validator`.
  */
 import type { AsyncLocalStorage as AsyncLocalStorageType } from "node:async_hooks";
 

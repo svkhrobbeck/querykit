@@ -1,5 +1,5 @@
 /**
- * Shared by check-treeshake.mjs and check-size.mjs (task 016): the published entries of
+ * Shared by check-treeshake.mjs and check-size.mjs: the published entries of
  * the workspace packages and an esbuild "consumer bundle" of one of them.
  */
 import { readdirSync, readFileSync } from "node:fs";

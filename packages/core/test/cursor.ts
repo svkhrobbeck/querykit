@@ -1,11 +1,11 @@
 /**
- * Task 012 — cursor token v2 (`{ v: 2, k, id }`), scalar-only values, optional
+ * Cursor token v2 (`{ v: 2, k, id }`), scalar-only values, optional
  * HMAC (`cursorSecret`). Imported by `internal.ts`; sets `process.exitCode`.
  */
 import { QueryKitError } from "../src/index";
 import * as internal from "../src/internal/index";
 
-/** Token v2 is not built yet (phase 01): every mismatch is a todo, not a failure. */
+/** Token v2 is not built yet: every mismatch is a todo, not a failure. */
 const PENDING = false;
 
 type Codec = {

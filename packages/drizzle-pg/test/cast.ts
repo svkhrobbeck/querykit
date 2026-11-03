@@ -1,5 +1,5 @@
 /**
- * Task 021 B8 — every filter value is cast to its column's type before SQL is
+ * Every filter value is cast to its column's type before SQL is
  * built: a value PostgreSQL would reject is `invalid-value` (dropped and
  * reported, or `QueryKitError` under strict), never a 22P02 from the driver.
  * Imported by `sql.ts` (offline, in the gate); sets `process.exitCode` on failure.

@@ -12,7 +12,7 @@ import type { CursorParams, CursorResult, InfiniteParams, InfiniteResult, Offset
  * `filterable` (equality on the schema's fields, R12).
  */
 export interface RepositoryOptions<TDoc = Document> {
-  /** The document's zod object schema — the one source of field types (task 017 Locked 2). */
+  /** The document's zod object schema — the one source of field types. */
   schema: z.ZodObject;
   /** Fields stored as `ObjectId` (cast from 24-hex strings). Default `["_id"]`. */
   objectId?: readonly (FieldKey<TDoc> | "_id")[];

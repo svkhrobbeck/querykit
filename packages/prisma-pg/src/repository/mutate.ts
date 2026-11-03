@@ -124,7 +124,7 @@ export function mutateMethods<TDelegate>(ctx: RepoContext<TDelegate>, config: Re
     },
 
     async updateWhere(filter: Filter<TDelegate> | AllRows, patch: Partial<Insert<TDelegate>>, options: MutationOptions = {}) {
-      // Task 013: one atomic statement — no read before the write, so a row that stops
+      // One atomic statement — no read before the write, so a row that stops
       // matching between a read and the write can never be updated.
       const where = mutationWhere(filter, "updateWhere");
       const data = forUpdate(patch as object);

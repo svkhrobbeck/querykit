@@ -1,5 +1,5 @@
 /**
- * Task 011 attack tests for @querykitjs/mongoose — **no database**. The policy
+ * Attack tests for @querykitjs/mongoose — **no database**. The policy
  * (K1 / Y5 / Y4, R19 raw), the LIKE wildcard limit, `startsWith` without the
  * `i` flag, and `maxTimeMS` on every read. `Query#exec` / `Aggregate#exec` of
  * the test model are spies: a refused request must never reach them.
@@ -210,7 +210,7 @@ allowed(
   await attempt(() => repositoryOf({ filterable: { name: ["contains"] } }).findAll!({ filter: [{ key: "name", operation: "contains", value: "a" }] })),
 );
 
-/* A9 — startsWith anchored and escaped, case-insensitive like every adapter (R11; thinker dropped Locked 4's case part). */
+/* startsWith anchored and escaped, case-insensitive like every adapter (R11). */
 await attempt(() => repositoryOf({ filterable: { name: ["startsWith"] } }).findAll!({ filter: [{ key: "name", operation: "startsWith", value: "Al" }] }));
 check(
   "A9 startsWith 'Al' → { $regex: '^Al', $options: 'i' }",
@@ -218,7 +218,7 @@ check(
   JSON.stringify(sent[0]?.filter),
 );
 
-/* Task 021 B8 — every path type is cast before exec: a bad value is invalid-value, never a CastError. */
+/* Every path type is cast before exec: a bad value is invalid-value, never a CastError. */
 {
   const castSchema = new Schema({ count: Number, active: Boolean, ref: Schema.Types.ObjectId, kind: { type: String, enum: ["a", "b"] } });
   const CastThing = mongoose.models.CastThing ?? mongoose.model("CastThing", castSchema);
@@ -251,7 +251,7 @@ check(
 const unknown = await attempt(() => repositoryOf(statusOnly, { strict: true }).findAll!({ filter: [{ key: "nope", value: 1 }] }));
 check("nope with strict → unknown-key", unknown.error instanceof QueryKitError && unknown.error.info.reason === "unknown-key", describe(unknown));
 
-/* Task 012 A2 — an _id cursor seeks on _id alone; any other cursorKey adds the _id tie-break. */
+/* An _id cursor seeks on _id alone; any other cursorKey adds the _id tie-break. */
 {
   const { encodeCursorToken } = await import("@querykitjs/core/internal");
   const oid = new mongoose.Types.ObjectId();
@@ -264,7 +264,7 @@ check("nope with strict → unknown-key", unknown.error instanceof QueryKitError
   check("A2 createdAt cursor → $or tie-break on _id", Array.isArray(sent[0]?.filter.$or), JSON.stringify(sent[0]?.filter));
 }
 
-/* Task 014 A5 (R21) — populate match is checked against relations[rel].filterable before exec. */
+/* R21: populate match is checked against relations[rel].filterable before exec. */
 {
   const rel = { relations: { posts: { columns: "*", filterable: { title: "*" } } } };
   const secretMatch = await attempt(() => repositoryOf(rel).findAll!({ with: { posts: { match: { secret: "x" } } } }));

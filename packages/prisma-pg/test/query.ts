@@ -27,11 +27,11 @@ import { QueryKitError, raw } from "@querykitjs/core";
 import { encodeCursor as drizzleEncode, encodeCursor as mongooseEncode } from "@querykitjs/core/internal";
 import "./policy";
 
-/** The 1.x behaviour (task 010 "Migrating to 2.0"): every scalar field filterable with every operator, every field sortable. */
+/** The 1.x behaviour ("Migrating to 2.0"): every scalar field filterable with every operator, every field sortable. */
 const OPEN = {
   filterable: { id: "*", name: "*", email: "*", age: "*", secret: "*", createdAt: "*", title: "*", authorId: "*", updatedAt: "*", deletedAt: "*" },
   sortable: ["id", "name", "email", "age", "secret", "createdAt", "title", "authorId", "updatedAt", "deletedAt"],
-  // Task 014 (R21): `with` opens only listed relations; these tests predate the allow-list.
+  // R21: `with` opens only listed relations; these tests predate the allow-list.
   relations: { posts: { columns: "*" }, author: { columns: "*" } },
 } as const;
 
@@ -196,7 +196,7 @@ console.log("\n=== 3. LIKE pattern translation (D2) ===");
     eq(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }]), { AND: [{ name: { startsWith: "a%b" } }, { name: { endsWith: "b" } }] }),
     show(buildWhere(userMeta, [{ key: "name", operation: "like", value: "a%b" }])),
   );
-  // Task 021 B9: an unescaped `_` cannot be relied on in Prisma — refused as invalid-value.
+  // An unescaped `_` cannot be relied on in Prisma — refused as invalid-value.
   {
     const { diag: underscoreDiag, seen: underscoreSeen } = spy();
     const refused = buildWhere(userMeta, [{ key: "name", operation: "like", value: "a_b" }], underscoreDiag);
@@ -441,7 +441,7 @@ console.log("\n=== 5. orderBy ===");
     ),
   );
   check("direction defaults to asc", eq(buildOrderBy(userMeta, [{ key: "name" }]), [{ name: "asc" }]));
-  // Task 021 B11: `nulls` only where nullability is known — the runtime model (Prisma 6.19)
+  // `nulls` only where nullability is known — the runtime model (Prisma 6.19)
   // or a `fields` override. Prisma 7's runtime model has no `isRequired`: plain order.
   {
     const rdmAge = (
@@ -491,7 +491,7 @@ console.log("\n=== 6. value coercion ===");
     (coerceCondition(userMeta, "createdAt", "in", [iso, iso]) as Date[]).every(d => d instanceof Date),
   );
   check("text operators keep their raw string", coerceCondition(userMeta, "createdAt", "contains", "2026") === "2026");
-  // Task 021 B8: Boolean and enum fields are cast too (synthetic meta: the fixture schema has neither).
+  // Boolean and enum fields are cast too (synthetic meta: the fixture schema has neither).
   const castMeta = {
     ...userMeta,
     fields: new Map([
@@ -509,7 +509,7 @@ console.log("\n=== 6. value coercion ===");
     coerceCondition(castMeta, "role", "=", "OWNER") === INVALID_VALUE && coerceCondition(castMeta, "role", "=", "ADMIN") === "ADMIN",
   );
   check("Int: 'abc' is invalid-value", coerceCondition(userMeta, "age", "=", "abc") === INVALID_VALUE);
-  // Task 021 B8: a @db.Uuid field is cast when its native type is known — the runtime model or the fields override.
+  // A @db.Uuid field is cast when its native type is known — the runtime model or the fields override.
   const uuidMeta = readModelMeta(prisma as never, "user", [{ name: "email", nativeType: "Uuid" }]);
   check(
     "declared Uuid: a malformed uuid is invalid-value, a uuid passes",
@@ -612,7 +612,7 @@ function spyClient(results: Record<string, unknown> = {}) {
 /** A spy client pre-loaded with the rows `findMany` should return. */
 const spyOf = (rows: Record<string, unknown>[], results: Record<string, unknown> = {}) => spyClient({ findMany: rows, count: rows.length, ...results });
 
-/** Task 012 v2 cursor tokens: build one, read its cursor value. */
+/** v2 cursor tokens: build one, read its cursor value. */
 const tokenV2 = (k: unknown, id: unknown) => Buffer.from(JSON.stringify({ v: 2, k, id }), "utf8").toString("base64url");
 const tokenK = (token: string | null | undefined) => (token ? (JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { k: unknown }).k : undefined);
 
@@ -777,7 +777,7 @@ console.log("\n=== 10. cursor pagination (keyset via WHERE) ===");
   await createRegistry(s5.client as never)
     .repository("user" as never, OPEN as never)
     .findCursor({ limit: 2, cursorKey: "createdAt", cursor: tokenV2("2026-07-30T10:00:00.000Z", 1) });
-  // Task 012: (createdAt > v) OR (createdAt = v AND id > i) — both values re-cast to their field type.
+  // (createdAt > v) OR (createdAt = v AND id > i) — both values re-cast to their field type.
   const dated = lastArgs(s5.calls, "findMany").where as {
     OR: [{ createdAt: { gt: Date } }, { AND: [{ createdAt: { equals: Date } }, { id: { gt: number } }] }];
   };

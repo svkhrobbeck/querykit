@@ -1,5 +1,5 @@
 /**
- * Task 015 for @querykitjs/web: the builders and parsers follow the 012–014 backend
+ * @querykitjs/web against the backend: the builders and parsers follow its
  * contract — registry `timestamps`, `withTotal`, nullable totals, the error body
  * guard, the `search` operation and the URL readers' clamp.
  * Imported by `smoke.ts`; sets `process.exitCode` on failure.
@@ -97,7 +97,7 @@ check(
   json({ page: tightPayload.page, sort: tightPayload.sort }),
 );
 
-/* A7b: a direct builder call still throws (task 008 Locked 5). */
+/* A direct builder call still throws. */
 let thrown = "";
 try {
   buildListParams({ page: 502, perPage: 20 });

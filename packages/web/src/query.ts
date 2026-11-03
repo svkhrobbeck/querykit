@@ -155,7 +155,7 @@ export function clampInt(value: number | undefined, fallback: number, max = Infi
 
 /**
  * The server rejects a request past a limit; the builder refuses to make one.
- * Filter limits stay with the server (task 008, Locked decision 5).
+ * Filter limits stay with the server.
  */
 function limitError(what: string, limit: "maxOffset" | "maxSortFields", max: number, hint = ""): Error {
   return new Error(`querykit: ${what} exceeds ${limit} (${max})${hint}`);

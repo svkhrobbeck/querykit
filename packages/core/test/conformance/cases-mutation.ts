@@ -1,5 +1,5 @@
 /**
- * Bulk mutations and `withTotal` (task 013). `updateWhere` / `deleteWhere` are one
+ * Bulk mutations and `withTotal`. `updateWhere` / `deleteWhere` are one
  * atomic write (`calls: ["write"]`, no read before it), return `{ count }` or, with
  * `returning: { limit }`, `{ count, rows }`; an empty filter is refused unless the
  * caller says `{ all: true }`. `findList({ withTotal: false })` reads `perPage + 1`

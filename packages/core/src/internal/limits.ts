@@ -1,5 +1,5 @@
 /**
- * The filter-limit walk shared by the validators (task 008). It runs on the raw,
+ * The filter-limit walk shared by the validators. It runs on the raw,
  * unvalidated payload **before** any recursive schema sees it, so it is
  * iterative — no recursion at all, whatever the payload's depth — and a
  * 10 000-level `not` chain is rejected after `maxDepth + 1` steps.

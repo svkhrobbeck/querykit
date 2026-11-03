@@ -67,7 +67,7 @@ export type Sort<TDoc = Record<string, unknown>> = SortItem<TDoc>[];
 
 export type ColumnSelection<TDoc = Record<string, unknown>> = Partial<Record<FieldKey<TDoc>, boolean>>;
 
-/** Relations (`with`): refused in this version unless the repository lists `relations` — no `$lookup` yet (task 017 L3). */
+/** Relations (`with`): refused in this version unless the repository lists `relations` — no `$lookup` yet. */
 export type WithRelations = Record<string, unknown>;
 
 export interface QueryParams<TDoc = Record<string, unknown>> {

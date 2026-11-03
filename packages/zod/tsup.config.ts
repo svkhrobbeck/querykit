@@ -10,7 +10,7 @@ export default defineConfig({
   cjsInterop: true,
   splitting: false,
   sourcemap: true,
-  // Task 016: minified without whitespace — esbuild drops `/* @__PURE__ */` when it minifies
+  // Minified without whitespace — esbuild drops `/* @__PURE__ */` when it minifies
   // whitespace, and the schemas need them to tree-shake (REQUIREMENTS R14).
   minifySyntax: true,
   minifyIdentifiers: true,

@@ -1,5 +1,5 @@
 /**
- * Document fields from the repository's zod schema (task 017 Locked 2): the field kinds the
+ * Document fields from the repository's zod schema: the field kinds the
  * filter casts to, the enum values a string field allows, and which fields hold an ObjectId.
  * The driver has no schema of its own, so the zod object is the one source of field types.
  */

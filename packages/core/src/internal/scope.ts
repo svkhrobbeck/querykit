@@ -1,6 +1,6 @@
 /**
  * A repository `scope` (the server's RBAC / tenancy filter) split once for every
- * adapter (task 014): equality values and `{ in: [...] }` lists.
+ * adapter: equality values and `{ in: [...] }` lists.
  */
 
 /** One scope condition, in the shape every adapter's `buildWhere` reads. */

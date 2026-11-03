@@ -39,7 +39,7 @@ const documents = () => cloneRows().map(({ id, ...rest }) => ({ _id: new Types.O
 const toRows = (docs: readonly Record<string, unknown>[]): ConformanceRow[] =>
   docs.map(({ _id, ...rest }) => ({ id: Number.parseInt(String(_id), 16), ...rest }) as ConformanceRow);
 
-/** `updateMany` / `deleteMany` on the case's rows (task 013). */
+/** `updateMany` / `deleteMany` on the case's rows. */
 function write(kind: "update" | "delete", filter: Record<string, unknown>, update: Record<string, unknown> = {}) {
   recordCall("write");
   const docs = documents();
@@ -118,7 +118,7 @@ export function assertNoConnection(): boolean {
 }
 
 if ((import.meta as { main?: boolean }).main) {
-  await import("./policy"); // task 011 attack tests — only when this file is the entry point, not when web/conformance imports it
+  await import("./policy"); // attack tests — only when this file is the entry point, not when web/conformance imports it
   const summary = await runConformance(mongooseHarness);
   const offline = assertNoConnection();
   if (summary.failed > 0 || !offline) process.exitCode = 1;

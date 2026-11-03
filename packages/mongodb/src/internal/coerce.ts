@@ -2,7 +2,7 @@
  * Wire value → stored value, by the field kind from the zod schema. A value the field cannot
  * hold is INVALID_VALUE and the condition is dropped as `invalid-value` — the same contract as
  * the mongoose adapter (`path.cast`) and drizzle-pg. A plain object is never a value: that is
- * how `{ "$where": … }` or `{ "$gt": "" }` would reach the driver as an operator (task 017 T-2).
+ * how `{ "$where": … }` or `{ "$gt": "" }` would reach the driver as an operator.
  */
 import { ObjectId } from "mongodb";
 import { TEXT_FILTER_OPERATORS, type FilterOperator, type FilterValue } from "@querykitjs/core";

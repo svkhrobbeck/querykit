@@ -1,5 +1,5 @@
 /**
- * Request limits (task 008) for @querykitjs/zod: the shared limit table on the
+ * Request limits for @querykitjs/zod: the shared limit table on the
  * factories and on the legacy constant schemas, the hostile-depth payload and
  * the error text. Imported by `smoke.ts`; sets `process.exitCode` on failure.
  */

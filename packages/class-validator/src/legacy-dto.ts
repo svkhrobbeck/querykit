@@ -1,6 +1,6 @@
 /**
- * Static param DTOs (deprecated, task 014 P3) — `class ListUsersDto extends OffsetParamsDto`.
- * Kept in their own module (task 016): their decorators register class-validator metadata
+ * Static param DTOs (deprecated) — `class ListUsersDto extends OffsetParamsDto`.
+ * Kept in their own module: their decorators register class-validator metadata
  * when the module loads, so a bundle that does not import them drops the whole module.
  * New code uses the `make*ParamsDto` factories (`./dto`).
  */
@@ -13,7 +13,7 @@ import { IsQueryFilter, IsQuerySort, IsWithinMaxOffset } from "./decorators";
 /**
  * Paginatsiyasiz umumiy params — `filter` + `sort`.
  *
- * @deprecated Use `makeOffsetParamsDto` / `makeInfiniteParamsDto` / `makeCursorParamsDto` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeOffsetParamsDto` / `makeInfiniteParamsDto` / `makeCursorParamsDto` (safe defaults). Removed in the next major.
  */
 export class BaseParamsDto {
   @IsOptional()
@@ -28,7 +28,7 @@ export class BaseParamsDto {
 /**
  * Offset (sahifali) params — `page` + `perPage` (`perPage` ≤ core cap).
  *
- * @deprecated Use `makeOffsetParamsDto` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeOffsetParamsDto` (safe defaults). Removed in the next major.
  */
 export class OffsetParamsDto extends BaseParamsDto {
   /* `page`ning o'zida cap yo'q — chegara `(page - 1) × perPage` ≤ `DEFAULT_MAX_OFFSET`
@@ -47,7 +47,7 @@ export class OffsetParamsDto extends BaseParamsDto {
   @Max(DEFAULT_MAX_PER_PAGE)
   perPage?: number;
 
-  /** `false` — no count; the meta totals are `null` (task 013). */
+  /** `false` — no count; the meta totals are `null`. */
   @IsOptional()
   @IsBoolean()
   withTotal?: boolean;
@@ -56,7 +56,7 @@ export class OffsetParamsDto extends BaseParamsDto {
 /**
  * Infinite-scroll params — `limit` + `offset`.
  *
- * @deprecated Use `makeInfiniteParamsDto` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeInfiniteParamsDto` (safe defaults). Removed in the next major.
  */
 export class InfiniteParamsDto extends BaseParamsDto {
   @IsOptional()
@@ -79,7 +79,7 @@ export class InfiniteParamsDto extends BaseParamsDto {
  * boshqariladi. Shu sababli `BaseParamsDto`dan meros olinmaydi — aks holda
  * `sort` kontraktga qarshi ravishda meros bo'lib qolardi.
  *
- * @deprecated Use `makeCursorParamsDto` (safe defaults, task 014 P3). Removed in the next major.
+ * @deprecated Use `makeCursorParamsDto` (safe defaults). Removed in the next major.
  */
 export class CursorParamsDto {
   @IsOptional()

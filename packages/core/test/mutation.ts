@@ -1,5 +1,5 @@
 /**
- * Task 013 — bulk-mutation guards (`isAllRows`, `isEmptyFilter`, `refuseEmptyFilter`)
+ * Bulk-mutation guards (`isAllRows`, `isEmptyFilter`, `refuseEmptyFilter`)
  * and the `withTotal: false` page. Imported by `internal.ts`; sets `process.exitCode`.
  */
 import { QueryKitError } from "../src/index";
@@ -43,7 +43,7 @@ check(
 );
 check("withTotal: false — perPage rows or fewer → no next page", offsetPageWithoutTotal([1, 2, 3], 1, 3).meta.has_next === false);
 
-/* Task 014 P1 — scope: equality or { in: [...] }. */
+/* Scope: equality or { in: [...] }. */
 const scope = { shopId: { in: [1, 2] }, tenant: "t1", meta: { in: [1], x: 1 } };
 check(
   "scopeConditions: { in } → in, everything else → = (an object with more keys stays equality)",

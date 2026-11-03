@@ -1,5 +1,5 @@
 /**
- * Task 014 P4 (R21) — `checkWith`: the client's `with` against `relations`.
+ * `checkWith` (R21): the client's `with` against `relations`.
  * Imported by `internal.ts`; sets `process.exitCode`.
  */
 import { QueryKitError, type Relations } from "../src/index";

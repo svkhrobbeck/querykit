@@ -25,11 +25,11 @@ export interface FieldMeta {
   isList: boolean;
   /** The `@map`ped database column, when it differs from the field name. */
   dbName?: string;
-  /** `false` for an optional (nullable) field — Prisma accepts `nulls` in `orderBy` only there (task 021 B11). */
+  /** `false` for an optional (nullable) field — Prisma accepts `nulls` in `orderBy` only there. */
   isRequired?: boolean;
-  /** The database type (`"Uuid"` for `@db.Uuid`) — from the runtime model when it has one, or the `fields` override (task 021 B8). */
+  /** The database type (`"Uuid"` for `@db.Uuid`) — from the runtime model when it has one, or the `fields` override. */
   nativeType?: string;
-  /** An enum field's values (from the runtime data model), for the task 021 B8 cast. */
+  /** An enum field's values (from the runtime data model), for the cast. */
   enumValues?: readonly string[];
 }
 
@@ -191,7 +191,7 @@ export function readModelMeta(client: Record<string, unknown>, delegateKey: stri
   }
 
   const discovered = fromRuntimeDataModel(client, delegateKey) ?? fromDelegateFields(delegate, delegateKey);
-  // A `fields` override patches the discovered fields by name (task 021: e.g. the
+  // A `fields` override patches the discovered fields by name (e.g. the
   // nullability Prisma 7's runtime model no longer carries); with nothing
   // discovered it is the field list itself. The model name is still worth
   // discovering — it is what diagnostics report as `source`.

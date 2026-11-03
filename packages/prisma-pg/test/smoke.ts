@@ -60,8 +60,8 @@ const OPEN_USERS = {
 
 async function main() {
   const registry = createRegistry(prisma);
-  // Task 014 (R21): `with` opens only listed relations.
-  // Task 010: fields are closed by default; the smoke exercises every operator, so it opens them all.
+  // R21: `with` opens only listed relations.
+  // Fields are closed by default; the smoke exercises every operator, so it opens them all.
   const usersRepo = registry.repository("user", { relations: { posts: { columns: "*" } }, ...OPEN_USERS });
   const postsRepo = registry.repository("post", { filterable: { id: "*", title: "*", authorId: "*", createdAt: "*", deletedAt: "*" } });
   const uf = createFilters<typeof prisma.user>();
@@ -127,7 +127,7 @@ async function main() {
     const noTail = await usersRepo.findAll({ filter: [{ key: "name", operation: "like", value: "Ali%z" }] });
     check("…and it really anchors the tail ('Ali%z' matches nothing)", noTail.length === 0, `${noTail.length}`);
 
-    // Task 021 B9: Prisma has no length-pinned `_` wildcard, so an unescaped `_` is refused as invalid-value.
+    // Prisma has no length-pinned `_` wildcard, so an unescaped `_` is refused as invalid-value.
     const strictUsers = createRegistry(prisma, { strict: true }).repository("user", OPEN_USERS);
     const underscore = await refusal(() => strictUsers.findAll({ filter: [{ key: "name", operation: "like", value: "Ali_Valiyev" }] }));
     check("like with an unescaped _ ('Ali_Valiyev') is refused", underscore === "invalid-value", underscore);
@@ -303,7 +303,7 @@ async function main() {
     }
     check("strict mode throws QueryKitError", strictCode === "QUERYKIT_INVALID_CONDITION", strictCode);
 
-    /* ------------- the database side of tasks 012–014 (task 024) ------------ */
+    /* ------------- the database side of cursors, mutations and scope ------------ */
     const timedRegistry = createRegistry(prisma, { timestamps: { createdAt: "createdAt", deletedAt: "deletedAt" } });
     const tiesRepo = timedRegistry.repository("post", { filterable: { title: "*", authorId: "*" }, sortable: ["id", "createdAt"] });
     const tieFilter = [{ key: "title", operation: "startsWith" as const, value: "tie-" }];

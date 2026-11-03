@@ -28,7 +28,7 @@ export function cursorMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       // 400 the same way as any other bad condition (all three adapters agree).
       if (!field) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
-      // Task 012: the token carries the cursor value and the primary key (tie-break),
+      // The token carries the cursor value and the primary key (tie-break),
       // both re-cast to their field's type (ISO string → Date, else Prisma rejects
       // `gt(dateTimeField, "2026-…")`); a token that does not fit is invalid-value.
       const idField = meta.idField ?? "id";

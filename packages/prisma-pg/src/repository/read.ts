@@ -60,7 +60,7 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
           ...projection(params.columns, withOf(params.with)),
         });
 
-      // Task 013: no count — one extra row tells whether a next page exists.
+      // No count — one extra row tells whether a next page exists.
       if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
       const [data, totalItems] = await Promise.all([rows(perPage), countWhere(where)]);
       return { data, meta: offsetMeta(page, perPage, totalItems) } as OffsetResult<never>;

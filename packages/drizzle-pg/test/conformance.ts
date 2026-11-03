@@ -65,7 +65,7 @@ function countQuery(where?: SQL) {
   };
 }
 
-/** `update(t).set(v).where(w).returning(sel?)` / `delete(t).where(w).returning(sel?)` on the case's rows (task 013). */
+/** `update(t).set(v).where(w).returning(sel?)` / `delete(t).where(w).returning(sel?)` on the case's rows. */
 function writeQuery(kind: "update" | "delete") {
   let values: Record<string, unknown> = {};
   let where: SQL | undefined;

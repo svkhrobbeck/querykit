@@ -1,6 +1,6 @@
 /**
  * Shared by the adapter harnesses: a `Call` → repository arguments, and a repository
- * result → `HarnessResult` (task 013 adds the mutation shapes).
+ * result → `HarnessResult`.
  */
 import type { Call } from "./case-types";
 import type { HarnessResult } from "./runner";

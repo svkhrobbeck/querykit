@@ -35,7 +35,7 @@ export function offsetMeta(page: number, perPage: number, totalItems: number): O
 }
 
 /**
- * `withTotal: false` (task 013): rows fetched with `perPage + 1` and no count →
+ * `withTotal: false`: rows fetched with `perPage + 1` and no count →
  * the page and its meta; the extra row only signals `has_next`, totals are `null`.
  */
 export function offsetPageWithoutTotal<T>(rows: readonly T[], page: number, perPage: number): { data: T[]; meta: OffsetMeta } {
@@ -63,7 +63,7 @@ export interface CursorPageOptions {
   hasCursor: boolean;
   /** The row field the tokens are read from. */
   cursorField: string;
-  /** The primary-key field — the tie-break value in every token (task 012). */
+  /** The primary-key field — the tie-break value in every token. */
   idField: string;
   /** Signs the tokens (registry `cursorSecret`). */
   secret?: string;

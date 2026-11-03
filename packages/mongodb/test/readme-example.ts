@@ -1,5 +1,5 @@
 /**
- * The README "Quick start" example (task 017 acceptance 8), kept compiling: `test:types`
+ * The README "Quick start" example, kept compiling: `test:types`
  * (and the package typecheck) compiles it. It is never run — it needs a live MongoDB.
  */
 import { MongoClient, type ObjectId } from "mongodb";

@@ -30,7 +30,7 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
       // 400 the same way as any other bad condition (both adapters agree).
       if (!column) throw new QueryKitError({ source: diag.source, site: "cursorKey", key: cursorKey, reason: "unknown-key" });
 
-      // Task 012: the token carries the cursor value and the primary key (tie-break),
+      // The token carries the cursor value and the primary key (tie-break),
       // both re-cast to their column's type; a token that does not fit is invalid-value.
       const [idKey, idColumn] = primaryKeyOf(table);
       const token = await decodeCursorToken(params.cursor, { source: diag.source, secret: runtime.cursorSecret, key: cursorKey });
@@ -95,7 +95,7 @@ export function cursorMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
   };
 }
 
-/** The primary-key column (JS key and column): the tie-break of every cursor seek (task 012). */
+/** The primary-key column (JS key and column): the tie-break of every cursor seek. */
 function primaryKeyOf(table: PgTable): [string, AnyPgColumn] {
   const columns = tableColumns(table);
   const primary = columns.find(([, column]) => column.primary) ?? columns.find(([key]) => key === "id");

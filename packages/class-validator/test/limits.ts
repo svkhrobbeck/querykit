@@ -1,5 +1,5 @@
 /**
- * Request limits (task 008) for @querykitjs/class-validator: the shared limit
+ * Request limits for @querykitjs/class-validator: the shared limit
  * table through the pure core (`validateFilter` / `validateSort`) and through
  * the DTOs, the hostile-depth payload and the en/ru/uz messages. Imported by
  * `smoke.ts`; sets `process.exitCode` on failure.

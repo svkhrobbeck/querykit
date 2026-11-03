@@ -19,7 +19,7 @@ export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
   /** At most this many rows back from `returning: { limit }` (the cursor/infinite caps). */
   const returningLimit = (returning: { limit: number }): number => clampPageSize(returning.limit, runtime.defaultLimit, runtime.maxLimit);
 
-  /** One atomic statement → `{ count }`, or `{ count, rows }` cut to the limit (task 013). */
+  /** One atomic statement → `{ count }`, or `{ count, rows }` cut to the limit. */
   const counted = async (
     query: { returning(selection?: Record<string, unknown>): Promise<unknown[]> },
     options: MutationOptions,
