@@ -17,6 +17,7 @@ result types inferred automatically.
 | [`@querykitjs/mongoose`](./packages/mongoose)               | ✅ available | Mongoose + MongoDB (backend repository)                                                                                        |
 | [`@querykitjs/mongodb`](./packages/mongodb)                 | ✅ available | MongoDB official driver (backend repository, no mongoose)                                                                      |
 | [`@querykitjs/web`](./packages/web)                         | ✅ available | Frontend query-building (filters, pagination, URL sync)                                                                        |
+| [`@querykitjs/tanstack-query`](./packages/tanstack-query)   | ✅ available | Ready TanStack Query options from a web resource (list, infinite, cursor) — React, Vue, Solid, Svelte                          |
 | [`@querykitjs/zod`](./packages/zod)                         | ✅ available | Zod schemas validating the request contract (backend)                                                                          |
 | [`@querykitjs/class-validator`](./packages/class-validator) | ✅ available | class-validator decorators + DTOs for the same contract (Nest)                                                                 |
 | [`@querykitjs/standard-schema`](./packages/standard-schema) | ✅ available | Standard Schema v1 validators for the same contract (valibot, arktype, Effect, Hono `sValidator`, tRPC) — no validator library |

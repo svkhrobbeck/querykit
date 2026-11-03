@@ -123,6 +123,21 @@
         "hono": "4.13.13",
       },
     },
+    "packages/tanstack-query": {
+      "name": "@querykitjs/tanstack-query",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@querykitjs/web": "workspace:*",
+        "@tanstack/query-core": "5.104.5",
+        "@tanstack/react-query": "5.104.5",
+        "@types/react": "19.3.0",
+        "react": "19.3.1",
+      },
+      "peerDependencies": {
+        "@querykitjs/web": "^4.0.0",
+        "@tanstack/query-core": "^5.0.0",
+      },
+    },
     "packages/web": {
       "name": "@querykitjs/web",
       "version": "4.0.0",
@@ -422,6 +437,8 @@
 
     "@querykitjs/standard-schema": ["@querykitjs/standard-schema@workspace:packages/standard-schema"],
 
+    "@querykitjs/tanstack-query": ["@querykitjs/tanstack-query@workspace:packages/tanstack-query"],
+
     "@querykitjs/web": ["@querykitjs/web@workspace:packages/web"],
 
     "@querykitjs/zod": ["@querykitjs/zod@workspace:packages/zod"],
@@ -501,6 +518,10 @@
     "@sindresorhus/is": ["@sindresorhus/is@4.6.0", "", {}, "sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw=="],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
+
+    "@tanstack/query-core": ["@tanstack/query-core@5.104.5", "", {}, "sha512-Q94gI8Opd+CbdVNOdj8ZCyV8WqLYitrDq1t96Xc8WZT6lY0r5iRnJLXYDxMex7EEf2v+mXvn4FcjaBKSxXZQ9A=="],
+
+    "@tanstack/react-query": ["@tanstack/react-query@5.104.5", "", { "dependencies": { "@tanstack/query-core": "5.104.5" }, "peerDependencies": { "@types/react": "^18 || ^19", "react": "^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-RORgFe052U+93weaNuqg7qHq7vNVNzXN/VrXqD4bbAuQCWUqOl2lV5Ui9flWk5CVvMyL/Bh27QWhzwH0aaOx9g=="],
 
     "@trpc/server": ["@trpc/server@11.19.0", "", { "peerDependencies": { "typescript": ">=5.7.2" }, "bin": { "intent": "bin/intent.js" } }, "sha512-7C1goiDurz82yFKtZUbEzjXd0Rg/jyisaIZQhdvus+1l7E6mwcEYZXjZ1US/HF8kOyz1LERL8UN3bcboJtjcyQ=="],
 

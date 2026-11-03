@@ -388,6 +388,8 @@ const cur = users.parseCursor(curRes.data); // cur.meta.nextCursor, cur.meta.has
 
 ### TanStack `useQuery` (offset)
 
+> Tayyor options: [`@querykitjs/tanstack-query`](../tanstack-query/README.md) shu obyektlarni o'zi quradi — `listOptions`, `infiniteOptions`, `cursorOptions` (kalit, fetch, meta parse, sahifa parametrlari).
+
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 const users = qk.resource<IUser>("users");

@@ -8,6 +8,7 @@
   "@querykitjs/mongoose": 9885,
   "@querykitjs/prisma-pg": 11504,
   "@querykitjs/standard-schema": 3441,
+  "@querykitjs/tanstack-query": 419,
   "@querykitjs/web": 3591,
   "@querykitjs/web/react": 675,
   "@querykitjs/zod": 1781

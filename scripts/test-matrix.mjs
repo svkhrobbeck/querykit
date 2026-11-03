@@ -78,6 +78,15 @@ export const EDGES = [
   },
   { pkg: "web", label: "react 19.3.1 + react-router 8.5.1", runs: ["test/smoke.ts", "test/hook.ts"] },
   { pkg: "zod", label: "zod 4.6.7", runs: ["test/smoke.ts"] },
+  // query-core lives on one major; the old end is its first release (REQUIREMENTS R15 exception).
+  {
+    pkg: "tanstack-query",
+    label: "@tanstack/query-core 5.0.0",
+    deps: { "@tanstack/query-core": "5.0.0", "@tanstack/react-query": "5.0.0" },
+    runs: ["test/smoke.ts"],
+    extra: ["web"],
+  },
+  { pkg: "tanstack-query", label: "@tanstack/query-core 5.104.5", runs: ["test/smoke.ts"] },
   {
     pkg: "prisma-pg",
     label: "Prisma 6.19.3",

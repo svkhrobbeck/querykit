@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "react"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@querykitjs/core": ["../core/src/index.ts"],
+      "@querykitjs/web": ["../web/src/index.ts"]
+    }
+  },
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist"]
+}

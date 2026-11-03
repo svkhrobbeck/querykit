@@ -1,0 +1,76 @@
+{
+  "name": "@querykitjs/tanstack-query",
+  "version": "0.0.0",
+  "description": "Ready TanStack Query options from a querykit resource — list, infinite and cursor queries with keys, fetch, meta parsing and page params. One code for React, Vue, Solid and Svelte Query.",
+  "type": "module",
+  "author": {
+    "name": "Suhrobbek Soatov",
+    "url": "https://soatov.uz",
+    "email": "svkhrobbeck@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svkhrobbeck/querykit.git",
+    "directory": "packages/tanstack-query"
+  },
+  "homepage": "https://github.com/svkhrobbeck/querykit/tree/main/packages/tanstack-query#readme",
+  "bugs": {
+    "url": "https://github.com/svkhrobbeck/querykit/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "skills/querykit-tanstack-query",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "bun run test/smoke.ts"
+  },
+  "peerDependencies": {
+    "@querykitjs/web": "^4.0.0",
+    "@tanstack/query-core": "^5.0.0"
+  },
+  "devDependencies": {
+    "@querykitjs/web": "workspace:*",
+    "@tanstack/query-core": "5.104.5",
+    "@tanstack/react-query": "5.104.5",
+    "@types/react": "19.3.0",
+    "react": "19.3.1"
+  },
+  "keywords": [
+    "querykit",
+    "tanstack-query",
+    "react-query",
+    "vue-query",
+    "infinite-scroll",
+    "pagination",
+    "typescript"
+  ]
+}
