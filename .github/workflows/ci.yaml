@@ -49,8 +49,9 @@ jobs:
         with:
           node-version: 24
           registry-url: "https://registry.npmjs.org"
-      # OIDC trusted publishing requires npm >= 11.5.1.
-      - run: npm install -g npm@latest
+      # OIDC trusted publishing requires npm >= 11.5.1. Pinned: npm 12 is untested here
+      # (the July OIDC publishes ran on npm 11); moving to 12 is its own decision.
+      - run: npm install -g npm@11.21.1
       - run: bun install --frozen-lockfile
       # Publish directly — versions are bumped locally (`bun run version-packages`)
       # and committed, so no changesets remain and nothing opens a PR. This
@@ -62,3 +63,5 @@ jobs:
         env:
           # No NPM_TOKEN: auth comes from OIDC trusted publishing (id-token: write).
           NPM_CONFIG_PROVENANCE: "true"
+          # setup-node writes a placeholder token to .npmrc; empty, it cannot block the OIDC exchange.
+          NODE_AUTH_TOKEN: ""
