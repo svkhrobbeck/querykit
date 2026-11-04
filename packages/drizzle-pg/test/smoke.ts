@@ -40,6 +40,11 @@ const posts = s.table("posts", {
   updatedAt: timestamp("updated_at", { withTimezone: true }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
+const geocodeCache = s.table("geocode_cache", {
+  key: text().primaryKey(),
+  addressText: text().notNull(),
+  namedCol: text("named_col"),
+});
 const usersRelations = relations(users, ({ many }) => ({ posts: many(posts) }));
 const postsRelations = relations(posts, ({ one }) => ({ author: one(users, { fields: [posts.authorId], references: [users.id] }) }));
 
@@ -189,6 +194,20 @@ async function main() {
       { target: "email" },
     );
     check("upsertMany inserts", many.length === 2 && (await usersRepo.count()) === 5);
+
+    // Under `casing` the column's real name comes from the connection, not from `column.name`.
+    await client.unsafe(`CREATE TABLE qk_smoke.geocode_cache (
+      key text PRIMARY KEY, address_text text NOT NULL, named_col text)`);
+    const casingSchema = { geocodeCache };
+    const cacheRepo = createRegistry(drizzle(client, { schema: casingSchema, casing: "snake_case" }), casingSchema).repository(geocodeCache);
+    const storedCacheRow = async (key: string) => (await client.unsafe(`SELECT address_text, named_col FROM qk_smoke.geocode_cache WHERE key = $1`, [key]))[0];
+    await cacheRepo.upsert({ key: "tas", addressText: "old", namedCol: "old" }, { target: "key" });
+    await cacheRepo.upsert({ key: "tas", addressText: "new", namedCol: "new" }, { target: "key" });
+    const updatedRow = await storedCacheRow("tas");
+    check("casing upsert updates a multi-word column", updatedRow?.address_text === "new" && updatedRow?.named_col === "new", JSON.stringify(updatedRow));
+    await cacheRepo.upsertMany([{ key: "tas", addressText: "newer", namedCol: "newer" }], { target: "key" });
+    const updatedByMany = await storedCacheRow("tas");
+    check("casing upsertMany updates a multi-word column", updatedByMany?.address_text === "newer", JSON.stringify(updatedByMany));
 
     // 12. aggregate
     const agg = await postsRepo.aggregate({ count: true, groupBy: "authorId" });

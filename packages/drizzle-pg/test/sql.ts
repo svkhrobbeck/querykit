@@ -22,6 +22,7 @@ import { createRegistry, createFilters } from "../src/index";
 import type { AnyDb } from "../src/types";
 import "./policy";
 import "./cast";
+import "./upsert-casing";
 
 /* -------------------------------- schema ---------------------------------- */
 

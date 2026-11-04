@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { aliasedTable, sql } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import type { MutationOptions } from "@querykitjs/core";
 import { clampPageSize, scopeDefaults } from "@querykitjs/core/internal";
@@ -54,10 +54,12 @@ export function mutateMethods<TTable extends AnyPgTable>(ctx: RepoContext<TTable
   const defaultConflictSet = (sample: object, targetKeys: string[]): Record<string, unknown> => {
     const set: Record<string, unknown> = {};
     const skip = new Set([...targetKeys, createdAtKey ?? "createdAt"]);
+    // A column, not its `name`: only a column goes through the connection's `casing`.
+    const excluded = aliasedTable(table, "excluded");
     for (const key of Object.keys(sample)) {
       if (skip.has(key)) continue;
-      const column = resolveColumn(table, key);
-      if (column) set[key] = sql`excluded.${sql.identifier(column.name)}`;
+      const column = resolveColumn(excluded, key);
+      if (column) set[key] = sql`${column}`;
     }
     if (updatedAtCol) set.updatedAt = sql`now()`;
     return set;
