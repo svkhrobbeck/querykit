@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 import { QueryKitError, type SkippedCondition } from "@querykitjs/core";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 
+import { checkListWalk, type WalkableRepository } from "../../core/test/conformance/list-walk";
 import { createRegistry, createFilters } from "../src/index";
 import { User, type IUser } from "./user.model";
 import { Post } from "./post.model";
@@ -586,6 +587,17 @@ async function main() {
       throws(() => registry.repository(User, { scope: { nope: 1 } as never })),
     );
     check("a valid scope is accepted", !throws(() => registry.repository(User, { scope: { name: "Ali Valiyev" } })));
+
+    // Offset pages over one repeated value: nothing repeats or goes missing.
+    await Post.insertMany(Array.from({ length: 205 }, () => ({ title: "same", author: ali!._id })));
+    await checkListWalk(registry.repository(Post, { filterable: { title: "*" }, sortable: ["title"] } as never) as unknown as WalkableRepository, {
+      key: "title",
+      idKey: "_id",
+      filter: [{ key: "title", operation: "=" as const, value: "same" }],
+      rows: 205,
+      check,
+    });
+    await Post.deleteMany({ title: "same" });
   } finally {
     await mongoose.disconnect();
     await replset.stop();

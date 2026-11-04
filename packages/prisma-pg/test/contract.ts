@@ -369,7 +369,7 @@ console.log("\n=== C1–C3. real web payloads, over the wire, into the repositor
     eq(listArgs.where, { AND: [{ name: { contains: "ali", mode: "insensitive" } }, { age: { gte: 18 } }] }),
     show(listArgs.where),
   );
-  check("…and the expected orderBy", eq(listArgs.orderBy, [{ createdAt: "desc" }]));
+  check("…and the expected orderBy", eq(listArgs.orderBy, [{ createdAt: "desc" }, { id: "desc" }]));
   check("…and web's empty columns/with do not narrow the result", listArgs.select === undefined && listArgs.include === undefined);
   check(
     "…and the meta matches web's mapper contract",

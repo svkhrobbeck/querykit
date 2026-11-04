@@ -4,6 +4,7 @@
  * three-valued logic, `contains`-style filters as escaped LIKE (case-insensitive
  * with `mode: "insensitive"`), PostgreSQL null ordering. Test-only.
  */
+import { recordOrder } from "../../core/test/conformance/fixtures";
 import {
   and3,
   escapeLike,
@@ -106,6 +107,7 @@ export function findMany<T extends Row>(rows: readonly T[], args: FindManyArgs =
       typeof value === "string" ? { key, direction: value, nulls: undefined } : { key, direction: value.sort, nulls: value.nulls },
     ),
   );
+  recordOrder(keys);
   // `{ sort, nulls }` in MongoDB's order on every key, or Postgres' default on none.
   const explicit = keys.filter(k => k.nulls !== undefined).length;
   if (keys.some(k => k.nulls !== undefined && (k.direction === "asc") !== (k.nulls === "first"))) throw new Error("fake-prisma: unsupported nulls order");

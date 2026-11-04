@@ -88,6 +88,16 @@ Mijoz faqat server ruxsat bergan maydonlar bo'yicha, ruxsat berilgan operatorlar
 - `findInfinite({ limit, offset })` — infinite scroll (`has_more`, `next_offset`).
 - `findCursor({ cursorKey, limit, cursor, order, direction })` — keyset; `cursorKey` dagi tengliklar `_id` bilan ajratiladi, shuning uchun hech bir qator tushib qolmaydi yoki takrorlanmaydi; `cursorSecret` bilan tokenlar imzolanadi, imzosizi rad etiladi.
 
+### Offset sahifalarda barqaror tartib
+
+`findList` va `findInfinite` tartibi doim primary key bilan tugaydi, birinchi kalit yo'nalishida: `sort: [{ key: "age", direction: "desc" }]` → `age` desc, keyin `_id` desc. Teng qiymatli qator sahifalar orasida takrorlanmaydi va tushib qolmaydi.
+
+- Primary key `maxSortFields` ga sanalmaydi va `sortable` da bo'lishi shart emas; mijoz u bo'yicha saralay olishi o'zgarmaydi. Sort'da allaqachon bo'lsa, qayta qo'shilmaydi.
+- `findAll` va `findOne` tartibi o'zgarmaydi: ular sahifalamaydi.
+- Tartib `findCursor` tartibi bilan bir xil.
+- ⚠️ **Indeks narxi.** `(col, _id)` compound indeksisiz MongoDB bu tartibni xotirada saralaydi, faqat `(col)` indeksi yetmaydi. Katta collection'da `{ col: 1, _id: 1 }` qo'ying; u ikkala yo'nalishga xizmat qiladi. `findCursor` ga ham shu indeks kerak.
+- `explainFind` `findAll` rejasini ko'rsatadi, unda bu kalit yo'q.
+
 ## Relation'lar (`with`)
 
 Bu versiyada yo'q: `$lookup` qurilmagan, shuning uchun har qanday `with` — `forbidden-key` (`site: "with"`). Bog'liq hujjatlarni ikkinchi repository chaqiruvi bilan yuklang.

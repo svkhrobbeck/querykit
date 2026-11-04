@@ -294,6 +294,15 @@ const p2 = await usersRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 const back = await usersRepository.findCursor({ cursor: p2.meta.prev_cursor, direction: "backward" });
 ```
 
+### Offset sahifalarda barqaror tartib
+
+`findList` va `findInfinite` tartibi doim primary key bilan tugaydi, birinchi kalit yo'nalishida: `sort: [{ key: "age", direction: "desc" }]` → `age` desc, keyin `_id` desc. Teng qiymatli qator sahifalar orasida takrorlanmaydi va tushib qolmaydi.
+
+- Primary key `maxSortFields` ga sanalmaydi va `sortable` da bo'lishi shart emas; mijoz u bo'yicha saralay olishi o'zgarmaydi. Sort'da allaqachon bo'lsa, qayta qo'shilmaydi.
+- `findAll` va `findOne` tartibi o'zgarmaydi: ular sahifalamaydi.
+- Tartib `findCursor` tartibi bilan bir xil.
+- ⚠️ **Indeks narxi.** `(col, _id)` compound indeksisiz MongoDB bu tartibni xotirada saralaydi, faqat `(col)` indeksi yetmaydi. Katta collection'da `{ col: 1, _id: 1 }` qo'ying; u ikkala yo'nalishga xizmat qiladi. `findCursor` ga ham shu indeks kerak.
+
 ### Cursor: teng qiymatlar va imzo
 
 - Seek kaliti `(cursorKey, _id)`: `cursorKey` unikal bo'lmasa ham (masalan bir xil `createdAt`) hech bir qator tushib qolmaydi va takrorlanmaydi. `cursorKey` primary key'ning o'zi bo'lsa — bitta maydonli seek.

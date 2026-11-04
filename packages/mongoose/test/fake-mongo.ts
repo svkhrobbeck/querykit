@@ -4,6 +4,7 @@
  * only between values of the same type, `$not`/`$nor` match when the inner
  * condition does not, null sorts lowest. Test-only.
  */
+import { recordOrder } from "../../core/test/conformance/fixtures";
 import { compareValues, mongoOrder, pick, sortRows, type Direction } from "../../core/test/conformance/semantics";
 
 type Doc = Record<string, unknown>;
@@ -88,6 +89,7 @@ export interface FindOptions {
 /** `find(filter, projection).sort().skip().limit()` on fixture documents. */
 export function find(docs: readonly Doc[], filter: Condition | undefined, options: FindOptions, projection?: Record<string, unknown>): Doc[] {
   const keys = Object.entries(options.sort ?? {}).map(([key, value]) => ({ key, direction: (value === -1 ? "desc" : "asc") as Direction }));
+  recordOrder(keys);
   const ordered = sortRows(
     docs.filter(doc => matches(filter, doc)),
     keys,

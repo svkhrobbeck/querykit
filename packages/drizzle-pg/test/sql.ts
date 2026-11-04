@@ -23,6 +23,7 @@ import type { AnyDb } from "../src/types";
 import "./policy";
 import "./cast";
 import "./upsert-casing";
+import "./list-order";
 
 /* -------------------------------- schema ---------------------------------- */
 

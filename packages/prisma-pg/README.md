@@ -293,6 +293,16 @@ const p2 = await postsRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 p1.meta; // { limit, has_next, has_prev, next_cursor, prev_cursor }
 ```
 
+### Offset sahifalarda barqaror tartib
+
+`findList` va `findInfinite` tartibi doim primary key bilan tugaydi, birinchi kalit yo'nalishida: `sort: [{ key: "age", direction: "desc" }]` → `age` desc, keyin `id` desc. Teng qiymatli qator sahifalar orasida takrorlanmaydi va tushib qolmaydi.
+
+- Primary key `maxSortFields` ga sanalmaydi va `sortable` da bo'lishi shart emas; mijoz u bo'yicha saralay olishi o'zgarmaydi. Sort'da allaqachon bo'lsa, qayta qo'shilmaydi.
+- `findAll` va `findOne` tartibi o'zgarmaydi: ular sahifalamaydi.
+- Composite primary key'da hamma maydon qo'shiladi. Primary key bo'lmasa, tartib avvalgidek va xato yo'q.
+- NULL bo'lmagan ustunda tartib `findCursor` tartibi bilan bir xil. Optional maydonda `findList` `nulls` yozadi (asc'da first, desc'da last), `findCursor` yozmaydi.
+- ⚠️ **Indeks narxi.** Faqat `(col)` indeksi bu tartibga to'g'ridan-to'g'ri xizmat qilmaydi: PostgreSQL incremental sort ishlatishi mumkin. Katta jadvalda `@@index([col, id])` qo'ying; optional maydonda indeks ham o'sha NULL tartibida bo'lishi kerak. `findCursor` ga ham `(col, id)` kerak.
+
 ### Cursor: teng qiymatlar va imzo
 
 - Seek kaliti `(cursorKey, @id)`: `cursorKey` unikal bo'lmasa ham (masalan bir xil `createdAt`) hech bir qator tushib qolmaydi va takrorlanmaydi. `cursorKey` primary key'ning o'zi bo'lsa — bitta maydonli seek.

@@ -15,7 +15,7 @@ import {
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
 import { hasPath, resolveField, type AnyModel } from "../internal/fields";
-import { buildSort } from "../internal/order-by";
+import { buildListSort, buildSort } from "../internal/order-by";
 import { buildWhere, type Query } from "../internal/where";
 import { buildProjection, type Projection } from "./projection";
 
@@ -72,6 +72,8 @@ export interface RepoContext<TDoc> extends Projection<TDoc> {
   /** Stamp `updatedAt` when the schema has a manual one (no `timestamps`). */
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
+  /** `sortSpec` of a paged read: `_id` ends the order, so pages cannot overlap. */
+  listSortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
   /**
    * The client's `with`, checked against `relations` (R21): an unlisted relation,
    * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
@@ -124,6 +126,7 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
   };
 
   const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(m, sort as Sort | undefined, diag, createdAtPath);
+  const listSortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildListSort(m, sort as Sort | undefined, diag, createdAtPath);
   // A bare model (`{ author: User }`) is for typing only and opens nothing (R21).
   const withOf = (value: unknown) => checkWith(value, config.relations as Relations | undefined, WITH_DIALECT, diag.source) as never;
 
@@ -199,6 +202,7 @@ export function buildRepoContext<TDoc>(runtime: RepoRuntime, model: Model<TDoc>,
     deletedAtPath,
     forUpdate,
     sortSpec,
+    listSortSpec,
     withOf,
     composeWhere,
     mutationWhere,

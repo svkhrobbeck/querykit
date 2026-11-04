@@ -19,7 +19,7 @@ import {
 
 import type { FieldCondition, FieldKey, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
 import { resolveField, shapeFromSchema, type DocShape } from "../internal/fields";
-import { buildSort } from "../internal/order-by";
+import { buildListSort, buildSort } from "../internal/order-by";
 import { buildWhere, type Query } from "../internal/where";
 import { buildProjection, type Projection } from "./projection";
 
@@ -53,6 +53,8 @@ export interface RepoContext<TDoc extends Document> extends Projection<TDoc> {
   deletedAtPath: string;
   forUpdate: <T extends object>(patch: T) => T;
   sortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
+  /** `sortSpec` of a paged read: `_id` ends the order, so pages cannot overlap. */
+  listSortSpec: (sort?: Sort<TDoc>) => Record<string, 1 | -1>;
   /** `with` is refused in this version (no `$lookup`): `forbidden-key`, site `with`. */
   withOf: (value: unknown) => void;
   policy: Policy;
@@ -110,6 +112,7 @@ export function buildRepoContext<TDoc extends Document>(
   }
 
   const sortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildSort(shape, sort as Sort | undefined, diag, createdAtPath);
+  const listSortSpec = (sort?: Sort<TDoc>): Record<string, 1 | -1> => buildListSort(shape, sort as Sort | undefined, diag, createdAtPath);
   const withOf = (value: unknown): void => {
     checkWith(value, undefined, WITH_DIALECT, diag.source);
   };
@@ -191,6 +194,7 @@ export function buildRepoContext<TDoc extends Document>(
     deletedAtPath,
     forUpdate,
     sortSpec,
+    listSortSpec,
     withOf,
     policy,
     maxTimeMS,

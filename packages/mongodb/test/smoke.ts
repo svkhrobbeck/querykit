@@ -12,6 +12,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { z } from "zod";
 
+import { checkListWalk, type WalkableRepository } from "../../core/test/conformance/list-walk";
 import { createRegistry } from "../src/index";
 import { explainFind } from "../src/testing";
 
@@ -78,6 +79,24 @@ try {
 
   const plan = await explainFind(repo, { sort: [{ key: "created_at", direction: "asc" }] });
   check("explainFind returns a query plan", JSON.stringify(plan).includes("queryPlanner"));
+
+  // Offset pages over one repeated value: nothing repeats or goes missing.
+  const sameRows = client.db("qk_mongodb_smoke").collection<{ _id: ObjectId; title: string }>("same_rows");
+  await sameRows.deleteMany({});
+  await sameRows.insertMany(Array.from({ length: 205 }, () => ({ _id: new ObjectId(), title: "same" })));
+  const sameRepo = qk.repository(sameRows, {
+    schema: z.object({ _id: z.string(), title: z.string() }),
+    objectId: ["_id"],
+    filterable: { title: "*" },
+    sortable: ["title"],
+  });
+  await checkListWalk(sameRepo as unknown as WalkableRepository, {
+    key: "title",
+    idKey: "_id",
+    filter: [{ key: "title", operation: "=" as const, value: "same" }],
+    rows: 205,
+    check,
+  });
 } finally {
   await client.close();
   await server.stop();

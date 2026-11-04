@@ -280,5 +280,31 @@ check("nope with strict → unknown-key", unknown.error instanceof QueryKitError
   check("A5 …a listed field passes", !titleMatch.error, describe(titleMatch));
 }
 
+/* List order on a schema with no createdAt path: `_id` is the default sort and is not repeated. */
+{
+  const NoTimestamps = mongoose.model("PolicyNoTimestamps", new Schema({ name: String }));
+  const sorts: unknown[] = [];
+  const execOfTest = mongoose.Query.prototype.exec;
+  mongoose.Query.prototype.exec = async function exec(this: Query<unknown, unknown>) {
+    if (this.model !== NoTimestamps) return execOfTest.call(this);
+    if ((this as unknown as { op?: string }).op === "countDocuments") return 0;
+    sorts.push((this.getOptions() as Options).sort);
+    return [];
+  } as typeof execOfTest;
+  const repository = createRegistry(mongoose.connection).repository(NoTimestamps, { sortable: ["name"] } as never) as unknown as Record<
+    string,
+    (params?: unknown) => Promise<unknown>
+  >;
+  await repository.findList!({});
+  check("list order: no createdAt → _id once", JSON.stringify(sorts.at(-1)) === JSON.stringify({ _id: -1 }), JSON.stringify(sorts.at(-1)));
+  await repository.findInfinite!({ sort: [{ key: "name", direction: "desc" }] });
+  check(
+    "list order: _id follows the first key's direction",
+    JSON.stringify(sorts.at(-1)) === JSON.stringify({ name: -1, _id: -1 }),
+    JSON.stringify(sorts.at(-1)),
+  );
+  mongoose.Query.prototype.exec = execOfTest;
+}
+
 console.log(`policy: ${passed} passed, ${failed} failed, ${todo} todo`);
 if (failed > 0) process.exitCode = 1;

@@ -178,6 +178,7 @@ The same JSON shape as every querykit package (`@querykitjs/core`): conditions `
 
 ## Mistakes to avoid
 
+- Relying on an index on `(col)` alone for `findList` or `findInfinite`: they end the order on the primary key, so a large table needs a compound index on `(col, primary key)`. The key does not count against `maxSortFields`; `findAll` and `findOne` do not add it.
 - An unescaped `_` in `like` / `ilike`: Prisma has no one-character wildcard, so it is `invalid-value`. Write `\\_` for a literal underscore.
 - Using the database column name (`created_at`) as a key: keys are Prisma field names (`createdAt`).
 - Using a text operator on a non-`String` field: it is skipped as `invalid-value`.

@@ -9,6 +9,7 @@
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
+import { recordOrder } from "../../core/test/conformance/fixtures";
 import { and3, mongoOrder, not3, or3, pgOrder, sortRows, sqlCompare, sqlIn, sqlLike, type Direction, type Tri } from "../../core/test/conformance/semantics";
 
 type Row = Record<string, unknown>;
@@ -190,7 +191,8 @@ export function orderRows<T extends Row>(rows: readonly T[], orderBy: readonly S
     if (nulls !== undefined && !mongoStyle) throw new Error(`fake-pg: unsupported NULLS order "${sql}"`);
     return { key: columnKey(match[1]!), direction, mongoStyle };
   });
+  recordOrder(keys);
+  // A bare key next to explicit ones is the primary key: it holds no NULLs to place.
   const explicit = keys.filter(k => k.mongoStyle).length;
-  if (explicit !== 0 && explicit !== keys.length) throw new Error("fake-pg: mixed NULLS orders in one ORDER BY");
   return sortRows(rows, keys, explicit ? mongoOrder : pgOrder);
 }

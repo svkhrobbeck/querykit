@@ -1028,5 +1028,42 @@ console.log("\n=== 13. transactions (ambient context) ===");
   check("after the transaction the base client is used again", s.calls.length === 2);
 }
 
+console.log("\n=== list order: the primary key ends a paged read's sort ===");
+{
+  const calls: Call[] = [];
+  const scalar = (name: string, extra: Record<string, unknown> = {}) => ({ name, kind: "scalar", type: "Int", ...extra });
+  const client = {
+    _runtimeDataModel: {
+      models: {
+        Membership: { fields: [scalar("orgId"), scalar("userId"), scalar("role")], primaryKey: { name: null, fields: ["orgId", "userId"] } },
+        Label: { fields: [scalar("title")], primaryKey: null },
+      },
+    },
+    membership: makeDelegate(calls, {}),
+    label: makeDelegate(calls, {}),
+  };
+  const sent = () => lastArgs(calls, "findMany").orderBy ?? lastArgs(calls, "findFirst").orderBy;
+  const registry = createRegistry(client as never);
+  const memberships = registry.repository("membership" as never, { sortable: ["role", "userId"] } as never) as unknown as Record<
+    string,
+    (params: unknown) => Promise<unknown>
+  >;
+
+  await memberships.findList!({ sort: [{ key: "role", direction: "desc" }] });
+  check("@@id: every field, in the first key's direction", eq(sent(), [{ role: "desc" }, { orgId: "desc" }, { userId: "desc" }]), show(sent()));
+  await memberships.findInfinite!({ sort: [{ key: "userId" }] });
+  check("@@id: a field already sorted on is not repeated", eq(sent(), [{ userId: "asc" }, { orgId: "asc" }]), show(sent()));
+  await memberships.findList!({});
+  check("@@id, no sort: every field, descending like the default", eq(sent(), [{ orgId: "desc" }, { userId: "desc" }]), show(sent()));
+  await memberships.findAll!({ sort: [{ key: "role" }] });
+  check("findAll stays without the tie-break", eq(sent(), [{ role: "asc" }]), show(sent()));
+
+  const labels = registry.repository("label" as never, { sortable: ["title"] } as never) as unknown as Record<string, (params: unknown) => Promise<unknown>>;
+  await labels.findList!({ sort: [{ key: "title" }] });
+  check("no primary key: the sort stays, no error", eq(sent(), [{ title: "asc" }]), show(sent()));
+  await labels.findInfinite!({});
+  check("no primary key, no sort: still no orderBy keys", eq(sent(), []), show(sent()));
+}
+
 console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

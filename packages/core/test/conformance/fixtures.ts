@@ -37,10 +37,14 @@ let current: ConformanceRow[] = copy(ROWS);
  */
 export const driverCalls: string[] = [];
 
+/** The sort of the last read a fake driver was given, as `key:direction` (`_id` reads as `id`). */
+export const driverOrder: string[] = [];
+
 /** Run one case on its own rows (`CaseOptions.rows`); `undefined` restores `ROWS`. Set by the runner only. */
 export function useRows(rows: readonly ConformanceRow[] | undefined): void {
   current = copy(rows ?? ROWS);
   driverCalls.length = 0;
+  driverOrder.length = 0;
 }
 
 /** Plain copies, so a fake driver can never mutate the table by accident. */
@@ -56,4 +60,10 @@ export function writeRows(rows: readonly ConformanceRow[]): void {
 /** One driver call for `driverCalls`. */
 export function recordCall(kind: "find" | "count" | "write", limit?: number): void {
   driverCalls.push(kind === "find" ? `find:${limit ?? "all"}` : kind);
+}
+
+/** One read's sort for `driverOrder`. */
+export function recordOrder(keys: ReadonlyArray<{ key: string; direction: string }>): void {
+  driverOrder.length = 0;
+  driverOrder.push(...keys.map(({ key, direction }) => `${key === "_id" ? "id" : key}:${direction}`));
 }

@@ -7,7 +7,7 @@ import type { RepoContext } from "./context";
 
 /** Reads: every one checks the policy first, so a refused request never reaches the driver. */
 export function readMethods<TDoc extends Document>(ctx: RepoContext<TDoc>) {
-  const { runtime, collection, policy, sortSpec, withOf, composeWhere, withId, runFind, countWhere, timed } = ctx;
+  const { runtime, collection, policy, sortSpec, listSortSpec, withOf, composeWhere, withId, runFind, countWhere, timed } = ctx;
 
   const checked = (params: QueryParams<TDoc>) => {
     policy.checkFilter(params.filter);
@@ -44,7 +44,7 @@ export function readMethods<TDoc extends Document>(ctx: RepoContext<TDoc>) {
       const perPage = clampPageSize(params.perPage, runtime.defaultPerPage, runtime.maxPerPage);
       policy.checkPage({ page, perPage });
       const where = composeWhere(params.filter, params.withDeleted);
-      const rows = (limit: number) => runFind(where, { sort: sortSpec(params.sort), columns: params.columns, limit, skip: (page - 1) * perPage });
+      const rows = (limit: number) => runFind(where, { sort: listSortSpec(params.sort), columns: params.columns, limit, skip: (page - 1) * perPage });
 
       // `withTotal: false`: one read of perPage + 1 rows, no count.
       if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
@@ -58,7 +58,7 @@ export function readMethods<TDoc extends Document>(ctx: RepoContext<TDoc>) {
       checked(params);
       policy.checkPage({ offset });
       const rows = await runFind(composeWhere(params.filter, params.withDeleted), {
-        sort: sortSpec(params.sort),
+        sort: listSortSpec(params.sort),
         columns: params.columns,
         limit: limit + 1,
         skip: offset,

@@ -5,7 +5,7 @@
  */
 import type { SkippedCondition } from "../../src/types";
 
-import { cloneRows, driverCalls, useRows } from "./fixtures";
+import { cloneRows, driverCalls, driverOrder, useRows } from "./fixtures";
 import { CASES, type AdapterName, type Call, type CaseOptions, type ConformanceCase, type SkipExpectation } from "./cases";
 
 export interface HarnessResult {
@@ -23,6 +23,7 @@ export interface Harness {
 export interface After {
   remaining: string[];
   calls: string[];
+  order: string[];
 }
 
 export type Outcome =
@@ -51,7 +52,7 @@ export async function execute(harness: Harness, call: Call, options: CaseOptions
   const skipped: SkippedCondition[] = [];
   const onSkipped = (info: SkippedCondition) => skipped.push(info);
   useRows(options.rows);
-  const after = (): After => ({ remaining: cloneRows().map(row => row.name), calls: [...driverCalls] });
+  const after = (): After => ({ remaining: cloneRows().map(row => row.name), calls: [...driverCalls], order: [...driverOrder] });
   try {
     if (call.method === "findCursor" && call.walk) return { kind: "ok", result: await walk(harness, call, options, onSkipped), skipped };
     let result = await harness.run(call, options, onSkipped);
@@ -92,6 +93,9 @@ export function compare(testCase: ConformanceCase, outcome: Outcome, adapter?: A
   if (expect.calls) {
     const got = [...(outcome.calls ?? [])].sort();
     if (canonical(got) !== canonical([...expect.calls].sort())) problems.push(`driver calls ${canonical(outcome.calls)}, expected ${canonical(expect.calls)}`);
+  }
+  if (expect.order && canonical(outcome.order) !== canonical(expect.order)) {
+    problems.push(`driver sort ${canonical(outcome.order)}, expected ${canonical(expect.order)}`);
   }
   if (expect.error) {
     if (outcome.kind !== "error") return [`expected QueryKitError ${skipLabel(expect.error)}, got rows`, ...problems];

@@ -13,7 +13,7 @@ import type { Filter, FilterNode, SortItem } from "../../src/types";
 import { CASES, type ConformanceCase } from "./cases";
 import { LIMIT_CASES, LIMIT_NAMES } from "./cases-limits";
 import { ROWS } from "./fixtures";
-import { referenceFilter, referenceSort } from "./reference";
+import { referenceFilter, referenceListSort, referenceSort } from "./reference";
 
 type Row = (typeof ROWS)[number];
 
@@ -25,7 +25,7 @@ function referenceNames(testCase: ConformanceCase): string[] | undefined {
   if (expect.error || (expect.skipped?.length ?? 0) > 0) return undefined;
   // Repository options (scope / timestamps) are not modelled by the reference.
   if (testCase.options?.scope || testCase.options?.timestamps) return undefined;
-  const filtered = referenceFilter<Row>(ROWS, call.params.filter as Filter | undefined);
+  const filtered = referenceFilter<Row>(testCase.options?.rows ?? ROWS, call.params.filter as Filter | undefined);
   const names = (rows: Row[]) => rows.map(row => row.name);
   switch (call.method) {
     case "findAll":
@@ -33,11 +33,11 @@ function referenceNames(testCase: ConformanceCase): string[] | undefined {
     case "findList": {
       const perPage = Math.min(call.params.perPage ?? 20, 200);
       const start = ((call.params.page ?? 1) - 1) * perPage;
-      return names(referenceSort(filtered, call.params.sort).slice(start, start + perPage));
+      return names(referenceListSort(filtered, call.params.sort).slice(start, start + perPage));
     }
     case "findInfinite": {
       const offset = call.params.offset ?? 0;
-      return names(referenceSort(filtered, call.params.sort).slice(offset, offset + (call.params.limit ?? 20)));
+      return names(referenceListSort(filtered, call.params.sort).slice(offset, offset + (call.params.limit ?? 20)));
     }
     case "findCursor": {
       const limit = call.params.limit ?? 20;

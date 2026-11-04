@@ -13,6 +13,7 @@ import { GROUP_CASES, OPERATOR_CASES } from "./cases-filter";
 import { DIAGNOSTIC_CASES, PAGINATION_CASES, PROJECTION_CASES, SORT_CASES } from "./cases-query";
 import { POLICY_CASES } from "./cases-policy";
 import { CURSOR_CASES } from "./cases-cursor";
+import { LIST_ORDER_CASES } from "./cases-list-order";
 import { MUTATION_CASES } from "./cases-mutation";
 import { SCOPE_CASES } from "./cases-scope";
 
@@ -23,6 +24,7 @@ export const CASES: readonly ConformanceCase[] = [
   ...GROUP_CASES,
   ...SORT_CASES,
   ...PAGINATION_CASES,
+  ...LIST_ORDER_CASES,
   ...DIAGNOSTIC_CASES,
   ...PROJECTION_CASES,
   ...POLICY_CASES,

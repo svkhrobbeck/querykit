@@ -83,6 +83,13 @@ export function referenceFilter<T extends Row>(rows: readonly T[], filter: Filte
   return rows.filter(row => evaluate(row) === true);
 }
 
+/** `referenceSort` of a paged read: the primary key is the last key, in the first key's direction. */
+export function referenceListSort<T extends Row>(rows: readonly T[], sort: Sort | undefined): T[] {
+  const items = (sort ?? []).filter(item => item && item.key);
+  if (items.length === 0 || items.some(item => item.key === "id")) return referenceSort(rows, sort);
+  return referenceSort(rows, [...items, { key: "id", direction: items[0]!.direction ?? "asc" }]);
+}
+
 /**
  * Rows in sort order (NULL first on asc, last on desc — MongoDB's order, on every adapter; ties keep fixture order). Items
  * without a `key` (`null`, `{}`) are dropped, as every adapter does.

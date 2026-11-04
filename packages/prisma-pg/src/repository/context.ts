@@ -12,7 +12,7 @@ import {
 } from "@querykitjs/core/internal";
 
 import type { FieldCondition, Filter, Id, QueryParams, RepositoryOptions, Sort } from "../types";
-import { buildOrderBy } from "../internal/order-by";
+import { buildListOrderBy, buildOrderBy } from "../internal/order-by";
 import type { AnyExecutor } from "../internal/executor";
 import { readModelMeta, resolveField, type ModelMeta } from "../internal/fields";
 import { buildProjection, truthyKeys, type Projection, type ProjectionGuard } from "../internal/projection";
@@ -80,6 +80,8 @@ export interface RepoContext<TDelegate> {
   createdAtField: string | undefined;
   /** `orderBy` for a sort; none given ⇒ createdAt desc, else the id. */
   sortBy: (sort?: Sort) => Record<string, unknown>[];
+  /** `sortBy` of a paged read: the primary key ends the order, so pages cannot overlap. */
+  listSortBy: (sort?: Sort) => Record<string, unknown>[];
   /**
    * The client's `with`, checked against `relations` (R21): an unlisted relation,
    * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
@@ -122,6 +124,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
   const deletedAtField = resolveField(meta, runtime.timestamps?.deletedAt ?? "deletedAt");
   const createdAtField = resolveField(meta, runtime.timestamps?.createdAt ?? "createdAt");
   const sortBy = (sort?: Sort) => buildOrderBy(meta, sort as never, diag, createdAtField) as Record<string, unknown>[];
+  const listSortBy = (sort?: Sort) => buildListOrderBy(meta, sort as never, diag, createdAtField) as Record<string, unknown>[];
   const withOf = (value: unknown) => checkWith(value, config.relations, WITH_DIALECT, diag.source) as never;
 
   const scopeWhere = buildScopeWhere(meta, config);
@@ -179,6 +182,7 @@ export function buildRepoContext<TDelegate>(runtime: RepoRuntime, modelKey: stri
     deletedAtField,
     createdAtField,
     sortBy,
+    listSortBy,
     withOf,
     composeWhere,
     mutationWhere,

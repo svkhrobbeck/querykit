@@ -5,7 +5,7 @@ import type { RepoContext } from "./context";
 
 /** `findAll`, `findOne`, `findById`, `findList`, `findInfinite`, `count`, `exists`. */
 export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
-  const { runtime, delegate, projection, policy, sortBy, withOf, composeWhere, withId, countWhere } = ctx;
+  const { runtime, delegate, projection, policy, sortBy, listSortBy, withOf, composeWhere, withId, countWhere } = ctx;
 
   /** The client's filter and sort, checked before Prisma is called. */
   const checked = (params: QueryParams<TDelegate>) => {
@@ -54,7 +54,7 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
       const rows = (take: number) =>
         delegate().findMany({
           where,
-          orderBy: sortBy(params.sort as never),
+          orderBy: listSortBy(params.sort as never),
           take,
           skip: (page - 1) * perPage,
           ...projection(params.columns, withOf(params.with)),
@@ -74,7 +74,7 @@ export function readMethods<TDelegate>(ctx: RepoContext<TDelegate>) {
 
       const rows = await delegate().findMany({
         where: composeWhere(params.filter, params.withDeleted),
-        orderBy: sortBy(params.sort as never),
+        orderBy: listSortBy(params.sort as never),
         take: limit + 1,
         skip: offset,
         ...projection(params.columns, withOf(params.with)),

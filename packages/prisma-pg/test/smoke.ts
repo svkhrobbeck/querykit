@@ -19,6 +19,7 @@ import { raw } from "@querykitjs/core";
 import { createTestClient } from "./prisma/client";
 import { Prisma } from "./prisma/generated/client";
 
+import { checkListWalk, type WalkableRepository } from "../../core/test/conformance/list-walk";
 import { createRegistry, createFilters } from "../src/index";
 
 const url = process.env.DATABASE_URL;
@@ -320,6 +321,13 @@ async function main() {
       if (!result.meta.has_next) break;
     }
     check("012 cursor walk over 25 equal createdAt → 25 unique rows", tieIds.size === 25, String(tieIds.size));
+
+    // Offset pages over one repeated value: nothing repeats or goes missing.
+    const sameRepo = registry.repository("post", { filterable: { title: "*" }, sortable: ["title"] });
+    const sameFilter = [{ key: "title", operation: "=" as const, value: "same" }];
+    await sameRepo.createMany(Array.from({ length: 205 }, () => ({ title: "same", authorId: guli!.id })));
+    await checkListWalk(sameRepo as unknown as WalkableRepository, { key: "title", idKey: "id", filter: sameFilter, rows: 205, check });
+    await sameRepo.deleteWhere(sameFilter);
 
     // 013: one atomic UPDATE / DELETE reports its count; `returning` uses updateManyAndReturn
     const touched = await tiesRepo.updateWhere(tieFilter, { updatedAt: sameTime });

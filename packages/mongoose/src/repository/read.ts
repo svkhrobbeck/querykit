@@ -5,7 +5,7 @@ import type { AnyQuery, RepoContext } from "./context";
 
 /** `findAll`, `findOne`, `findById`, `findList`, `findInfinite`, `count`, `exists`. */
 export function readMethods<TDoc>(ctx: RepoContext<TDoc>) {
-  const { runtime, m, policy, projection, sortSpec, withOf, composeWhere, withId, applyPopulate, attachSession, runFind, countWhere } = ctx;
+  const { runtime, m, policy, projection, sortSpec, listSortSpec, withOf, composeWhere, withId, applyPopulate, attachSession, runFind, countWhere } = ctx;
 
   /** The client's filter and sort, checked before the query is built. */
   const checked = (params: QueryParams<TDoc>) => {
@@ -50,7 +50,7 @@ export function readMethods<TDoc>(ctx: RepoContext<TDoc>) {
       policy.checkPage({ page, perPage });
       const where = composeWhere(params.filter, params.withDeleted);
       const rows = (limit: number) =>
-        runFind(where, { sort: sortSpec(params.sort), columns: params.columns, with: withOf(params.with), limit, skip: (page - 1) * perPage });
+        runFind(where, { sort: listSortSpec(params.sort), columns: params.columns, with: withOf(params.with), limit, skip: (page - 1) * perPage });
 
       // No count — one extra row tells whether a next page exists.
       if (params.withTotal === false) return offsetPageWithoutTotal(await rows(perPage + 1), page, perPage) as OffsetResult<never>;
@@ -65,7 +65,7 @@ export function readMethods<TDoc>(ctx: RepoContext<TDoc>) {
       policy.checkPage({ offset });
 
       const rows = await runFind(composeWhere(params.filter, params.withDeleted), {
-        sort: sortSpec(params.sort),
+        sort: listSortSpec(params.sort),
         columns: params.columns,
         with: withOf(params.with),
         limit: limit + 1,

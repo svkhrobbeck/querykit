@@ -14,6 +14,7 @@ export type CasePolicy = "default" | { filterable?: Filterable; sortable?: reado
 
 export type Call =
   | { method: "findAll"; params: WireBaseParams }
+  | { method: "findOne"; params: WireBaseParams }
   | { method: "findList"; params: WireOffsetParams }
   | { method: "findInfinite"; params: WireInfiniteParams }
   | { method: "findCursor"; params: WireCursorParams; followNext?: boolean; walk?: "forward" | "forward-back" }
@@ -61,6 +62,8 @@ export interface Expectation {
   returned?: number;
   /** Driver calls as `driverCalls` records them (a multiset) — also checked when the call throws. */
   calls?: readonly string[];
+  /** The sort the driver received, as `key:direction` in order. */
+  order?: readonly string[];
 }
 
 export interface ConformanceCase {

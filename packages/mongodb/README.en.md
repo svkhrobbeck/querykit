@@ -88,6 +88,16 @@ A client filters and sorts only by the fields the server allows, with the operat
 - `findInfinite({ limit, offset })` — infinite scroll (`has_more`, `next_offset`).
 - `findCursor({ cursorKey, limit, cursor, order, direction })` — keyset; ties on `cursorKey` are broken by `_id`, so no row is skipped or repeated; with `cursorSecret` the tokens are signed and an unsigned one is refused.
 
+### A stable order across offset pages
+
+`findList` and `findInfinite` always end the order on the primary key, in the first key's direction: `sort: [{ key: "age", direction: "desc" }]` → `age` desc, then `_id` desc. A row with an equal value cannot repeat or go missing between pages.
+
+- The primary key does not count against `maxSortFields` and need not be in `sortable`; whether a client may sort by it does not change. A sort that already holds it gets no second copy.
+- `findAll` and `findOne` keep their order: they do not page.
+- The order equals `findCursor`'s.
+- ⚠️ **Index cost.** With no compound `(col, _id)` index MongoDB sorts this order in memory; an index on `(col)` alone is not enough. On a large collection add `{ col: 1, _id: 1 }`, which serves both directions. `findCursor` needs the same index.
+- `explainFind` shows the plan of `findAll`, which has no such key.
+
 ## Relations (`with`)
 
 Not in this version: `$lookup` is not built, so any `with` is `forbidden-key` (`site: "with"`). Load related documents with a second repository call.

@@ -30,3 +30,12 @@ export function buildSort(
   }
   return spec;
 }
+
+/**
+ * `buildSort` for a paged read: `_id` ends the order, in the first key's direction, so equal
+ * values cannot repeat or skip a document between pages.
+ */
+export function buildListSort(model: AnyModel, sort?: Sort, diag?: Diagnostics, createdAt?: string): SortSpec {
+  const spec = buildSort(model, sort, diag, createdAt);
+  return "_id" in spec ? spec : { ...spec, _id: Object.values(spec)[0]! };
+}

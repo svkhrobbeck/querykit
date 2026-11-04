@@ -267,6 +267,16 @@ const p2 = await usersRepository.findCursor({ limit: 20, cursor: p1.meta.next_cu
 const back = await usersRepository.findCursor({ cursor: p2.meta.prev_cursor, direction: "backward" });
 ```
 
+### A stable order across offset pages
+
+`findList` and `findInfinite` always end the order on the primary key, in the first key's direction: `sort: [{ key: "age", direction: "desc" }]` → `age` desc, then `id` desc. A row with an equal value cannot repeat or go missing between pages.
+
+- The primary key does not count against `maxSortFields` and need not be in `sortable`; whether a client may sort by it does not change. A sort that already holds it gets no second copy.
+- `findAll` and `findOne` keep their order: they do not page.
+- A composite primary key adds every field. A table with no primary key keeps its order and raises no error.
+- On a column with no NULLs the order equals `findCursor`'s. NULLs differ: `findList` writes `asc nulls first` and `desc nulls last`, `findCursor` plain `asc` and `desc`.
+- ⚠️ **Index cost.** An index on `(col)` alone no longer serves this order directly: PostgreSQL may use an incremental sort. On a large table add an index matching the sort: `(col ASC NULLS FIRST, id ASC)` or `(col DESC NULLS LAST, id DESC)`. `findCursor` needs `(col, id)`.
+
 ### Cursor: ties and signing
 
 - The seek key is `(cursorKey, primary key)`: with a non-unique `cursorKey` (for example a shared `createdAt`) no row is skipped or repeated. When `cursorKey` is the primary key itself the seek uses that one field.

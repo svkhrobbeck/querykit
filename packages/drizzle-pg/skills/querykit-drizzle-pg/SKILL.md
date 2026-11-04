@@ -192,6 +192,7 @@ The same JSON shape as every querykit package (`@querykitjs/core`): conditions `
 
 ## Mistakes to avoid
 
+- Relying on an index on `(col)` alone for `findList` or `findInfinite`: they end the order on the primary key, so a large table needs a compound index on `(col, primary key)`. The key does not count against `maxSortFields`; `findAll` and `findOne` do not add it.
 - Giving `createRegistry` a different schema object than `drizzle(client, { schema })`: tables are matched by identity, so the repository fails with "table was not found".
 - Expecting a custom repository method to bypass `filterable`: the policy checks server filters too. Build a separate, wider repository for internal code and never hand it to a route.
 - Using `contains` / `like` on a non-text column: it is skipped as `invalid-value` (Postgres has no LIKE on a timestamp or a number).

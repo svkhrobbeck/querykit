@@ -15,8 +15,8 @@ import {
 import type { QueryLimits } from "@querykitjs/core";
 
 import type { AnyDb, FieldCondition, Filter, Id, RepositoryOptions, Sort } from "../types";
-import { buildOrderBy } from "../internal/order-by";
-import { getTableKey, isTable, resolveColumn, tableColumns } from "../internal/columns";
+import { buildListOrderBy, buildOrderBy } from "../internal/order-by";
+import { getTableKey, isTable, primaryKeyColumns, resolveColumn, tableColumns } from "../internal/columns";
 import { buildWhere } from "../internal/where";
 import { buildProjection, type Projection } from "./projection";
 
@@ -71,6 +71,8 @@ export interface RepoContext<TTable extends AnyPgTable> {
   createdAtKey: string | undefined;
   /** ORDER BY for a sort; none given ⇒ createdAt desc, else the primary key. */
   sortBy: (sort?: Sort<TTable>) => SQL[];
+  /** `sortBy` of a paged read: the primary key ends the order, so pages cannot overlap. */
+  listSortBy: (sort?: Sort<TTable>) => SQL[];
   /**
    * The client's `with`, checked against `relations` (R21): an unlisted relation,
    * column, filter field or nested relation is `forbidden-key`, `site: "with"`. A column list
@@ -121,6 +123,8 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
   const deletedAtKey = keyOf(deletedAtCol);
   const createdAtKey = keyOf(createdAtCol);
   const sortBy = (sort?: Sort<TTable>): SQL[] => buildOrderBy(table, sort, diag, createdAtCol);
+  const primaryKey = primaryKeyColumns(table);
+  const listSortBy = (sort?: Sort<TTable>): SQL[] => buildListOrderBy(table, primaryKey, sort, diag, createdAtCol);
   // drizzle's relational `where` / `orderBy` are code, not JSON: a client may only select and page.
   const withOf = (value: unknown) => checkWith(value, config.relations, WITH_DIALECT, diag.source) as never;
 
@@ -171,6 +175,7 @@ export function buildRepoContext<TTable extends AnyPgTable, TSchema extends Reco
     deletedAtKey,
     createdAtKey,
     sortBy,
+    listSortBy,
     withOf,
     projection,
     policy,

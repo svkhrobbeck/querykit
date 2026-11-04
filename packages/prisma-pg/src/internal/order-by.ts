@@ -39,3 +39,15 @@ export function buildOrderBy(
   if (createdAt) return [{ [createdAt]: "desc" }];
   return meta.idField ? [{ [meta.idField]: "desc" }] : [];
 }
+
+/**
+ * `buildOrderBy` for a paged read: the primary key ends the order, in the first key's
+ * direction, so equal values cannot repeat or skip a row between pages.
+ */
+export function buildListOrderBy(meta: ModelMeta, sort?: Sort, diag?: Diagnostics, createdAt?: string): OrderBy {
+  const orderBy = buildOrderBy(meta, sort, diag, createdAt);
+  const first = orderBy[0] && Object.values(orderBy[0])[0];
+  const direction: SortDirection = (typeof first === "object" ? first.sort : first) === "asc" ? "asc" : "desc";
+  const sorted = new Set(orderBy.flatMap(item => Object.keys(item)));
+  return [...orderBy, ...meta.primaryKey.filter(field => !sorted.has(field)).map(field => ({ [field]: direction }))];
+}

@@ -89,5 +89,24 @@ try {
 }
 check("explainFind refuses a non-mongodb repository", notRepo.includes("not a @querykitjs/mongodb repository"), notRepo);
 
+/* List order on a schema with no createdAt field: `_id` is the default sort and is not repeated. */
+{
+  const sorts: unknown[] = [];
+  const spied = {
+    collectionName: "plain",
+    find: (_filter: unknown, options: { sort?: unknown }) => (sorts.push(options.sort), { toArray: async () => [] }),
+    countDocuments: async () => 0,
+  } as unknown as typeof fakeCollection;
+  const plain = registry.repository(spied, { schema: z.object({ name: z.string() }), sortable: ["name"] });
+  await plain.findList({});
+  check("list order: no createdAt → _id once", JSON.stringify(sorts.at(-1)) === JSON.stringify({ _id: -1 }), JSON.stringify(sorts.at(-1)));
+  await plain.findInfinite({ sort: [{ key: "name", direction: "desc" }] });
+  check(
+    "list order: _id follows the first key's direction",
+    JSON.stringify(sorts.at(-1)) === JSON.stringify({ name: -1, _id: -1 }),
+    JSON.stringify(sorts.at(-1)),
+  );
+}
+
 console.log(`policy: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exitCode = 1;

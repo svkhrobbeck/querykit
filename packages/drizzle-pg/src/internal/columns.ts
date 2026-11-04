@@ -1,4 +1,4 @@
-import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
+import { getTableConfig, type AnyPgColumn, type AnyPgTable } from "drizzle-orm/pg-core";
 
 /** Whether a value looks like a Drizzle column object. */
 function isColumn(value: unknown): value is AnyPgColumn {
@@ -63,4 +63,18 @@ export function tableColumns(table: AnyPgTable): Array<[string, AnyPgColumn]> {
     if (isColumn(value)) out.push([key, value]);
   }
   return out;
+}
+
+/**
+ * The columns that identify a row: a composite `primaryKey()`, else the `.primaryKey()` column,
+ * else `id` (as `findCursor` picks it). Empty when the table has none. A composite key holds its
+ * own column objects, so they are matched by name.
+ */
+export function primaryKeyColumns(table: AnyPgTable): AnyPgColumn[] {
+  const columns = tableColumns(table).map(([key, column]) => ({ key, column }));
+  const composite = getTableConfig(table).primaryKeys[0]?.columns ?? [];
+  const named = composite.flatMap(({ name }) => columns.filter(({ column }) => column.name === name));
+  if (named.length > 0) return named.map(({ column }) => column);
+  const single = columns.find(({ column }) => column.primary) ?? columns.find(({ key }) => key === "id");
+  return single ? [single.column] : [];
 }

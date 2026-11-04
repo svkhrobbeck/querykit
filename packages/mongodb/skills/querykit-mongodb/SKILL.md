@@ -90,6 +90,7 @@ The same JSON shape as every querykit package (`@querykitjs/core`): conditions `
 
 ## Mistakes to avoid
 
+- Relying on an index on `(col)` alone for `findList` or `findInfinite`: they end the order on `_id`, so with no compound `(col, _id)` index MongoDB sorts in memory. `_id` does not count against `maxSortFields`; `findAll` and `findOne` do not add it.
 - Forgetting `objectId` for a reference field such as `shop_id` — a 24-hex string then never matches the stored `ObjectId`.
 - Expecting a numeric `id` to match: MongoDB ids are ObjectIds, so `{ key: "id", value: 2 }` is `invalid-value`.
 - Opening `contains` / `endsWith` on a large collection — they cannot use an index.
