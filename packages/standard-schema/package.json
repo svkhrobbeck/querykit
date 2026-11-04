@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/standard-schema",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Standard Schema v1 validators for the querykit request contract (filters, sort, pagination) — for valibot, arktype or Effect projects, Hono sValidator and tRPC. No validator library needed.",
   "type": "module",
   "author": {

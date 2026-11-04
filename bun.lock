@@ -27,7 +27,7 @@
     },
     "packages/class-validator": {
       "name": "@querykitjs/class-validator",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -47,11 +47,11 @@
     },
     "packages/core": {
       "name": "@querykitjs/core",
-      "version": "2.0.0",
+      "version": "2.1.0",
     },
     "packages/drizzle-pg": {
       "name": "@querykitjs/drizzle-pg",
-      "version": "4.0.0",
+      "version": "4.0.1",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -65,7 +65,7 @@
     },
     "packages/mongodb": {
       "name": "@querykitjs/mongodb",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -81,7 +81,7 @@
     },
     "packages/mongoose": {
       "name": "@querykitjs/mongoose",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -95,7 +95,7 @@
     },
     "packages/prisma-pg": {
       "name": "@querykitjs/prisma-pg",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -112,7 +112,7 @@
     },
     "packages/standard-schema": {
       "name": "@querykitjs/standard-schema",
-      "version": "0.0.0",
+      "version": "1.0.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -125,7 +125,7 @@
     },
     "packages/tanstack-query": {
       "name": "@querykitjs/tanstack-query",
-      "version": "0.0.0",
+      "version": "1.0.0",
       "devDependencies": {
         "@querykitjs/web": "workspace:*",
         "@tanstack/query-core": "5.104.5",
@@ -140,7 +140,7 @@
     },
     "packages/web": {
       "name": "@querykitjs/web",
-      "version": "4.0.0",
+      "version": "4.1.0",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },
@@ -181,7 +181,7 @@
     },
     "packages/zod": {
       "name": "@querykitjs/zod",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "dependencies": {
         "@querykitjs/core": "workspace:*",
       },

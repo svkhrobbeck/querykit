@@ -1,5 +1,13 @@
 # @querykitjs/zod
 
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies [7a9c0f8]
+- Updated dependencies [0f5bd25]
+  - @querykitjs/core@2.1.0
+
 ## 3.0.0
 
 ### Major Changes

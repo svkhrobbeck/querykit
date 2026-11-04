@@ -1,5 +1,21 @@
 # @querykitjs/web
 
+## 4.1.0
+
+### Minor Changes
+
+- 6c06c30: New `@querykitjs/web/angular` entry: `injectListParams` (Angular Router) and `injectListParamsBase` — the same list URL state as the React and Vue versions, with `params`, `clamped` and `searchParams` as signals. A setter navigates with `router.navigate`; call it in an injection context. A plain ESM entry, no Angular package format. Optional peers: `@angular/core` and `@angular/router` ^21 || ^22, `rxjs` ^7.8.
+- 9521da2: New `@querykitjs/web/vue` entry: `useListParams` (vue-router 4 / 5) and `useListParamsBase` — the same reads, clamping and setters as the React hooks, with `params`, `clamped` and `searchParams` as computed refs. A setter navigates with `router.push({ query })`; a repeated query key is kept. Optional peers: `vue` ^3.5, `vue-router` ^4.6 || ^5.
+  
+  New `createListState(resource, { schema, url?, with? })` in `@querykitjs/web`: the framework-free list URL state (`read(searchParams)`, `actions(searchParams)` returning the next params) for Svelte, Solid or vanilla code. The React hooks now use it; their signatures and behaviour are unchanged.
+- bb94dfa: `createRegistry({ adapter: "mongodb" })` is typed for `@querykitjs/mongodb`. That backend loads no relations, so `with` is a compile-time error for this adapter (the server would answer `forbidden-key`); load relations with a second request. Runtime payloads are unchanged.
+
+### Patch Changes
+
+- Updated dependencies [7a9c0f8]
+- Updated dependencies [0f5bd25]
+  - @querykitjs/core@2.1.0
+
 ## 4.0.0
 
 ### Major Changes

@@ -1,6 +1,6 @@
 {
   "name": "@querykitjs/tanstack-query",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Ready TanStack Query options from a querykit resource — list, infinite and cursor queries with keys, fetch, meta parsing and page params. One code for React, Vue, Solid and Svelte Query.",
   "type": "module",
   "author": {
